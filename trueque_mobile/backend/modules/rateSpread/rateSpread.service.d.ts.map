@@ -1,0 +1,1 @@
+{"version":3,"file":"rateSpread.service.d.ts","sourceRoot":"","sources":["rateSpread.service.ts"],"names":[],"mappings":"AAGA,qBACa,iBAAiB;IAC5B,oBAAoB,CAAC,aAAa,EAAE,MAAM,EAAE,eAAe,EAAE,MAAM,GAAG;QACpE,OAAO,EAAE,MAAM,CAAC;QAChB,OAAO,EAAE,MAAM,CAAC;QAChB,MAAM,EAAE,MAAM,CAAC;QACf,YAAY,EAAE,MAAM,CAAC;KACtB;IA4BD,OAAO,CAAC,aAAa;CAOtB"}

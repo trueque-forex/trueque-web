@@ -1,0 +1,31 @@
+name: trueque_mobile
+description: A peer-to-peer remittance app
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^0.13.6
+  uuid: ^3.0.7
+  flutter_localizations:
+    sdk: flutter
+  intl: 0.20.2
+  local_auth: ^2.1.6
+  shared_preferences: ^2.2.2
+  flutter_secure_storage: ^9.0.0
+
+
+dev_dependencies:
+  flutter_gen: any
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+
+  
