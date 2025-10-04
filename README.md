@@ -1,26 +1,15 @@
-# Trueque Backend
+# Trueque Web
 
-This repository contains the backend logic for Trueque, a transparent and fair remittance platform.
-
-## Overview
-
-Trueque empowers users with instant, audit-grade remittance flows. This backend handles:
-
-- Corridor-specific compliance
-- Fee attribution and fairness guarantees
-- Sender/receiver UX logic
-- Audit schema validation
+Frontend interface for the Trueque protocol—designed for instant, transparent, and fair remittance across global corridors.
 
 ## Features
 
+- Audit-grade fallback UX
+- Sender/receiver dignity guarantees
+- SLA breach detection and fee attribution
 - Modular architecture for reproducibility
-- Fallback UX for SLA breaches
-- CLI audit parsers and test harnesses
-- CI integration for protocol validation
 
 ## Getting Started
-
-To run locally:
 
 ```bash
 npm install

@@ -1,0 +1,10 @@
+{
+  "transaction_id": "TX-20251004-001",
+  "timestamp": "2025-10-04T21:42:00Z",
+  "corridor": "MX-USD",
+  "sla_breach": true,
+  "fee_exceeded": true,
+  "fallback_triggered": true,
+  "user_dignity_preserved": true,
+  "notes": "Dual breach fallback triggered. UX preserved dignity. Fee logic respected."
+}
