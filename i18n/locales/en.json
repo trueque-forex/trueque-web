@@ -1,0 +1,32 @@
+{
+  "fx": {
+    "title": "FX Integrity Breakdown",
+    "marketRate": "Market Rate",
+    "sendRate": "Send Rate (Bid)",
+    "receiveRate": "Receive Rate (Ask)",
+    "effectiveRate": "Your Effective Rate",
+    "footer": "You always see your rate, your fees, and the real market anchor.",
+    "simpleTitle": "Your Rate and Cost",
+    "simpleFooter": "You see your rate, your cost, and nothing else. No surprises." 
+ },
+  "fee": {
+    "title": "Your Fee Share",
+    "trueque": "Trueque Fee",
+    "transmitter": "Transmitter Fee",
+    "delivery": "Delivery Premium",
+    "total": "Total",
+    "deliveryChoice": "Delivery Speed"
+  },
+  "delivery": {
+    "instant": "Instant (1hr)",
+    "sameDay": "Same-day (6hr)",
+    "nextDay": "Next-day (24hr)",
+    "batch": "Batch (48hr+)"
+  }
+  "match": {
+    "confirmed": "Match Confirmed",
+    "message": "Your funds are matched and processing. Below is your FX integrity       breakdown:",
+    "simplify": "Simplify View",
+    "details": "Show Details"
+  }
+}

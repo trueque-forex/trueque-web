@@ -1,0 +1,37 @@
+{
+  "pt": [
+    "loginTitle",
+    "emailLabel",
+    "passwordLabel",
+    "loginButton",
+    "biometricButton",
+    "kycError",
+    "loginError",
+    "biometricError",
+    "currencyTitle",
+    "exchangeTitle",
+    "exchangeRateLabel",
+    "feeLabel",
+    "receiveAmountLabel",
+    "confirmExchangeButton",
+    "enterAmountLabel"
+  ],
+
+  "pt_BR": [
+    "loginTitle",
+    "emailLabel",
+    "passwordLabel",
+    "loginButton",
+    "biometricButton",
+    "kycError",
+    "loginError",
+    "biometricError",
+    "currencyTitle",
+    "exchangeTitle",
+    "exchangeRateLabel",
+    "feeLabel",
+    "receiveAmountLabel",
+    "confirmExchangeButton",
+    "enterAmountLabel"
+  ]
+}
