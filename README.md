@@ -1,25 +1,43 @@
-## 🔁 Reproducibility Summary
+# 🌐 Trueque Web
 
-This release (`v0.2-fallback-ci`) validates Trueque’s fallback UX, audit schema, and sender/receiver dignity logic across breach scenarios.
-
-### ✅ Included:
-- Fallback UX simulation with override acknowledgment
-- Corridor selector with fee and SLA preview
-- Audit log preview per corridor (via `audit_log.json`)
-- CI-verified test harness for SLA breach and fee threshold
-- Modular landing page scaffold (`LandingPage.tsx`)
-- Reproducibility badge in footer
-
-### 🧪 Test Harness:
-Run `npm test` to validate:
-- SLA breach triggers fallback
-- Fee threshold logic per corridor
-- Audit log output matches schema
-
-### 🌐 Deployment:
-Live at [trueque.vercel.app](https://trueque.vercel.app) *(example—replace with your actual URL)*  
-CI badge: ![CI](https://img.shields.io/github/actions/workflow/status/your-org/trueque/ci.yml)
+**Instant, transparent, and fair remittance—built for reproducibility and dignity.**
 
 ---
 
-Built with clarity, empathy, and audit-grade transparency.
+## 🚀 Live Demo
+
+[![Vercel Deploy](https://vercel.com/button)](https://trueque-web.vercel.app)
+
+---
+
+## 📦 Tech Stack
+
+- **Frontend**: React + Vite
+- **Build Tool**: Rollup
+- **Testing**: Vitest
+- **Deployment**: Vercel
+- **Config**: `vite.config.js` with `@vitejs/plugin-react`
+
+---
+
+## 🧪 Audit-Grade Features
+
+- ✅ Modular fallback UX with breach scenario coverage
+- ✅ Corridor-specific remittance logic
+- ✅ Audit preview with corridor filtering
+- ✅ Reproducible test harness for backend flows
+
+---
+
+## 🛠 Setup Instructions
+
+```bash
+# Clone the repo
+git clone https://github.com/trueque-forex/trueque-web.git
+cd trueque-web
+
+# Install dependencies
+npm install
+
+# Start dev server
+npm run dev
