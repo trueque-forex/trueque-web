@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { MatchEngine } from './MatchEngine.ts';
+import { match } from './MatchEngine';
 
 describe('MatchEngine', () => {
   it('matches senders to recipients', () => {
-    const result = MatchEngine.match();
+    const result = match();
     expect(result).toBeDefined();
+    expect(result.sender.id).toBe('A');
+    expect(result.receiver.id).toBe('B');
   });
 });

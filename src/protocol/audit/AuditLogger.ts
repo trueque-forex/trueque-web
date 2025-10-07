@@ -1,22 +1,12 @@
-export type AuditEntry = {
+export type MatchAuditEntry = {
+  senderId: string;
+  receiverId: string;
+  corridor: string;
   timestamp: number;
-  corridorId: string;
-  breachFlags: string[];
-  fallbackUsed: boolean;
-  feeAttribution: {
-    feeAmount: number;
-    slaSeconds: number;
-    bufferSeconds: number;
-    fallbackTriggered: boolean;
-  };
-  userDignityPreserved: boolean;
-  notes?: string;
 };
 
-export function logAuditEntry(entry: AuditEntry): void {
-  console.log('[Audit]', JSON.stringify(entry, null, 2));
-}
-
-export function exportAuditLog(entries: AuditEntry[]): string {
-  return entries.map(e => JSON.stringify(e)).join('\n');
+export function logMatchAudit(entry: MatchAuditEntry): boolean {
+  // In production, this would write to a database or audit log file
+  console.log('📘 Match Audit Entry:', entry);
+  return true;
 }
