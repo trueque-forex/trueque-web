@@ -1,7 +1,0 @@
-{
-  "routes": [
-    { "src": "/api/health", "dest": "api/health.ts" },
-    { "src": "/api/audit", "dest": "api/audit.ts" },
-    { "src": "/api/fallback", "dest": "api/fallback.ts" }
-  ]
-}
