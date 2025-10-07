@@ -1,7 +1,7 @@
 {
   "routes": [
-    { "src": "/api/health", "dest": "backend/routes/health.ts" },
-    { "src": "/api/audit", "dest": "backend/routes/audit.ts" },
-    { "src": "/api/fallback", "dest": "backend/routes/fallback.ts" }
+    { "src": "/api/health", "dest": "api/health.ts" },
+    { "src": "/api/audit", "dest": "api/audit.ts" },
+    { "src": "/api/fallback", "dest": "api/fallback.ts" }
   ]
 }
