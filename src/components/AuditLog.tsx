@@ -1,27 +1,29 @@
-// src/components/AuditLog.tsx
-
-import React from 'react';
+import React from 'react'
 
 type AuditEntry = {
-  id: string;
-  corridor: string;
-  executionModel: 'OM' | 'TBM';
-  senderCountry: string;
-  receiverCountry: string;
-  senderBeneficiary: string;
-  receiverBeneficiary: string;
-  timestamp: string;
-};
+  id: string
+  corridor: string
+  executionModel: 'OM' | 'TBM'
+  senderCountry: string
+  receiverCountry: string
+  senderBeneficiary: string
+  receiverBeneficiary: string
+  timestamp: string
+}
 
 type AuditLogProps = {
-  entries: AuditEntry[];
-  filterCorridor?: string;
-};
+  entries: AuditEntry[]
+  filterCorridor?: string
+  debug?: boolean
+  onEntryClick?: (entry: AuditEntry) => void
+}
 
-export default function AuditLog({ entries, filterCorridor }: AuditLogProps) {
+export default function AuditLog({ entries, filterCorridor, debug = false, onEntryClick }: AuditLogProps) {
   const filtered = filterCorridor
     ? entries.filter(e => e.corridor === filterCorridor)
-    : entries;
+    : entries
+
+  if (debug) console.log('Filtered audit entries:', filtered)
 
   return (
     <section className="mt-8">
@@ -42,7 +44,12 @@ export default function AuditLog({ entries, filterCorridor }: AuditLogProps) {
           <tbody>
             {filtered.map(entry => (
               <tr key={entry.id} className="border-t">
-                <td className="p-2">{entry.timestamp}</td>
+                <td
+                  className="p-2 cursor-pointer hover:underline"
+                  onClick={() => onEntryClick?.(entry)}
+                >
+                  {new Date(entry.timestamp).toLocaleString()}
+                </td>
                 <td className="p-2">{entry.corridor}</td>
                 <td className="p-2">{entry.executionModel}</td>
                 <td className="p-2">
@@ -60,5 +67,5 @@ export default function AuditLog({ entries, filterCorridor }: AuditLogProps) {
         All transfers are domestic. Trueque does not touch funds. No money crosses borders.
       </div>
     </section>
-  );
+  )
 }

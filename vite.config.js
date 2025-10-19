@@ -1,9 +1,17 @@
-const { defineConfig } = require('vite');
-const react = require('@vitejs/plugin-react');
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
-module.exports = defineConfig({
+export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: 'dist', // Vercel will auto-detect this
+  },
   server: {
-    port: 3000
-  }
-});
+    port: 3000,
+    strictPort: true,
+    proxy: {
+      // Only used during local development
+      '/api': 'http://localhost:3000',
+    },
+  },
+})

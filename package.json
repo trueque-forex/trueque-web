@@ -2,27 +2,34 @@
   "name": "trueque-web",
   "version": "0.0.0",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "typecheck": "tsc --noEmit",
+    "ci:test": "ts-node scripts/ping-test.ts",
+    "migrate:check": "ts-node scripts/validate-env.ts",
+    "migrate:local": "npm run migrate:check && psql \"$DATABASE_URL\" -f ./migrations/20251017_0002_create_kyc_submissions_and_audit.sql",
+    "migrate:rollback": "psql \"$DATABASE_URL\" -f ./migrations/20251017_0002_create_kyc_submissions_and_audit.down.sql",
+    "kyc:status": "curl -s -H \"Authorization: Bearer $TOKEN\" http://localhost:3000/api/kyc/status | jq"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@aws-sdk/client-s3": "^3.913.0",
+    "next": "^15.5.4",
+    "pg": "^8.16.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "vite": "^7.1.7"
   },
   "devDependencies": {
+    "@types/react": "19.2.2",
     "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.0",
     "rollup": "^3.29.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.2.2",
     "vitest": "^3.2.4"
-  },
-  "engines": {
-    "node": "22.11.1"
-  },
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest run"
   }
 }

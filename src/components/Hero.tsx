@@ -1,7 +1,6 @@
-// src/components/Hero.tsx
-
-import React from 'react';
-import Link from 'next/link';
+import React from 'react'
+import Link from 'next/link'
+import CorridorSelector from '@/components/CorridorSelector'
 
 export default function Hero() {
   return (
@@ -12,11 +11,14 @@ export default function Hero() {
       <p className="text-lg text-gray-600 mb-8">
         Trueque empowers senders and receivers with instant matching, audit-grade fairness, and corridor-specific clarity.
       </p>
+      <div className="mb-8">
+        <CorridorSelector />
+      </div>
       <Link href="/send">
         <a className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg shadow hover:bg-blue-700 transition">
           Get Started
         </a>
       </Link>
     </section>
-  );
+  )
 }

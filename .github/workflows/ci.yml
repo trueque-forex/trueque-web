@@ -29,3 +29,6 @@ jobs:
 
       - name: Run audit CLI parser
         run: bash ./scripts/audit-check.sh
+
+      - name: Ping /api/test
+        run: npm run ci:test

@@ -1,6 +1,4 @@
-// src/components/Footer.tsx
-
-import React from 'react';
+import React from 'react'
 
 export default function Footer() {
   return (
@@ -33,5 +31,5 @@ export default function Footer() {
         Built with ❤️ by the Trueque team. Empowering global remittance with transparency and trust.
       </div>
     </footer>
-  );
+  )
 }
