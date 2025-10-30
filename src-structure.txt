@@ -1,0 +1,194 @@
+Folder PATH listing
+Volume serial number is D4BB-8925
+C:\USERS\WERNE\TRUEQUE\TRUEQUE-WEB\SRC
+¦   App.css
+¦   App.js
+¦   App.tsx
+¦   fallback.py
+¦   index.css
+¦   main.js
+¦   main.tsx
+¦   
++---assets
+¦       react.svg
+¦       
++---components
+¦   ¦   AmountInput.tsx
+¦   ¦   AuditDashboard.tsx
+¦   ¦   AuditDashboardFilters.tsx
+¦   ¦   AuditDashboardSummary.tsx
+¦   ¦   AuditDashboardTable.tsx
+¦   ¦   AuditLog.tsx
+¦   ¦   AuditPreview.tsx
+¦   ¦   BeneficiaryRetryModal.tsx
+¦   ¦   BeneficiarySelector.tsx
+¦   ¦   ComplianceDashboard.js
+¦   ¦   ComplianceDashboard.tsx
+¦   ¦   ConfirmTransfer.tsx
+¦   ¦   CorridorSelector.tsx
+¦   ¦   CountrySelector.tsx
+¦   ¦   ExchangePreview.tsx
+¦   ¦   FallbackNotice.tsx
+¦   ¦   FallbackTester.js
+¦   ¦   FallbackTester.tsx
+¦   ¦   FallbackUXDemo.js
+¦   ¦   FallbackUXDemo.tsx
+¦   ¦   FeeBreakdown.tsx
+¦   ¦   Footer.js
+¦   ¦   Footer.tsx
+¦   ¦   GatewayBadge.js
+¦   ¦   GatewayBadge.tsx
+¦   ¦   GatewayDashboard.js
+¦   ¦   GatewayDashboard.tsx
+¦   ¦   Hero.tsx
+¦   ¦   KYCForm.tsx
+¦   ¦   KYCRetryModal.tsx
+¦   ¦   MatchPreview.tsx
+¦   ¦   Mission.tsx
+¦   ¦   MultiSenderDashboard.js
+¦   ¦   MultiSenderDashboard.tsx
+¦   ¦   Navigation.tsx
+¦   ¦   PaymentOptions.tsx
+¦   ¦   RatePreview.tsx
+¦   ¦   RecipientForm.js
+¦   ¦   RecipientForm.tsx
+¦   ¦   RecipientOnboarding.js
+¦   ¦   RecipientOnboarding.tsx
+¦   ¦   RoutingFlow.js
+¦   ¦   RoutingFlow.tsx
+¦   ¦   SelectBeneficiary.tsx
+¦   ¦   SendConfirmation.tsx
+¦   ¦   SenderDashboard.js
+¦   ¦   SenderDashboard.tsx
+¦   ¦   SendFlow.tsx
+¦   ¦   SendForm.tsx
+¦   ¦   TransactionFinalized.tsx
+¦   ¦   TransactionHistory.js
+¦   ¦   TransactionHistory.tsx
+¦   ¦   TransactionResult.js
+¦   ¦   TransactionResult.tsx
+¦   ¦   TransactionSuccess.tsx
+¦   ¦   UnifiedSenderDashboard.js
+¦   ¦   UnifiedSenderDashboard.tsx
+¦   ¦   
+¦   +---onboarding
+¦           BeneficiaryMethodHelper.tsx
+¦           RegisterUser.tsx
+¦           
++---controllers
+¦       auditPreview.controller.ts
+¦       
++---harness
+¦       AuditPreviewHarness.ts
+¦       
++---lib
+¦       MatchEngine.ts
+¦       TransmitterRegistry.ts
+¦       
++---pages
+¦   ¦   audit-dashboard.tsx
+¦   ¦   audit.tsx
+¦   ¦   corridor.tsx
+¦   ¦   Dashboard.tsx
+¦   ¦   debug-corridor.tsx
+¦   ¦   estimate.tsx
+¦   ¦   exchange.tsx
+¦   ¦   fees.tsx
+¦   ¦   Home.tsx
+¦   ¦   index.tsx
+¦   ¦   kyc.tsx
+¦   ¦   Landing.tsx
+¦   ¦   LandingPage.tsx
+¦   ¦   login.tsx
+¦   ¦   match.tsx
+¦   ¦   preview.tsx
+¦   ¦   send.ts
+¦   ¦   signin.tsx
+¦   ¦   signup.tsx
+¦   ¦   success.tsx
+¦   ¦   test-corridor.tsx
+¦   ¦   verify.tsx
+¦   ¦   
+¦   +---api
+¦   ¦   ¦   match.ts
+¦   ¦   ¦   rate.ts
+¦   ¦   ¦   refresh.ts
+¦   ¦   ¦   test.ts
+¦   ¦   ¦   
+¦   ¦   +---rate
+¦   ¦       +---[from]
+¦   ¦               [to].ts
+¦   ¦               
+¦   +---dashboard
+¦   ¦       audit.tsx
+¦   ¦       
+¦   +---scripts
+¦           ping-test.ts
+¦           
++---protocol
+¦   ¦   FeeAttribution.js
+¦   ¦   FeeAttribution.ts
+¦   ¦   ProtocolManifest.js
+¦   ¦   ProtocolManifest.ts
+¦   ¦   
+¦   +---audit
+¦   ¦       AuditLogger.js
+¦   ¦       AuditLogger.ts
+¦   ¦       AuditSchema.js
+¦   ¦       AuditSchema.ts
+¦   ¦       AuditSummary.js
+¦   ¦       AuditSummary.ts
+¦   ¦       audit_check.py
+¦   ¦       audit_log.json
+¦   ¦       LogRotator.js
+¦   ¦       LogRotator.ts
+¦   ¦       match_audit_MX-US_2025-10-04.log
+¦   ¦       
+¦   +---delivery
+¦   ¦       DeliverySimulator.js
+¦   ¦       DeliverySimulator.ts
+¦   ¦       FallbackUX.js
+¦   ¦       FallbackUX.ts
+¦   ¦       
+¦   +---matching
+¦           MatchEngine.broken.ts
+¦           MatchEngine.test.ts
+¦           MatchEngine.ts
+¦           MatchEngineCheck.ts
+¦           TestHarness.test.ts
+¦           
++---schemas
+¦       AuditPreviewSchema.ts
+¦       
++---server
+¦       New Text Document.txt
+¦       routes.ts
+¦       
++---services
+¦       auditLog.service.ts
+¦       gatewayService.js
+¦       gatewayService.ts
+¦       payoutService.js
+¦       payoutService.ts
+¦       
++---types
+¦       recipient.js
+¦       recipient.ts
+¦       transaction.js
+¦       transaction.ts
+¦       
++---utils
+¦       api.ts
+¦       formatCurrency.js
+¦       formatCurrency.ts
+¦       generateUserId.ts
+¦       validateRecipient.js
+¦       validateRecipient.ts
+¦       validation.ts
+¦       
++---__pycache__
+¦       fallback.cpython-311.pyc
+¦       
++---__tests__
+        fallback.test.ts
+        

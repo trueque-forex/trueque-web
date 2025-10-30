@@ -1,0 +1,58 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+<<<<<<< HEAD
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+=======
+    "moduleResolution": "node",
+    "module": "ESNext",
+>>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+    "lib": [
+      "DOM",
+      "ES2022"
+    ],
+    "baseUrl": "src",
+    "paths": {
+      "@/*": [
+        "*"
+      ]
+    },
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "noEmit": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+<<<<<<< HEAD
+    "isolatedModules": true
+=======
+    "isolatedModules": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "jest"
+    ]
+>>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+<<<<<<< HEAD
+    "node_modules"
+=======
+    "node_modules",
+    ".next",
+    "backend"
+>>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+  ]
+}

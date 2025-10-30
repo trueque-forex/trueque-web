@@ -1,0 +1,18 @@
+{
+  "@@locale": "en",
+  "loginTitle": "Trueque Login",
+  "emailLabel": "Email or Phone",
+  "passwordLabel": "Password",
+  "loginButton": "Login",
+  "biometricButton": "Login with Biometrics",
+  "kycError": "KYC not verified",
+  "loginError": "Login failed",
+  "biometricError": "Biometric authentication failed",
+  "currencyTitle": "Select a currency",
+  "exchangeTitle": "Currency Exchange",
+  "exchangeRateLabel": "Exchange rate",
+  "feeLabel": "Service fee",
+  "receiveAmountLabel": "You’ll receive",
+  "confirmExchangeButton": "Confirm Exchange",
+  "enterAmountLabel": "Enter amount to exchange"
+}

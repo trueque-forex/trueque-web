@@ -1,0 +1,26 @@
+{
+  "fx": {
+    "title": "Detalhamento da integridade cambial",
+    "marketRate": "Taxa de mercado",
+    "sendRate": "Taxa de envio (Compra)",
+    "receiveRate": "Taxa de recebimento (Venda)",
+    "effectiveRate": "Sua taxa efetiva",
+    "footer": "Você sempre vê sua taxa, suas tarifas e a referência real do mercado.",
+    "simpleTitle": "Sua taxa e custo",
+    "simpleFooter": "Você vê sua taxa, seu custo e nada mais. Sem surpresas."
+  },
+  "fee": {
+    "title": "Sua parte da taxa",
+    "trueque": "Taxa Trueque",
+    "transmitter": "Taxa do transmissor",
+    "delivery": "Custo de entrega",
+    "total": "Total",
+    "deliveryChoice": "Velocidade de entrega"
+  },
+  "delivery": {
+    "instant": "Instantânea (1h)",
+    "sameDay": "Mesmo dia (6h)",
+    "nextDay": "Dia seguinte (24h)",
+    "batch": "Agrupada (48h+)"
+  }
+}

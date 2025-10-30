@@ -1,0 +1,26 @@
+{
+  "fx": {
+    "title": "Desglose de integridad cambiaria",
+    "marketRate": "Tasa de mercado",
+    "sendRate": "Tasa de envío (Oferta)",
+    "receiveRate": "Tasa de recepción (Demanda)",
+    "effectiveRate": "Tu tasa efectiva",
+    "footer": "Siempre ves tu tasa, tus tarifas y el anclaje real del mercado.",
+    "simpleTitle": "Tu tasa y costo",
+    "simpleFooter": "Ves tu tasa, tu costo y nada más. Sin sorpresas."
+  },
+  "fee": {
+    "title": "Tu parte de la tarifa",
+    "trueque": "Tarifa Trueque",
+    "transmitter": "Tarifa del transmisor",
+    "delivery": "Costo de entrega",
+    "total": "Total",
+    "deliveryChoice": "Velocidad de entrega"
+  },
+  "delivery": {
+    "instant": "Instantánea (1 hora)",
+    "sameDay": "Mismo día (6 horas)",
+    "nextDay": "Día siguiente (24 horas)",
+    "batch": "Agrupada (48+ horas)"
+  }
+}

@@ -1,0 +1,15 @@
+﻿{
+  "email":"joao.teste22@trueque.dev",
+  "first_name":"João",
+  "last_name":"Teste",
+  "dob":"1999-12-31",
+  "country_of_residence":"Brazil",
+  "country_destiny":"United States",
+  "address":"Av. Victoria #22",
+  "is_test": true,
+  "beneficiary": {
+    "name": "Maria Beneficiary",
+    "type": "bank",
+    "account": "000123456789"
+  }
+}

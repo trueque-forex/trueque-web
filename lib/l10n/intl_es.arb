@@ -1,0 +1,18 @@
+{
+  "@@locale": "es",
+  "loginTitle": "Inicio de sesión Trueque",
+  "emailLabel": "Correo o Teléfono",
+  "passwordLabel": "Contraseña",
+  "loginButton": "Iniciar sesión",
+  "biometricButton": "Acceder con biometría",
+  "kycError": "KYC no verificado",
+  "loginError": "Error de inicio de sesión",
+  "biometricError": "Error de autenticación biométrica",
+  "currencyTitle": "Selecciona una moneda",
+  "exchangeTitle": "Cambio de moneda",
+  "exchangeRateLabel": "Tasa de cambio",
+  "feeLabel": "Comisión de servicio",
+  "receiveAmountLabel": "Recibirás",
+  "confirmExchangeButton": "Confirmar cambio",
+  "enterAmountLabel": "Ingresa el monto a cambiar"
+}
