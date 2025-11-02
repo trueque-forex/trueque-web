@@ -7,3 +7,7 @@ keys/
 .ssh/
 AppData/
 repo-mirror.git/
+# local secrets
+keys/
+trueque-keys-*
+trueque-keys-encrypted.zip
