@@ -1,0 +1,6 @@
+hello
+<<<<<<< HEAD
+foo
+=======
+bar
+>>>>>>> branch
