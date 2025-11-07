@@ -14,21 +14,51 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      - name: Scan for conflict markers
+        run: |
+          set -euo pipefail
+          if git grep -n --untracked -e '<<<<<<<' -e '=======' -e '>>>>>>>' >/dev/null; then
+            echo "::error::Conflict markers detected. Resolve before merging."
+            git --no-pager grep -n -e '<<<<<<<' -e '=======' -e '>>>>>>>' || true
+            exit 1
+          fi
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install pytest; fi
+
+      - name: Run tests
+        run: python -m pytest -q
 
       - name: Run fallback UX test
-        run: pytest tests/test_fallback.py
+        run: python -m pytest tests/test_fallback.py
+
+      - name: Ensure audit script is executable
+        run: chmod +x ./scripts/audit-check.sh
 
       - name: Run audit CLI parser
         run: bash ./scripts/audit-check.sh
 
-      - name: Ping /api/test
-        run: npm run ci:test
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install and run frontend CI tests
+        run: |
+          npm ci
+          npm run ci:test
