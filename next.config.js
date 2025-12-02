@@ -1,23 +1,21 @@
-// next.config.js
-<<<<<<< HEAD
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  outputFileTracingRoot: __dirname,
-  reactStrictMode: true
-}
-
-module.exports = nextConfig
-=======
-/** Temporarily allow dev server to start while we fix TypeScript errors incrementally */
-const baseConfig = {
+// Force restart 2
+module.exports = {
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
-};
-
-module.exports = {
-  ...baseConfig,
   typescript: {
     ignoreBuildErrors: true,
+    tsconfigPath: './tsconfig.json'
   },
+  eslint: {
+    ignoreDuringBuilds: true
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://127.0.0.1:8000/api/:path*'
+      }
+    ]
+  }
 };
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

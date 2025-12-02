@@ -4,7 +4,7 @@ type MatchRequest = {
   corridor: string
   amount: number
   paymentMethod: 'SPEI' | 'debit' | 'wallet'
-  deliverySpeed: 'instant' | 'same-day'
+  deliverySpeed: 'instant' | 'same-day' | 'standard'
   beneficiary: {
     country: string
     accountType: 'wallet' | 'bank'
@@ -13,16 +13,17 @@ type MatchRequest = {
 
 type MatchResponse = {
   counterparty: {
-    name: string
-    country: string
-    paymentMethod: string
-    deliverySpeed: string
-    estimatedReceive: number
-    fee: number
-    effectiveRate: number
-    costIncreasePercent: number
+    name?: string
+    country?: string
+    paymentMethod?: string
+    deliverySpeed?: string
+    estimatedReceive?: number
+    fee?: number
+    effectiveRate?: number
+    market_rate_used?: number
+    costIncreasePercent?: number
   }
-  matchStatus: 'confirmed' | 'pending'
+  matchStatus: 'confirmed' | 'pending' | 'quote'
 }
 
 export default function handler(req: NextApiRequest, res: NextApiResponse<MatchResponse>) {
@@ -30,10 +31,31 @@ export default function handler(req: NextApiRequest, res: NextApiResponse<MatchR
     return res.status(405).end()
   }
 
-  const { corridor, amount, paymentMethod, deliverySpeed, beneficiary }: MatchRequest = req.body
+  const { corridor, amount, paymentMethod, deliverySpeed }: MatchRequest = req.body
 
-  // Simulate counterparty logic
-  const marketRate = 0.411
+  // Mock Market Rates
+  const rates: Record<string, number> = {
+    'USD-MXN': 17.50,
+    'MXN-USD': 0.057,
+    'EUR-USD': 1.08,
+    'USD-EUR': 0.92,
+    'COP-USD': 0.00025,
+    'USD-COP': 4000.0
+  }
+
+  const marketRate = rates[corridor] || 1.0
+
+  // If just checking rate (amount small or specific flag), return quote
+  if (amount <= 1) {
+    return res.status(200).json({
+      counterparty: {
+        market_rate_used: marketRate,
+        effectiveRate: marketRate // Approx for quote
+      },
+      matchStatus: 'quote'
+    })
+  }
+
   const counterpartyFee = paymentMethod === 'debit' ? 2.0 : 1.5
   const estimatedReceive = amount * marketRate
   const finalReceive = estimatedReceive - counterpartyFee
@@ -42,12 +64,13 @@ export default function handler(req: NextApiRequest, res: NextApiResponse<MatchR
 
   const counterparty = {
     name: 'Carlos Méndez',
-    country: corridor.split('-')[1],
+    country: corridor.split('-')[1] || 'Unknown',
     paymentMethod,
     deliverySpeed,
     estimatedReceive: parseFloat(finalReceive.toFixed(2)),
     fee: counterpartyFee,
     effectiveRate: parseFloat(effectiveRate.toFixed(3)),
+    market_rate_used: marketRate,
     costIncreasePercent: parseFloat(costIncreasePercent.toFixed(2)),
   }
 

@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-// src/pages/api/auth/signin.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-=======
 // pages/api/auth/signin.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
@@ -29,21 +25,11 @@ function ensureDevUsers() {
   }
   return (global as any).__DEV_USERS;
 }
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-<<<<<<< HEAD
-    const { email, password } = JSON.parse(req.body || '{}');
-    if (!email || !password) return res.status(400).json({ error: 'missing_fields' });
-
-    // TODO: validate, set cookie/session
-    // Simulate approved KYC for demo purposes
-    return res.status(200).json({ kycStatus: 'approved' });
-  } catch (e: any) {
-=======
     // Debug: environment and dev-users presence
     // eslint-disable-next-line no-console
     console.log('NODE_ENV', process.env.NODE_ENV);
@@ -122,7 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return await respondWithSession(res, { ...resolvedUser, tid });
   } catch (err: any) {
     console.error('signin error', err);
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+
     return res.status(500).json({ error: 'internal_error' });
   }
 }

@@ -1,32 +1,37 @@
-import React, { useMemo, useState } from 'react'
-import { Beneficiary } from '../types'
+// src/components/PaymentOptions.tsx
+import React, { useMemo, useState } from 'react';
+import type { Beneficiary } from '../types';
+
+type FeeSet = {
+  platform?: number;
+  corridor?: number;
+  network?: number;
+  delivery?: number;
+};
+
+type PayerAccount = {
+  name: string;
+  accountType: string;
+  maskedNumber: string;
+};
 
 type Props = {
-  corridor: string
-  amount: string
-  rate: number
-  sendCurrency: string
-  receiveCurrency: string
-  fees?: {
-    platform?: number
-    corridor?: number
-    network?: number
-    delivery?: number
-  }
-  beneficiary: Beneficiary
-  payerAccount?: {
-    name: string
-    accountType: string
-    maskedNumber: string
-  }
-  onBack: () => void
+  corridor: string;
+  amount: string;
+  rate: number;
+  sendCurrency: string;
+  receiveCurrency: string;
+  fees?: FeeSet;
+  beneficiary: Beneficiary;
+  payerAccount?: PayerAccount;
+  onBack: () => void;
   onConfirm: (
     matchStatus: 'confirmed' | 'pending',
     delivery: string,
     finalReceive: number,
-    payer: { name: string; accountType: string; maskedNumber: string }
-  ) => void
-}
+    payer: PayerAccount
+  ) => void;
+};
 
 export default function PaymentOptions({
   corridor,
@@ -40,71 +45,80 @@ export default function PaymentOptions({
   onBack,
   onConfirm,
 }: Props) {
-  const [confirmed, setConfirmed] = useState(false)
-  const [useNewMethod, setUseNewMethod] = useState(false)
-  const [newAccount, setNewAccount] = useState({
+  const [confirmed, setConfirmed] = useState(false);
+  const [useNewMethod, setUseNewMethod] = useState(false);
+  const [newAccount, setNewAccount] = useState<PayerAccount>({
     name: '',
     accountType: 'bank',
     maskedNumber: '',
-  })
-  const [showTooltip, setShowTooltip] = useState(false)
+  });
+  const [showTooltip, setShowTooltip] = useState(false);
 
-  const sendAmount = parseFloat(amount)
+  const sendAmount = Number.parseFloat(amount || '0') || 0;
+
   const totalFeesUSD = useMemo(() => {
-    return (fees.platform ?? 0) + (fees.corridor ?? 0) + (fees.network ?? 0) + (fees.delivery ?? 0)
-  }, [fees])
+    return (fees.platform ?? 0) + (fees.corridor ?? 0) + (fees.network ?? 0) + (fees.delivery ?? 0);
+  }, [fees]);
 
   const finalReceive = useMemo(() => {
-    return (sendAmount - totalFeesUSD) / rate
-  }, [sendAmount, totalFeesUSD, rate])
+    return rate !== 0 ? (sendAmount - totalFeesUSD) / rate : 0;
+  }, [sendAmount, totalFeesUSD, rate]);
 
   const effectiveRate = useMemo(() => {
-    return sendAmount / finalReceive
-  }, [sendAmount, finalReceive])
+    return finalReceive !== 0 ? sendAmount / finalReceive : 0;
+  }, [sendAmount, finalReceive]);
 
   const feePercent = useMemo(() => {
-    return (totalFeesUSD / sendAmount) * 100
-  }, [totalFeesUSD, sendAmount])
+    return sendAmount !== 0 ? (totalFeesUSD / sendAmount) * 100 : 0;
+  }, [totalFeesUSD, sendAmount]);
 
-  const deliverySpeed = 'instant'
+  const deliverySpeed = 'instant';
 
   const handleConfirm = () => {
-    if (confirmed) {
-      const payer = useNewMethod ? newAccount : payerAccount!
-      onConfirm('confirmed', deliverySpeed, finalReceive, payer)
-    }
-  }
+    if (!confirmed) return;
+    const payer = useNewMethod ? newAccount : (payerAccount as PayerAccount);
+    if (!payer) return;
+    onConfirm('confirmed', deliverySpeed, finalReceive, payer);
+  };
+
+  const beneficiaryName = ((beneficiary as any)?.name ?? '').replace(/\s*\(.*?\)/, '') || '—';
 
   return (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold">Payment Method</h3>
 
       <div className="bg-gray-50 p-4 rounded shadow-sm space-y-2">
-        <p className="text-sm text-gray-600">📍 Corridor: <strong>{corridor}</strong></p>
-<<<<<<< HEAD
-        <p className="text-sm text-gray-600">👤 Beneficiary: <strong>{beneficiary.name.replace(/\s*\(.*?\)/, '')}</strong></p>
-=======
-        <p className="text-sm text-gray-600">👤 Beneficiary: <strong>{(beneficiary.name ?? '').replace(/\s*\(.*?\)/, '')}</strong></p>
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
-        <p className="text-sm text-gray-600">💰 Amount to Send: <strong>{sendCurrency}{sendAmount.toFixed(2)}</strong></p>
+        <p className="text-sm text-gray-600">
+          📍 Corridor: <strong>{corridor}</strong>
+        </p>
+        <p className="text-sm text-gray-600">
+          👤 Beneficiary: <strong>{beneficiaryName}</strong>
+        </p>
+        <p className="text-sm text-gray-600">
+          💰 Amount to Send: <strong>{sendCurrency}{sendAmount.toFixed(2)}</strong>
+        </p>
         <p className="text-sm text-gray-600">
           💱 Final Receive: <strong>{receiveCurrency}{finalReceive.toFixed(2)}</strong>
           <span className="text-xs italic text-gray-500 ml-2">(After fees)</span>
         </p>
         <p className="text-sm text-gray-600 relative">
-          💱 Effective Exchange Rate: <strong>1 {receiveCurrency} ≈ {effectiveRate.toFixed(2)} {sendCurrency}</strong>
+          💱 Effective Exchange Rate:{' '}
+          <strong>
+            1 {receiveCurrency} ≈ {effectiveRate.toFixed(2)} {sendCurrency}
+          </strong>
           <span
             className="ml-2 text-blue-600 cursor-pointer"
-            onClick={() => setShowTooltip(!showTooltip)}
+            onClick={() => setShowTooltip((s) => !s)}
             title="Click to explain"
+            role="button"
           >
             ℹ️
           </span>
           {showTooltip && (
             <div className="absolute bg-white border rounded shadow-md p-2 text-xs text-gray-700 mt-1 w-64 z-10">
-              This rate reflects the actual cost after fees.  
-              You’re effectively paying <strong>{effectiveRate.toFixed(2)} {sendCurrency}</strong> per <strong>1 {receiveCurrency}</strong>.  
-              The difference from the market rate represents a cost increase of <strong>{feePercent.toFixed(1)}%</strong>.
+              This rate reflects the actual cost after fees. You’re effectively paying{' '}
+              <strong>{effectiveRate.toFixed(2)} {sendCurrency}</strong> per <strong>1 {receiveCurrency}</strong>. The
+              difference from the market rate represents a cost increase of <strong>{feePercent.toFixed(1)}%</strong>.
             </div>
           )}
         </p>
@@ -118,10 +132,7 @@ export default function PaymentOptions({
             <p className="text-sm text-gray-700 ml-2">
               {payerAccount.name} — {payerAccount.accountType} ••••{payerAccount.maskedNumber}
             </p>
-            <button
-              onClick={() => setUseNewMethod(true)}
-              className="underline text-blue-600 text-sm mt-2"
-            >
+            <button onClick={() => setUseNewMethod(true)} className="underline text-blue-600 text-sm mt-2" type="button">
               Use a different payment method
             </button>
           </>
@@ -132,7 +143,7 @@ export default function PaymentOptions({
               <input
                 type="text"
                 value={newAccount.name}
-                onChange={e => setNewAccount({ ...newAccount, name: e.target.value })}
+                onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })}
                 className="mt-1 block w-full border rounded px-2 py-1"
               />
             </label>
@@ -140,7 +151,7 @@ export default function PaymentOptions({
               Account Type
               <select
                 value={newAccount.accountType}
-                onChange={e => setNewAccount({ ...newAccount, accountType: e.target.value })}
+                onChange={(e) => setNewAccount({ ...newAccount, accountType: e.target.value })}
                 className="mt-1 block w-full border rounded px-2 py-1"
               >
                 <option value="bank">Bank</option>
@@ -153,7 +164,7 @@ export default function PaymentOptions({
               <input
                 type="text"
                 value={newAccount.maskedNumber}
-                onChange={e => setNewAccount({ ...newAccount, maskedNumber: e.target.value })}
+                onChange={(e) => setNewAccount({ ...newAccount, maskedNumber: e.target.value })}
                 className="mt-1 block w-full border rounded px-2 py-1"
               />
             </label>
@@ -164,7 +175,7 @@ export default function PaymentOptions({
           <input
             type="checkbox"
             checked={confirmed}
-            onChange={e => setConfirmed(e.target.checked)}
+            onChange={(e) => setConfirmed(e.target.checked)}
             className="form-checkbox"
           />
           <span>I confirm this is my account and I authorize payment.</span>
@@ -175,6 +186,7 @@ export default function PaymentOptions({
         <button
           onClick={onBack}
           className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-100"
+          type="button"
         >
           Back
         </button>
@@ -182,14 +194,13 @@ export default function PaymentOptions({
           onClick={handleConfirm}
           disabled={!confirmed}
           className={`px-4 py-2 rounded ${
-            confirmed
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            confirmed ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
+          type="button"
         >
           Confirm & Pay
         </button>
       </div>
     </div>
-  )
+  );
 }

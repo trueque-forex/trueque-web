@@ -1,18 +1,17 @@
-<<<<<<< HEAD
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
-DATABASE_URL = "postgresql://postgres:trueque-mobile@localhost:5432/trueque_db"
-=======
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# Use environment variable or fallback to local dev DB (SQLite)
+# Note: Ensure DATABASE_URL is set in your .env file for production
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:<pw>@localhost:5432/trueque_dev"
+    "sqlite:///./trueque.db"
 )
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 
-engine = create_engine(DATABASE_URL)
+connect_args = {}
+if "sqlite" in DATABASE_URL:
+    connect_args = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

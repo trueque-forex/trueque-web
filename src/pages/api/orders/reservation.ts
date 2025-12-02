@@ -27,28 +27,35 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     return res.status(404).json({ error: 'not_found' });
   }
 
-  // Extract timestamp from reservationId if present to compute expiry
-  const tsPart = reservationId.replace(/^resv_/, '');
-  const ts = Number(tsPart) || Date.now();
+  // Hack for demo: encode params in reservationId to survive round trip without DB
+  // Format: resv_<timestamp>_<amount>_<rate>
+  const parts = reservationId.split('_');
+  const ts = Number(parts[1]) || Date.now();
+  const amount = Number(parts[2]) || 20;
+  const rate = Number(parts[3]) || 17.50;
+
   const createdAt = new Date(ts).toISOString();
-  const expiresAt = new Date(ts + 5 * 60 * 1000).toISOString(); // 5 minutes TTL
+  const expiresAt = new Date(ts + 5 * 60 * 1000).toISOString();
+  const status: Reservation['status'] = Date.now() > ts + 5 * 60 * 1000 ? 'expired' : 'active';
 
-  const now = Date.now();
-  const status: Reservation['status'] = now > ts + 5 * 60 * 1000 ? 'expired' : 'active';
+  const fees = 2.50; // Fixed mock fee
+  const recipientAmount = (amount * rate) - fees; // Simplified logic
+  const effectiveRate = recipientAmount / amount;
 
-  // Return a minimal reservation shape; adjust fields to match your real reservation model.
   const mock: Reservation = {
     reservationId,
     userId: (req as any).session?.userId ?? 'unknown_user',
-    corridor: 'BR-ES',
-    offerEUR: 20,
-    requiredSenderAmount: 20 / 0.18,
-    recipientAmount: 20,
-    totalCost: Number((20 / 0.18 + 0.52 + 0.25).toFixed(2)),
+    corridor: 'USD-MXN', // Default for demo
+    offerEUR: amount, // reusing field name
+    amount: amount, // Adding proper field
+    rate: rate,
+    fees: fees,
+    recipientAmount: parseFloat(recipientAmount.toFixed(2)),
+    effectiveRate: parseFloat(effectiveRate.toFixed(4)),
     createdAt,
     expiresAt,
     status,
-  };
+  } as any; // Cast to any to allow new fields
 
   return res.status(200).json(mock);
 }

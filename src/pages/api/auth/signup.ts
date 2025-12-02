@@ -1,21 +1,6 @@
 // src/pages/api/auth/signup.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-<<<<<<< HEAD
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).end();
-
-  try {
-    const { email, password } = JSON.parse(req.body || '{}');
-    if (!email || !password) return res.status(400).json({ error: 'missing_fields' });
-
-    // TODO: create user, set cookie/session here
-    // Simulate: new users need KYC review
-    return res.status(201).json({ needsKyc: true, kycStatus: 'pending' });
-  } catch (e: any) {
-    return res.status(500).json({ error: 'internal_error' });
-=======
-import getKnex from '../../../lib/db';
+import { getKnex } from '../../../lib/db';
 import { buildTidAndReserve } from '../../../lib/buildTID'; // corrected relative path to src/lib/buildTID.ts
 
 async function createUserTransaction(db: any, payload: any) {
@@ -33,8 +18,15 @@ async function createUserTransaction(db: any, payload: any) {
 
   return await db.transaction(async (tx: any) => {
     if (isDev) {
-      await tx('beneficiaries').where({ email }).del().catch(() => {});
-      await tx('users').where({ email }).del().catch(() => {});
+      try {
+        // Use a savepoint (nested transaction) so errors don't abort the main transaction
+        await tx.transaction(async (innerTx: any) => {
+          await innerTx('beneficiaries').where({ email }).del();
+          await innerTx('users').where({ email }).del();
+        });
+      } catch (e) {
+        console.warn('Dev user cleanup failed (ignoring):', e);
+      }
     }
 
     const toInsert = {
@@ -164,6 +156,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res
       .status(500)
       .json({ ok: false, error: 'create_failed', detail: String(err?.message || err) });
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
   }
 }

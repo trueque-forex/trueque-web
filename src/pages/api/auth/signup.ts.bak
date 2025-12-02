@@ -1,0 +1,243 @@
+// src/pages/api/auth/signup.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import getPool from '../../../lib/db';
+import { buildTidAndReserve } from '../../../lib/buildTID';
+import bcrypt from 'bcryptjs';
+
+type ApiError = { ok: false; error: string; code?: string; message?: string; suggestions?: any;[k: string]: any };
+type ApiSuccess = { ok: true; user: any };
+
+function canonicalize(v?: string) {
+  if (!v) return null;
+  return String(v).trim().toLowerCase();
+}
+function isEmailLike(v?: string) {
+  if (!v) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v).trim());
+}
+function isSimpleUsername(v?: string) {
+  if (!v) return false;
+  return /^[a-zA-Z0-9_.-]{3,30}$/.test(String(v).trim());
+}
+
+/**
+ * Build a transaction helper from the pool.
+ */
+function buildTransactionFromPool() {
+  const pool = typeof getPool === 'function' ? getPool() : getPool;
+  if (!pool) throw new Error('DB pool is not available');
+
+  if (typeof (pool as any).transaction === 'function') {
+    return (pool as any).transaction.bind(pool);
+  }
+
+  if (typeof (pool as any).connect === 'function') {
+    return async function transactionFallback<T>(cb: (client: any) => Promise<T>): Promise<T> {
+      const client = await (pool as any).connect();
+      try {
+        await client.query('BEGIN');
+        const result = await cb(client);
+        await client.query('COMMIT');
+        return result;
+      } catch (errAny) {
+        try {
+          await client.query('ROLLBACK');
+        } catch (rbErr) {
+          console.error('[TRANSACTION] rollback failed', rbErr);
+        }
+        if (errAny && typeof errAny === 'object' && !(errAny instanceof Error)) {
+          const wrapper = new Error('Transaction aborted with non-Error payload');
+          (wrapper as any).payload = errAny;
+          throw wrapper;
+        }
+        throw errAny;
+      } finally {
+        client.release();
+      }
+    };
+  }
+
+  throw new Error('No usable DB pool/transaction helper available from lib/db');
+}
+
+function buildSuggestionsForEmail(rawEmail?: string) {
+  const e = rawEmail ? String(rawEmail) : '';
+  return {
+    signInUrl: `/signin?prefill=${encodeURIComponent(e)}`,
+    forgotPasswordUrl: `/forgot-password?prefill=${encodeURIComponent(e)}`
+  };
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse<ApiSuccess | ApiError>) {
+  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+
+  const body = (() => {
+    if (!req.body) return {};
+    if (typeof req.body === 'object') return req.body;
+    try {
+      return JSON.parse(String(req.body));
+    } catch {
+      return {};
+    }
+  })();
+
+  const {
+    username: clientUsername,
+    email: clientEmail,
+    password: clientPassword,
+    first_name,
+    last_name,
+    dob,
+    country_of_residence,
+    country_destiny,
+    address,
+    beneficiary,
+    is_test,
+  } = body;
+
+  const rawUsername = clientUsername ? String(clientUsername).trim() : null;
+  const rawEmail = clientEmail ? String(clientEmail).trim() : null;
+  const usernameCanonical = canonicalize(rawUsername);
+  const emailCanonical = canonicalize(rawEmail);
+
+  if (!rawUsername) return res.status(400).json({ ok: false, error: 'username_required', code: 'USERNAME_REQUIRED', message: 'username is required' });
+  if (!rawEmail) return res.status(400).json({ ok: false, error: 'email_required', code: 'EMAIL_REQUIRED', message: 'email is required' });
+  if (!clientPassword) return res.status(400).json({ ok: false, error: 'password_required', code: 'PASSWORD_REQUIRED', message: 'password is required' });
+
+  const usernameIsEmail = isEmailLike(rawUsername);
+  if (!(usernameIsEmail || isSimpleUsername(rawUsername))) {
+    return res.status(400).json({ ok: false, error: 'invalid_username', code: 'INVALID_USERNAME', message: 'Username must be 3–30 chars or a valid email' });
+  }
+
+  const passwordHash = await bcrypt.hash(String(clientPassword), 10);
+  const isDev = process.env.NODE_ENV === 'development' ? true : Boolean(is_test);
+
+  let transactionFn;
+  try {
+    transactionFn = buildTransactionFromPool();
+  } catch (err: any) {
+    console.error('signup: cannot build transaction helper', err);
+    return res.status(500).json({ ok: false, error: 'create_failed', message: String(err?.message || err) });
+  }
+
+  try {
+    // pre-checks inside transaction
+    await transactionFn(async (client: any) => {
+      console.error('[SIGNUP] precheck start', { emailCanonical, usernameCanonical });
+      if (emailCanonical) {
+        const r = await client.query('SELECT id FROM users WHERE email_canonical = $1 LIMIT 1', [emailCanonical]);
+        if (r.rowCount) throw { status: 409, body: { ok: false, error: 'email_exists', code: 'EMAIL_EXISTS', message: 'Email already registered', suggestions: buildSuggestionsForEmail(rawEmail) } };
+        const r2 = await client.query('SELECT id FROM users WHERE username_canonical = $1 LIMIT 1', [emailCanonical]);
+        if (r2.rowCount) throw { status: 409, body: { ok: false, error: 'email_username_collision', code: 'EMAIL_USERNAME_COLLISION', message: 'This email collides with an existing username', suggestions: buildSuggestionsForEmail(rawEmail) } };
+      }
+
+      if (usernameCanonical) {
+        const r = await client.query('SELECT id FROM users WHERE username_canonical = $1 LIMIT 1', [usernameCanonical]);
+        if (r.rowCount) throw { status: 409, body: { ok: false, error: 'username_exists', code: 'USERNAME_EXISTS', message: 'Username already taken', suggestions: { signInUrl: `/signin?prefill=${encodeURIComponent(rawUsername)}` } } };
+        const r2 = await client.query('SELECT id FROM users WHERE email_canonical = $1 LIMIT 1', [usernameCanonical]);
+        if (r2.rowCount) throw { status: 409, body: { ok: false, error: 'username_email_collision', code: 'USERNAME_EMAIL_COLLISION', message: 'This value is already used as an email by another account', suggestions: buildSuggestionsForEmail(usernameCanonical) } };
+      }
+      console.error('[SIGNUP] precheck ok');
+    });
+
+    // create user
+    const user = await transactionFn(async (client: any) => {
+      console.error('[SIGNUP] create start', { rawEmail, usernameCanonical, isDev });
+
+      /*
+      if (isDev) {
+        // We must not swallow errors here because a failed query aborts the transaction.
+        // If these fail, we want to know why (e.g. table missing).
+        if (rawEmail) await client.query('DELETE FROM beneficiaries WHERE email = $1', [rawEmail]);
+        if (rawEmail) await client.query('DELETE FROM users WHERE email = $1', [rawEmail]);
+        if (usernameCanonical) await client.query('DELETE FROM users WHERE username_canonical = $1', [usernameCanonical]);
+      }
+      */
+
+      const insertSql = `
+        INSERT INTO users
+          (username, username_canonical, email, email_canonical, password_hash, first_name, last_name, dob, country_of_residence, country_destiny, address, is_test, created_at)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        RETURNING id, created_at
+      `;
+      const now = new Date();
+      const insertParams = [
+        rawUsername || null,
+        usernameCanonical || null,
+        rawEmail || null,
+        emailCanonical || null,
+        passwordHash,
+        first_name ?? null,
+        last_name ?? null,
+        dob ?? null,
+        country_of_residence ?? null,
+        country_destiny ?? null,
+        address ?? null,
+        isDev ? true : false,
+        now,
+      ];
+      const ins = await client.query(insertSql, insertParams);
+      const newId = ins.rows[0].id;
+      const createdAt = ins.rows[0].created_at ? new Date(ins.rows[0].created_at) : now;
+
+      let tid: string;
+      if (isDev) {
+        tid = `TDEV${String(newId).padStart(6, '0')}`;
+      } else {
+        const country = (country_of_residence || 'XX').toString().toUpperCase().slice(0, 2);
+        tid = await buildTidAndReserve(client, createdAt, country);
+      }
+
+      await client.query('UPDATE users SET tid = $1 WHERE id = $2', [tid, newId]);
+
+      if (beneficiary?.name && beneficiary?.account) {
+        await client.query(
+          `INSERT INTO beneficiaries (owner_id, name, metadata)
+           VALUES ($1, $2, json_build_object('account_type', $3, 'account_identifier', $4, 'email', $5))`,
+          [newId, beneficiary.name, beneficiary.type || 'bank', beneficiary.account, rawEmail]
+        );
+      }
+
+      const sel = await client.query(
+        `SELECT id, username, username_canonical, email, email_canonical, first_name, last_name, tid, created_at, country_of_residence
+         FROM users WHERE id = $1 LIMIT 1`,
+        [newId]
+      );
+      console.error('[SIGNUP] create complete', { newId });
+      return sel.rows[0];
+    });
+
+    console.error('[SIGNUP] returning created user', { id: user?.id });
+    return res.status(201).json({ ok: true, user });
+  } catch (errAny: any) {
+    if (errAny && errAny.payload) {
+      const payload = errAny.payload;
+      if (payload && typeof payload === 'object' && 'status' in payload && 'body' in payload) {
+        return res.status(payload.status).json(payload.body);
+      }
+    }
+
+    if (errAny && typeof errAny === 'object' && 'status' in errAny && 'body' in errAny) {
+      return res.status(errAny.status).json(errAny.body);
+    }
+
+    if (errAny && errAny.code === '23505') {
+      const constraint = String(errAny.constraint || '').toLowerCase();
+      const suggestions = buildSuggestionsForEmail(rawEmail);
+      if (constraint.includes('username')) return res.status(409).json({ ok: false, error: 'username_exists', code: 'USERNAME_EXISTS', message: 'Username already taken', suggestions });
+      if (constraint.includes('email')) return res.status(409).json({ ok: false, error: 'email_exists', code: 'EMAIL_EXISTS', message: 'Email already registered', suggestions });
+      return res.status(409).json({ ok: false, error: 'duplicate', code: 'DUPLICATE', message: 'Duplicate value', suggestions });
+    }
+
+    console.error('signup create error - full', {
+      message: errAny && errAny.message,
+      code: errAny && errAny.code,
+      constraint: errAny && errAny.constraint,
+      detail: errAny && errAny.detail,
+      stack: errAny && errAny.stack,
+      payload: errAny && errAny.payload
+    });
+
+    return res.status(500).json({ ok: false, error: 'create_failed', message: String(errAny?.message || errAny) });
+  }
+}

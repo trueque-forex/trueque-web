@@ -1,7 +1,10 @@
 // src/pages/_app.tsx
 import type { AppProps } from 'next/app';
-<<<<<<< HEAD
 import Head from 'next/head';
+import '../styles/globals.css';
+import dynamic from 'next/dynamic';
+
+const ClientMswStart = dynamic(() => import('../components/ClientMswStart'), { ssr: false });
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -11,16 +14,11 @@ export default function App({ Component, pageProps }: AppProps) {
         <meta charSet="utf-8" />
         <title>Trueque</title>
       </Head>
-      <Component {...pageProps} />
+
+      {/* Wrap the entire app so pages don't run until MSW is ready */}
+      <ClientMswStart>
+        <Component {...pageProps} />
+      </ClientMswStart>
     </>
   );
-=======
-import React from 'react';
-
-// Minimal, safe _app that avoids server-only side-effects during client builds.
-// If you need dev-only bootstrap, load it from a server-only entrypoint or
-// require it conditionally inside API routes, not here.
-export default function MyApp({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />;
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 }

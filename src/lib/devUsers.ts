@@ -6,10 +6,20 @@ export const DEV_USERS = {
     id: '00000000-0000-0000-0000-000000000001',
     email: 'test@example.com',
     full_name: 'Test User',
-    // Correct bcrypt hash for 'YourPassword123'
-    passwordHash: '$2b$12$68aSmSSlTmAxk9WLh1pPYelQ1gflAmOCxD6eIPK5Z85JMpQQmbHTK',
+    passwordHash: '$2b$12$Ox2TASo9p/JhW2qAt7JDf.ZHQQZh4Ow6ST/5TWYAQh6p/.G0Sr5cy',
     mfa_enabled: true,
     tid: '00000000-0000-0000-0000-000000000100',
+    created_at: new Date().toISOString()
+  },
+
+  'joao.teste@trueque.dev': {
+    id: '11111111-1111-1111-1111-111111111111',
+    email: 'joao.teste@trueque.dev',
+    full_name: 'Joao Teste',
+    // bcrypt hash for plaintext 'jt123456'
+    passwordHash: '$2b$12$HQC8V.RY/YXZ2HG/mL0IoeA1oP6RaUqSonBfZWQqUfsU7poVC6e2G',
+    mfa_enabled: false,
+    tid: 'TDEV000111',
     created_at: new Date().toISOString()
   }
 };

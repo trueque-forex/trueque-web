@@ -1,6 +1,16 @@
-import { jsx as _jsx } from "react/jsx-runtime";
-import { StrictMode } from 'react';
+// src/main.tsx
+import React from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './App.tsx';
-const root = createRoot(document.getElementById('root'));
-root.render(_jsx(StrictMode, { children: _jsx(App, {}) }));
+import App from './App';
+
+const container = document.getElementById('root');
+if (!container) {
+  throw new Error('Root container not found: expected an element with id "root"');
+}
+
+const root = createRoot(container);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);

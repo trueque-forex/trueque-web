@@ -37,8 +37,4 @@ const styles = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', marginTop: 8 },
   value: { fontSize: 14, color: '#333' },
   footer: { fontSize: 14, marginTop: 16, color: '#555' }
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

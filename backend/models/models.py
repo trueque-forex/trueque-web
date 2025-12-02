@@ -36,3 +36,20 @@ transactions = Table(
     Column("tx_id", String),
     Column("timestamp", DateTime, default=datetime.utcnow),
 )
+
+users = Table(
+    "users",
+    metadata,
+    Column("id", String, primary_key=True),
+    Column("trueque_id", String, unique=True, nullable=False),
+    Column("email", String, unique=True, nullable=False),
+    Column("password_hash", String),
+    Column("first_name", String),
+    Column("last_name", String),
+    Column("dob", String),
+    Column("country_of_residence", String),
+    Column("country_destiny", String),
+    Column("address", String),
+    Column("phone_number", String, unique=True, nullable=True),
+    Column("created_at", DateTime, default=datetime.utcnow),
+)

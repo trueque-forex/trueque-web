@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # trueque_mobile/backend/routes/onboarding.py
 
 import os
@@ -9,7 +8,6 @@ router = APIRouter()
 
 def read_today_audit_log(corridor_id="MX-US"):
     today = date.today().isoformat()  # YYYY-MM-DD
-=======
 import os
 import uuid
 from datetime import date, datetime
@@ -17,14 +15,13 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, validator
 from sqlalchemy import text
-from backend.init_db import SessionLocal
+from backend.database import SessionLocal
 
 router = APIRouter()
 
 
 def read_today_audit_log(corridor_id: str = "BR-US"):
     today = date.today().isoformat()
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
     filename = f"match_audit_{corridor_id}_{today}.log"
     log_path = os.path.join(os.path.dirname(__file__), "../../protocol/audit", filename)
 
@@ -44,11 +41,9 @@ def read_today_audit_log(corridor_id: str = "BR-US"):
             "entries": entries
         }
 
-<<<<<<< HEAD
 @router.get("/onboarding/audit-log")
 def get_audit_log(corridor: str = "MX-US"):
     return read_today_audit_log(corridor)
-=======
 
 @router.get("/onboarding/audit-log")
 def get_audit_log(corridor: str = "BR-US"):
@@ -99,58 +94,53 @@ def signup(payload: SignupPayload):
     """
     db = SessionLocal()
     try:
+        # Check if user exists first (SQLite-friendly)
+        existing_user_sql = text("SELECT trueque_id FROM users WHERE phone_number = :phone_number")
+        res = db.execute(existing_user_sql, {"phone_number": payload.phone})
+        row = res.fetchone()
+
+        if row:
+            # User exists
+            returned_id = row[0]
+            write_signup_log(payload.phone, returned_id, corridor=payload.corridor)
+            return JSONResponse(
+                status_code=status.HTTP_200_OK,
+                content={
+                    "status": "ok",
+                    "trueque_id": returned_id,
+                    "message": f"User with phone {payload.phone} already exists — returned existing trueque_id"
+                }
+            )
+
+        # User does not exist, insert new
         trueque_id = str(uuid.uuid4())
+        user_id = str(uuid.uuid4())
         # Placeholder email pattern so NOT NULL constraint is satisfied for phone-first flows
         placeholder_email = f"phone+{payload.phone.replace('+','')}@noemail.trueque"
-
-        upsert_sql = text("""
+        
+        insert_sql = text("""
             INSERT INTO users (id, phone_number, trueque_id, created_at, email)
-            VALUES (gen_random_uuid(), :phone_number, :trueque_id, now(), :email)
-            ON CONFLICT (phone_number)
-            DO UPDATE SET phone_number = users.phone_number
-            RETURNING trueque_id AS returned_trueque_id, (xmax = 0) AS inserted;
+            VALUES (:id, :phone_number, :trueque_id, :created_at, :email)
         """)
 
-        res = db.execute(upsert_sql, {
+        db.execute(insert_sql, {
+            "id": user_id,
             "phone_number": payload.phone,
             "trueque_id": trueque_id,
+            "created_at": datetime.utcnow(),
             "email": placeholder_email
         })
         db.commit()
 
-        row = res.fetchone()
-        if not row:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected DB response")
-
-        # Handle both RowMapping (named access) and positional tuple results
-        if hasattr(row, "keys"):
-            returned_id = row["returned_trueque_id"]
-            was_inserted = bool(row["inserted"])
-        else:
-            # Order corresponds to RETURNING trueque_id AS returned_trueque_id, (xmax = 0) AS inserted
-            returned_id = row[0]
-            was_inserted = bool(row[1])
-
-        write_signup_log(payload.phone, returned_id, corridor=payload.corridor)
-
-        if was_inserted:
-            return JSONResponse(
-                status_code=status.HTTP_201_CREATED,
-                content={
-                    "status": "ok",
-                    "trueque_id": returned_id,
-                    "message": f"User with phone {payload.phone} created"
-                }
-            )
+        write_signup_log(payload.phone, trueque_id, corridor=payload.corridor)
 
         return JSONResponse(
-            status_code=status.HTTP_200_OK,
+            status_code=status.HTTP_201_CREATED,
             content={
                 "status": "ok",
-                "trueque_id": returned_id,
-                "message": f"User with phone {payload.phone} already exists — returned existing trueque_id"
+                "trueque_id": trueque_id,
+                "message": f"User with phone {payload.phone} created"
             }
         )
     finally:
         db.close()
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

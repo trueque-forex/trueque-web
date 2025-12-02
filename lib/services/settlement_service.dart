@@ -31,4 +31,21 @@ class SettlementService {
 
     return response.statusCode == 200;
   }
+
+  static Future<String> getTransactionStatus(String transactionId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://localhost:8000/transaction/$transactionId/status'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['status'] ?? 'pending';
+      }
+      return 'pending';
+    } catch (e) {
+      return 'pending';
+    }
+  }
 }
