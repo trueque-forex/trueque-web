@@ -41,48 +41,6 @@ class ApiService {
     };
     
     if (includeAuth && _authToken != null) {
-      headers['Authorization'] = 'Bearer $_authToken';
-    }
-    
-    return headers;
-  }
-
-  static Future<Map<String, dynamic>> _handleResponse(http.Response response) async {
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      if (response.body.isEmpty) return {};
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    } else {
-      String errorMessage = 'Request failed';
-      try {
-        final errorBody = jsonDecode(response.body);
-        errorMessage = errorBody['error'] ?? errorBody['message'] ?? errorMessage;
-      } catch (e) {
-        errorMessage = response.body.isNotEmpty ? response.body : errorMessage;
-          'phone_number': phoneNumber,
-          'first_name': firstName,
-          'last_name': lastName,
-        }),
-      );
-
-      final data = await _handleResponse(response);
-      
-      if (data['token'] != null) {
-        _authToken = data['token'];
-      }
-      
-      if (data['user'] != null) {
-        _currentUser = User.fromJson(data['user']);
-      }
-      
-      return data;
-    } catch (e) {
-      throw ApiException('Signup failed: ${e.toString()}');
-    }
-  }
-
-  static Future<void> logout() async {
-    clearAuth();
-  }
 
   // ==================== User Profile ====================
 

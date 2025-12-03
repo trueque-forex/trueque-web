@@ -80,13 +80,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             : `TRQ-${Date.now()}`;
 
         // Insert new user
+        // Insert new user
         const insertQuery = `
       INSERT INTO users (
         email, email_canonical, password_hash, first_name, last_name,
-        phone, country, tid, kyc_status, created_at, is_admin
+        country_of_residence, tid, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), $10)
-      RETURNING id, email, first_name, last_name, phone, country, tid, kyc_status, created_at, is_admin
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+      RETURNING id, email, first_name, last_name, country_of_residence, tid, created_at
     `;
 
         const result = await pool.query(insertQuery, [
@@ -95,11 +96,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             passwordHash,
             firstName,
             lastName,
-            phone || null,
             country || 'CO',
-            truequeId,
-            'not_started',
-            false
+            truequeId
         ]);
 
         const newUser = result.rows[0];
@@ -116,13 +114,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             id: String(newUser.id),
             trueque_id: newUser.tid,
             email: newUser.email,
-            country: newUser.country,
+            country: newUser.country_of_residence,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            phone: newUser.phone,
-            kyc_status: newUser.kyc_status,
+            phone: null, // Not in DB yet
+            kyc_status: 'not_started', // Not in DB yet
             created_at: newUser.created_at,
-            is_admin: newUser.is_admin
+            is_admin: false // Not in DB yet
         };
 
         console.log('[MOBILE SIGNUP] Created new user:', newUser.tid);

@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         if (!pool) throw new Error('DB pool not available');
 
         const query = `
-      SELECT id, password_hash, email, tid, first_name, last_name, phone, country, kyc_status, created_at, is_admin
+      SELECT id, password_hash, email, tid, first_name, last_name, country_of_residence, created_at
       FROM users
       WHERE email_canonical = $1 OR username_canonical = $1
       LIMIT 1
@@ -71,13 +71,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             id: String(user.id),
             trueque_id: user.tid || `TRQ-${user.id}`,
             email: user.email,
-            country: user.country || 'CO',
+            country: user.country_of_residence || 'CO',
             first_name: user.first_name,
             last_name: user.last_name,
-            phone: user.phone,
-            kyc_status: user.kyc_status || 'not_started',
+            phone: null, // Not in DB yet
+            kyc_status: 'not_started', // Not in DB yet
             created_at: user.created_at,
-            is_admin: user.is_admin || false,
+            is_admin: false, // Not in DB yet
         };
 
         return res.status(200).json({
