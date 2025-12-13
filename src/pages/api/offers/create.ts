@@ -7,7 +7,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     const session = (req as any).session as { userId: string };
 
     try {
-        const { amount, rate, currencyFrom, currencyTo } = JSON.parse(req.body || '{}');
+        const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+
+        // Support both camelCase and snake_case
+        const amount = body.amount;
+        const rate = body.rate;
+        const currencyFrom = body.currencyFrom || body.currency_from;
+        const currencyTo = body.currencyTo || body.currency_to;
 
         if (!amount || Number.isNaN(Number(amount))) {
             return res.status(400).json({ error: 'invalid_amount' });

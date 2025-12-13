@@ -1,6 +1,6 @@
 // src/lib/session.ts
 import type { IncomingMessage, ServerResponse } from 'http';
-import cookie from 'cookie';
+import { serialize, parse } from 'cookie';
 import { v4 as uuidv4 } from 'uuid';
 
 const TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -12,7 +12,7 @@ const inMemoryStore: Map<string, string> =
 
 // Helpers
 function serializeCookie(name: string, value: string, maxAge: number) {
-  return cookie.serialize(name, value, {
+  return serialize(name, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -24,7 +24,7 @@ function serializeCookie(name: string, value: string, maxAge: number) {
 function parseCookieHeader(header?: string | null) {
   if (!header) return {};
   try {
-    return cookie.parse(header);
+    return parse(header);
   } catch {
     // fallback simple parse
     return header.split(';').map((p) => p.split('=')).reduce<Record<string, string>>((acc, [k, v]) => {
@@ -83,7 +83,26 @@ export async function getSessionById(sidLike?: string | null) {
 }
 
 // getSession reads cookie from IncomingMessage and returns parsed session payload or null.
+// Also supports Authorization: Bearer <token> for mobile/API clients.
 export async function getSession(req: IncomingMessage) {
+  // 1. Check for Bearer token (Mobile/API)
+  const authHeader = (req as any).headers?.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    try {
+      const jwt = require('jsonwebtoken'); // Lazy load to avoid overhead if not needed
+      const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+      const decoded = jwt.verify(token, secret);
+      return decoded;
+    } catch (err) {
+      // Invalid token, fall through to cookie check or return null?
+      // Usually if auth header is present but invalid, we should probably fail, 
+      // but returning null allows mapped handling upstream (e.g. 401).
+      return null;
+    }
+  }
+
+  // 2. Check for Cookie (Web)
   const header = (req as any).headers?.cookie;
   if (!header) return null;
   const parsed = parseCookieHeader(header);
@@ -118,7 +137,7 @@ export async function destroySession(req: IncomingMessage | null, res: ServerRes
       // clear cookie
       res.setHeader(
         'Set-Cookie',
-        cookie.serialize(COOKIE_NAME, '', {
+        serialize(COOKIE_NAME, '', {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
