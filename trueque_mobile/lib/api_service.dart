@@ -16,7 +16,7 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  static const String baseUrl = 'http://localhost:3000'; // TODO: Use environment config
+  static const String baseUrl = 'http://192.168.12.253:3000'; // LAN IP for physical device
   static String? _authToken;
   static User? _currentUser;
 
@@ -44,6 +44,30 @@ class ApiService {
       headers['Authorization'] = 'Bearer $_authToken';
     }
     return headers;
+  }
+
+  // ==================== Auth ====================
+
+  static Future<Map<String, dynamic>> login(String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/mobile/signin'),
+        headers: _getHeaders(includeAuth: false),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      final data = await _handleResponse(response);
+      if (data['token'] != null) {
+        setAuthToken(data['token']);
+        // _currentUser = User.fromJson(data['user']); // TODO: Ensure backend sends user object
+      }
+      return data;
+    } catch (e) {
+      throw ApiException('Login failed: ${e.toString()}');
+    }
   }
 
   // ==================== User Profile ====================
@@ -252,16 +276,26 @@ class ApiService {
   }
 
   static Future<Beneficiary> addBeneficiary({
-    required String truequeId,
-    String? nickname,
+    required String firstName,
+    required String lastName,
+    required String bankName,
+    required String accountNumber,
+    required String accountType,
+    String country = 'US', // Default for now
   }) async {
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/api/beneficiaries/add'),
+        Uri.parse('$baseUrl/api/beneficiaries'),
         headers: _getHeaders(),
         body: jsonEncode({
-          'trueque_id': truequeId,
-          if (nickname != null) 'nickname': nickname,
+          'method': 'bank_account',
+          'name': '$firstName $lastName',
+          'country': country,
+          'identifiers': {
+            'bank_name': bankName,
+            'account_number': accountNumber,
+            'account_type': accountType,
+          },
         }),
       );
 
