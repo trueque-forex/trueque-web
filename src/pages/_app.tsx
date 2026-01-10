@@ -3,6 +3,9 @@ import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import '../styles/globals.css';
 import dynamic from 'next/dynamic';
+import { SwapProvider } from '../context/SwapContext';
+import { AuthProvider } from '../context/AuthContext';
+
 
 const ClientMswStart = dynamic(() => import('../components/ClientMswStart'), { ssr: false });
 
@@ -15,10 +18,12 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>Trueque</title>
       </Head>
 
-      {/* Wrap the entire app so pages don't run until MSW is ready */}
-      <ClientMswStart>
-        <Component {...pageProps} />
-      </ClientMswStart>
+      {/* Wrap the entire app */}
+      <AuthProvider>
+        <SwapProvider>
+          <Component {...pageProps} />
+        </SwapProvider>
+      </AuthProvider>
     </>
   );
 }

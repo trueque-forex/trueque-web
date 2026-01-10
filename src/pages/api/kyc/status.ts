@@ -79,12 +79,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const userId = session.userId ?? session.user?.id ?? null;
-    const kycStatus =
+    const kycStatus = (
       session.kycStatus ??
       session.kyc_status ??
       session.user?.kycStatus ??
       session.user?.kyc_status ??
-      'unknown';
+      'unknown'
+    ).toUpperCase();
 
     console.log('🔐 Resolved session', { userId, kycStatus });
 
@@ -136,6 +137,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
       }
     }
+
+
 
     return res.status(200).json({
       kycStatus,

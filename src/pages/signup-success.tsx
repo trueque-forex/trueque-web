@@ -12,7 +12,7 @@ export default function SignupSuccessPage() {
         if (sessionData) {
             try {
                 const session = JSON.parse(sessionData);
-                setTruequeId(session.truequeId || '');
+                setTruequeId(session.tid || session.truequeId || '');
                 setUserName(session.firstName || 'User');
             } catch (e) {
                 console.error('Error parsing session data', e);
@@ -75,6 +75,10 @@ export default function SignupSuccessPage() {
                         <div style={{ fontSize: '24px', fontWeight: '700', color: '#2c3e50', fontFamily: 'monospace' }}>
                             {truequeId || 'Loading...'}
                         </div>
+                    </div>
+
+                    <div style={{ backgroundColor: '#fff8e1', padding: '15px', borderRadius: '8px', marginBottom: '30px', borderLeft: '4px solid #f1c40f', fontSize: '14px', color: '#7f6000', textAlign: 'left' }}>
+                        <strong>Value & Security:</strong> This unique ID allows you to receive personalized offers and serves as a high-trust key to recover your account if you check "Lost Device".
                     </div>
 
                     <button

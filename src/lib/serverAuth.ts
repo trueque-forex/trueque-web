@@ -1,19 +1,11 @@
 // src/lib/serverAuth.ts
 import type { NextApiRequest } from 'next';
 import { getSession } from './session';
+import { TruequeSession } from '../types/auth';
 
-export type Session =
-  | {
-      userId: string;
-      email?: string;
-      kycStatus?: 'none' | 'pending' | 'approved' | 'rejected';
-    }
-  | null;
-
-export async function parseSessionFromReq(req: NextApiRequest): Promise<Session> {
+export async function parseSessionFromReq(req: NextApiRequest): Promise<TruequeSession | null> {
   try {
-    const s = await getSession(req);
-    return (s as Session) ?? null;
+    return await getSession(req);
   } catch (err) {
     console.error('parseSessionFromReq error', err);
     return null;

@@ -19,3 +19,8 @@ def read_root():
 @app.get("/api/health")
 def health_check():
     return {"status": "ok"}
+
+from .routes import quotes, history, offers
+app.include_router(quotes.router)
+app.include_router(history.router)
+app.include_router(offers.router)

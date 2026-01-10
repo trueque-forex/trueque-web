@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from backend.utils.match_utils import get_market_rate
 from backend.models.match_model import MatchResponse, MatchRequest
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 router = APIRouter()
@@ -30,5 +30,5 @@ def match_advance(request: MatchRequest):
         rate_source=rate_source,
         rate_fallback=rate_fallback,
         rate_reason=rate_reason,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )

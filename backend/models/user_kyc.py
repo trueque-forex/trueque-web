@@ -2,7 +2,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from .base import Base
+from backend.database import Base
 
 class UserKYC(Base):
     __tablename__ = 'user_kyc'

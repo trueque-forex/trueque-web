@@ -31,6 +31,24 @@ export default function handler(req: NextApiRequest, res: NextApiResponse<MatchR
     return res.status(405).end()
   }
 
+  // Handle Mobile App Payload (uuid based)
+  if (req.body.uuid && req.body.counterparty_uuid) {
+    // Mock response for mobile flow
+    return res.status(200).json({
+      market_rate_used: 4000.0,
+      rate_source: 'Reuters',
+      rate_fallback: 'Mid-market',
+      timestamp: new Date().toISOString(),
+      status: 'confirmed',
+      counterparty: {
+        name: 'Carlos Méndez',
+        country: 'MX',
+        trueque_id: 'TRQ-MX-123',
+        kyc_verified: true
+      }
+    } as any);
+  }
+
   const { corridor, amount, paymentMethod, deliverySpeed }: MatchRequest = req.body
 
   // Mock Market Rates

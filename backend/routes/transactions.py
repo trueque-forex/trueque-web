@@ -1,7 +1,7 @@
 # backend/routes/transactions.py
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.transaction import Transaction
 from ..models.user_kyc import UserKYC
@@ -71,7 +71,7 @@ async def create_transaction(
         
         # Generate transaction ID
         transaction_id = generate_trueque_id(
-            datetime.utcnow(),
+            datetime.now(timezone.utc),
             currency_from[:2],
             kyc_record.transaction_count + 1
         )

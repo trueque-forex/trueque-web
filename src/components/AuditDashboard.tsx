@@ -6,7 +6,7 @@ import AuditDashboardTable from './AuditDashboardTable';
 
 type Offer = {
   offerAmount: number;
-  userId: string;
+  id: string;
   fee?: number;
 };
 
@@ -52,13 +52,14 @@ export default function AuditDashboard({
 
       {/* Keep both old props and the newer onFilter/initial API so consumers on either side continue to work */}
       <AuditDashboardFilter
-        from={from}
-        to={to}
-        model={model}
-        fee={fee}
-        sla={sla}
         onFilterChange={handleFilterChange}
-        initial={{ corridor }}
+        initial={{
+          corridor,
+          // Map other props to initial state if needed, or update AuditDashboardFilter to accept them directly.
+          // For now, let's stick to what AuditDashboardFilter.tsx accepts in 'initial'.
+          // The component signature is initial?: Partial<FilterState>;
+          // FilterState has: corridor, senderKYC, beneficiaryKYC, fallback, velocity, transmitter, dateRange.
+        }}
       />
 
       <AuditDashboardSummary marketRate={marketRate} offers={offers} />

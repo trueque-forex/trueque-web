@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Float, DateTime
-from sqlalchemy import Column, String, Float, DateTime, Text, TIMESTAMP
+from sqlalchemy import Column, String, Float, DateTime, Numeric, Integer, Text, TIMESTAMP
 from sqlalchemy.orm import declarative_base
 from datetime import datetime
 
@@ -16,7 +15,10 @@ class Transaction(Base):
     rate = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow)
     status = Column(String, default="confirmed")
-    status = Column(String, default="confirmed")
+    remittance_purpose = Column(String, nullable=True)
+    sender_ip_address = Column(String, nullable=True)
+    kyc_tier_at_execution = Column(Integer, nullable=True)
+    receiver_user_id = Column(Integer, nullable=True) # For Internal Ledger / Merchant swaps
 
 class Beneficiary(Base):
     __tablename__ = "beneficiaries"

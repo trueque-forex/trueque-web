@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -69,7 +69,7 @@ def web_signup(payload: WebSignupPayload):
             "country_of_residence": payload.country_of_residence,
             "country_destiny": payload.country_destiny,
             "address": payload.address,
-            "created_at": datetime.utcnow()
+            "created_at": datetime.now(timezone.utc)
         })
         db.commit()
 

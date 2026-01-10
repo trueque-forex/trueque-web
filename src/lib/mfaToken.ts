@@ -8,15 +8,15 @@
 
 import { v4 as uuidv4 } from 'uuid';
 
-type CreateMfaArgs = { userId: string; tid?: string; expiresInSeconds?: number };
+type CreateMfaArgs = { id: string; tid?: string; expiresInSeconds?: number };
 
 const DEFAULT_EXPIRES = 5 * 60; // 5 minutes
 
-export function createMfaPendingToken({ userId, tid, expiresInSeconds }: CreateMfaArgs): string {
+export function createMfaPendingToken({ id, tid, expiresInSeconds }: CreateMfaArgs): string {
   const token = uuidv4(); // opaque token for dev
   const expiresAt = Date.now() + 1000 * (expiresInSeconds || DEFAULT_EXPIRES);
 
-  const entry = { token, userId, tid: tid || null, createdAt: Date.now(), expiresAt };
+  const entry = { token, id, tid: tid || null, createdAt: Date.now(), expiresAt };
 
   const g: any = global;
   if (!g.__DEV_MFA_PENDING) g.__DEV_MFA_PENDING = new Map<string, any>();
@@ -25,7 +25,7 @@ export function createMfaPendingToken({ userId, tid, expiresInSeconds }: CreateM
   // For convenience in dev, also log the mapping (remove in prod)
   if (process.env.NODE_ENV === 'development') {
     // eslint-disable-next-line no-console
-    console.log('DEV MFA PENDING CREATED', { token, userId, tid, expiresAt });
+    console.log('DEV MFA PENDING CREATED', { token, id, tid, expiresAt });
   }
 
   return token;

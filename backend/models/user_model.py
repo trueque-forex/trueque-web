@@ -10,6 +10,9 @@ class User(Base):
     full_name = Column(String, nullable=True)
     country = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    kyc_tier = Column(Integer, default=0) # 0=Trust($200), 1=Std($3k), 2=Unl
+    kyc_status = Column(String, default="PENDING") # "PENDING", "APPROVED", "REJECTED"
+    user_type = Column(String, default="PEER") # "PEER", "MERCHANT"
     
 
     # 🔐 Centralized PIN logic

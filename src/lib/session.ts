@@ -8,7 +8,7 @@ const COOKIE_NAME = 'trueque_sid';
 const redisClient: any = null; // TODO: Initialize Redis client if needed
 
 const inMemoryStore: Map<string, string> =
-  global.__TRUEQUE_SESSION_STORE__ || (global.__TRUEQUE_SESSION_STORE__ = new Map<string, string>());
+  (global as any).__TRUEQUE_SESSION_STORE__ || ((global as any).__TRUEQUE_SESSION_STORE__ = new Map<string, string>());
 
 // Helpers
 function serializeCookie(name: string, value: string, maxAge: number) {
@@ -37,9 +37,13 @@ function parseCookieHeader(header?: string | null) {
 
 // Core functions
 
+import { TruequeSession } from '../types/auth';
+
+// ... imports remain the same ...
+
 // createSession: persists payload and sets cookie on the response.
 // Returns the canonical raw sid (e.g., "sess:...")
-export async function createSession(res: ServerResponse, payload: Record<string, any>) {
+export async function createSession(res: ServerResponse, payload: TruequeSession) {
   const sid = 'sess:' + uuidv4();
   const raw = JSON.stringify(payload);
 
@@ -55,14 +59,16 @@ export async function createSession(res: ServerResponse, payload: Record<string,
   }
 
   res.setHeader('Set-Cookie', serializeCookie(COOKIE_NAME, sid, TTL_SECONDS));
+  console.log('[SESSION] Created Session:', sid, 'Store Size:', inMemoryStore.size);
   return sid;
 }
 
 // getSessionById accepts either the raw sid or a cookie-like value and returns parsed payload or null.
 // If a raw header value is passed in (from cookie parsing), it will handle either raw sid or encoded sid.
-export async function getSessionById(sidLike?: string | null) {
+export async function getSessionById(sidLike?: string | null): Promise<TruequeSession | null> {
   if (!sidLike) return null;
-  const sid = String(sidLike);
+  // FIX: Decode the SID to handle URL-encoded colons (%3A) from cookies
+  const sid = decodeURIComponent(String(sidLike));
 
   // Accept both plain sid and cookie-serialized sid values.
   const candidate = sid;
@@ -70,12 +76,12 @@ export async function getSessionById(sidLike?: string | null) {
   try {
     if (redisClient) {
       const v = await redisClient.get(candidate);
-      if (v) return JSON.parse(v);
+      if (v) return JSON.parse(v) as TruequeSession;
       return null;
     } else {
       const v = inMemoryStore.get(candidate);
       if (!v) return null;
-      return JSON.parse(v);
+      return JSON.parse(v) as TruequeSession;
     }
   } catch {
     return null;
@@ -84,7 +90,7 @@ export async function getSessionById(sidLike?: string | null) {
 
 // getSession reads cookie from IncomingMessage and returns parsed session payload or null.
 // Also supports Authorization: Bearer <token> for mobile/API clients.
-export async function getSession(req: IncomingMessage) {
+export async function getSession(req: IncomingMessage): Promise<TruequeSession | null> {
   // 1. Check for Bearer token (Mobile/API)
   const authHeader = (req as any).headers?.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -92,7 +98,7 @@ export async function getSession(req: IncomingMessage) {
     try {
       const jwt = require('jsonwebtoken'); // Lazy load to avoid overhead if not needed
       const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-      const decoded = jwt.verify(token, secret);
+      const decoded = jwt.verify(token, secret) as TruequeSession;
       return decoded;
     } catch (err) {
       // Invalid token, fall through to cookie check or return null?
@@ -108,6 +114,12 @@ export async function getSession(req: IncomingMessage) {
   const parsed = parseCookieHeader(header);
   const sid = parsed[COOKIE_NAME];
   if (!sid) return null;
+
+  // DEBUG LOGGING requested by Directive
+  console.log('[SESSION] Raw Cookie SID:', sid);
+  const decoded = decodeURIComponent(sid); // Preview what getSessionById will do
+  console.log('[SESSION] Decoded SID:', decoded);
+
   return getSessionById(sid);
 }
 

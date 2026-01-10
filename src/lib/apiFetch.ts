@@ -17,6 +17,7 @@ export default async function apiFetch<T = any>(
     baseUrl?: string;
     timeoutMs?: number;
     credentials?: RequestCredentials;
+    skipAuthRedirect?: boolean;
   }
 ): Promise<{ res: Response; json: T | null }> {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
@@ -61,6 +62,17 @@ export default async function apiFetch<T = any>(
     parsedBody = text || null;
   }
 
+  if (res.status === 401) {
+    if (typeof window !== 'undefined' && !(opts as any)?.skipAuthRedirect) {
+      // SAFETY-OFF: Disable auto-redirect to prevent loops.
+      // AuthContext will handle state updates using the 401 status.
+      // localStorage.removeItem('trueque_session');
+      // sessionStorage.clear();
+      // window.location.href = '/signin?error=session_expired'; 
+      console.warn('apiFetch: 401 received. Redirect suppressed.');
+    }
+  }
+
   if (res.ok) {
     return { res, json: parsedBody as T };
   }
@@ -99,7 +111,7 @@ export default async function apiFetch<T = any>(
     // best-effort logging for local debugging
     // eslint-disable-next-line no-console
     console.error('apiFetch throwing', JSON.stringify(apiErr, null, 2));
-  } catch {}
+  } catch { }
 
   throw err;
 }

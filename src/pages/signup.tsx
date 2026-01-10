@@ -1,5 +1,5 @@
 // File: src/pages/signup.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import apiFetch from '../lib/apiFetch';
 
@@ -13,12 +13,27 @@ type SignupSuccessJson = { redirectCorridor?: string;[k: string]: any };
 type SignupErrorJson = { error?: string; code?: string; message?: string;[k: string]: any };
 type SignupResponseJson = SignupSuccessJson | SignupErrorJson | null;
 
+const COUNTRY_PHONE_CODES: Record<string, string> = {
+  'ES': '+34',
+  'PT': '+351',
+  'US': '+1',
+  'MX': '+52',
+  'GT': '+502',
+  'CO': '+57',
+  'AR': '+54',
+  'VE': '+58',
+};
+
 export default function SignupPage(): React.JSX.Element {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [rawServerDebug, setRawServerDebug] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Phone State (Mandatory)
+  const [phoneCode, setPhoneCode] = useState('+1');
+  const [phoneNumber, setPhoneNumber] = useState('');
 
   const [form, setForm] = useState({
     firstName: '',
@@ -29,8 +44,75 @@ export default function SignupPage(): React.JSX.Element {
     confirmPassword: '',
     countryOfResidence: '',
     countryDestiny: '',
-    address: ''
+    // address: '', // Deprecated in favor of split fields
+    street_address: '',
+    apartment: '',
+    city: '',
+    state_province: '',
+    postal_code: ''
   });
+
+  // Pre-fill from IP Locator & Storage
+  useEffect(() => {
+    // 0. Redirect if Already Logged In
+    const session = localStorage.getItem('trueque_session');
+    if (session) {
+      router.push('/dashboard');
+      return;
+    }
+
+    // 1. IP Locator
+    const geo = sessionStorage.getItem('user_geo');
+    if (geo) {
+      setForm(prev => ({ ...prev, countryOfResidence: geo }));
+      const codes: Record<string, string> = { 'US': '+1', 'AR': '+54', 'MX': '+52', 'BR': '+55', 'CO': '+57' };
+      if (codes[geo]) setPhoneCode(codes[geo]);
+    }
+
+    // 2. Hydrate Draft
+    const draft = sessionStorage.getItem('signupDraft');
+    if (draft) {
+      try {
+        const parsedDraft = JSON.parse(draft);
+        setForm(prev => ({ ...prev, ...parsedDraft }));
+        // Also hydrate phone number if saved separately or parsed?
+        // form uses single fields, phone is split.
+        // If draft has raw phone, we might miss splits.
+        // Assuming persistence saves exact form structure.
+      } catch { }
+    }
+  }, []);
+
+  // Save Draft on Change
+  useEffect(() => {
+    if (form.firstName || form.email) {
+      sessionStorage.setItem('signupDraft', JSON.stringify(form));
+    }
+  }, [form]);
+
+  // Sync Phone Code with Country of Residence
+  useEffect(() => {
+    if (form.countryOfResidence && COUNTRY_PHONE_CODES[form.countryOfResidence]) {
+      setPhoneCode(COUNTRY_PHONE_CODES[form.countryOfResidence]);
+    }
+  }, [form.countryOfResidence]);
+
+  // Absolute Persistence for Phone (LocalStorage)
+  useEffect(() => {
+    if (phoneNumber) {
+      localStorage.setItem('signup_phone_number', phoneNumber);
+    }
+    if (phoneCode) {
+      localStorage.setItem('signup_phone_code', phoneCode);
+    }
+  }, [phoneNumber, phoneCode]);
+
+  useEffect(() => {
+    const savedPhone = localStorage.getItem('signup_phone_number');
+    const savedCode = localStorage.getItem('signup_phone_code');
+    if (savedPhone) setPhoneNumber(savedPhone);
+    if (savedCode) setPhoneCode(savedCode);
+  }, []);
 
   const today = useMemo(() => new Date(), []);
   const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -70,11 +152,16 @@ export default function SignupPage(): React.JSX.Element {
       if (form.dob < minDob) errors.dob = 'Please enter a valid birth date';
     }
     if (!form.email) errors.email = 'Email is required';
+    if (!phoneNumber || phoneNumber.length < 8) errors.phone = 'Valid mobile number is required';
     if (!form.password) errors.password = 'Password is required';
     if (form.password !== form.confirmPassword) errors.passwordMismatch = 'Passwords do not match';
     if (!form.countryOfResidence) errors.countryOfResidence = 'Country of residence is required';
-    if (!form.countryDestiny) errors.countryDestiny = 'Destination country is required';
-    if (!form.address) errors.address = 'Address is required';
+    // if (!form.countryDestiny) errors.countryDestiny = 'Destination country is required'; // OPTIONAL NOW
+    // if (!form.address) errors.address = 'Address is required';
+    if (!form.street_address) errors.street_address = 'Street address is required';
+    if (!form.city) errors.city = 'City is required';
+    if (!form.state_province) errors.state_province = 'State/Province is required';
+    if (!form.postal_code) errors.postal_code = 'Postal Code is required';
 
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
@@ -107,10 +194,16 @@ export default function SignupPage(): React.JSX.Element {
       last_name: form.lastName.trim(),
       dob: form.dob,
       email: form.email.trim(),
+      phone: `${phoneCode} ${phoneNumber}`,
       password: form.password,
       country_of_residence: form.countryOfResidence,
       country_destiny: form.countryDestiny,
-      address: form.address ? form.address.trim() : null,
+      address: `${form.street_address} ${form.apartment || ''}, ${form.city}, ${form.state_province} ${form.postal_code}`,
+      street_address: form.street_address,
+      apartment: form.apartment,
+      city: form.city,
+      state_province: form.state_province,
+      postal_code: form.postal_code,
       username: form.email.split('@')[0], // Auto-generate username from email
       is_test: false
     };
@@ -127,19 +220,29 @@ export default function SignupPage(): React.JSX.Element {
       const parsed = (json ?? {}) as SignupResponseJson;
 
       if (res.ok) {
-        // Store user session for swap page
-        const sessionData = {
-          email: payload.email,
-          firstName: payload.first_name,
-          lastName: payload.last_name,
-          country_of_residence: payload.country_of_residence,
-          country_destiny: payload.country_destiny,
-          truequeId: parsed.trueque_id
-        };
-        localStorage.setItem('trueque_session', JSON.stringify(sessionData));
+        // Instant Session & Auto-Login
+        localStorage.setItem('trueque_session', JSON.stringify(parsed));
 
-        // Redirect to success page to show Trueque ID
-        router.replace('/signup-success');
+        // Store DRAFT for KYC pre-filling
+        const registrationDraft = {
+          dob: payload.dob,
+          street_address: payload.street_address,
+          apartment: payload.apartment,
+          city: payload.city,
+          state_province: payload.state_province,
+          postal_code: payload.postal_code,
+          country: payload.country_of_residence,
+          nationality: payload.country_of_residence,
+          fullLegalName: `${payload.first_name} ${payload.last_name}`
+        };
+        sessionStorage.setItem('registrationDraft', JSON.stringify(registrationDraft));
+
+        console.log('DEBUG: Signup Success. Waiting for cookie to settle...');
+        // Wait for Session Cookie to settle (Race Condition Fix)
+        await new Promise(r => setTimeout(r, 1500));
+
+        // Redirect directly to KYC
+        router.replace('/kyc?newUser=true');
         return;
       }
 
@@ -229,7 +332,7 @@ export default function SignupPage(): React.JSX.Element {
             Create your Trueque account
           </h1>
           <button
-            onClick={() => router.push('/welcome')}
+            onClick={() => router.push('/')}
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',
@@ -317,6 +420,35 @@ export default function SignupPage(): React.JSX.Element {
                 {fieldErrors.email && <div style={errorStyle}>{fieldErrors.email}</div>}
               </div>
 
+              {/* Mobile Phone (Mandatory) */}
+              <div>
+                <label style={labelStyle}>Mobile Phone (MFA)</label>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <select
+                    value={phoneCode}
+                    onChange={(e) => setPhoneCode(e.target.value)}
+                    style={{ ...inputStyle, width: '120px' }}
+                  >
+                    <option value="+34">🇪🇸 +34</option>
+                    <option value="+351">🇵🇹 +351</option>
+                    <option value="+1">🇺🇸 +1</option>
+                    <option value="+52">🇲🇽 +52</option>
+                    <option value="+502">🇬🇹 +502</option>
+                    <option value="+57">🇨🇴 +57</option>
+                    <option value="+54">🇦🇷 +54</option>
+                    <option value="+58">🇻🇪 +58</option>
+                  </select>
+                  <input
+                    required
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Mobile Number"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                </div>
+                {fieldErrors.phone && <div style={errorStyle}>{fieldErrors.phone}</div>}
+              </div>
+
               {/* Password Fields */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
@@ -388,17 +520,88 @@ export default function SignupPage(): React.JSX.Element {
                 </div>
               </div>
 
-              {/* Address */}
-              <div>
-                <label htmlFor="address" style={labelStyle}>Address</label>
-                <input
-                  id="address"
-                  required
-                  value={form.address}
-                  onChange={handleChange('address')}
-                  style={inputStyle}
-                />
-                {fieldErrors.address && <div style={errorStyle}>{fieldErrors.address}</div>}
+              {/* Address Split Fields */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333' }}>Residential Address</label>
+
+                {/* Street & Apt */}
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <input
+                      type="text"
+                      name="street_address"
+                      placeholder="Street Address"
+                      value={form.street_address}
+                      onChange={handleChange('street_address')}
+                      style={{
+                        width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px',
+                        border: fieldErrors.street_address ? '1px solid #e74c3c' : '1px solid #bdc3c7'
+                      }}
+                    />
+                    {fieldErrors.street_address && <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px' }}>{fieldErrors.street_address}</div>}
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="apartment"
+                      placeholder="Apt/Suite (Opt)"
+                      value={form.apartment}
+                      onChange={handleChange('apartment')}
+                      style={{
+                        width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px',
+                        border: '1px solid #bdc3c7'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* City & State */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <input
+                      type="text"
+                      name="city"
+                      placeholder="City"
+                      value={form.city}
+                      onChange={handleChange('city')}
+                      style={{
+                        width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px',
+                        border: fieldErrors.city ? '1px solid #e74c3c' : '1px solid #bdc3c7'
+                      }}
+                    />
+                    {fieldErrors.city && <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px' }}>{fieldErrors.city}</div>}
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      name="state_province"
+                      placeholder="State/Province"
+                      value={form.state_province}
+                      onChange={handleChange('state_province')}
+                      style={{
+                        width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px',
+                        border: fieldErrors.state_province ? '1px solid #e74c3c' : '1px solid #bdc3c7'
+                      }}
+                    />
+                    {fieldErrors.state_province && <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px' }}>{fieldErrors.state_province}</div>}
+                  </div>
+                </div>
+
+                {/* Zip */}
+                <div>
+                  <input
+                    type="text"
+                    name="postal_code"
+                    placeholder="Postal/Zip Code"
+                    value={form.postal_code}
+                    onChange={handleChange('postal_code')}
+                    style={{
+                      width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px',
+                      border: fieldErrors.postal_code ? '1px solid #e74c3c' : '1px solid #bdc3c7'
+                    }}
+                  />
+                  {fieldErrors.postal_code && <div style={{ color: '#e74c3c', fontSize: '12px', marginTop: '5px' }}>{fieldErrors.postal_code}</div>}
+                </div>
               </div>
 
 

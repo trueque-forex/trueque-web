@@ -2,7 +2,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 from sqlalchemy.orm import Session
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import json
 
 from ..models.user_kyc import UserKYC, Transaction
@@ -177,7 +177,7 @@ async def submit_kyc(
         kyc_record.agreed_to_screening = data.get('agreedToScreening', False)
         
         kyc_record.kyc_status = 'pending'
-        kyc_record.kyc_submitted_at = datetime.utcnow()
+        kyc_record.kyc_submitted_at = datetime.now(timezone.utc)
         
         db.commit()
         
@@ -247,7 +247,7 @@ async def update_transaction_count(
         
         kyc_record.transaction_count += 1
         kyc_record.total_transaction_value_usd += transaction_amount_usd
-        kyc_record.last_transaction_date = datetime.utcnow()
+        kyc_record.last_transaction_date = datetime.now(timezone.utc)
         
         db.commit()
         

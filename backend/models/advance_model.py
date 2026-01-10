@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Numeric
 from datetime import datetime
 from backend.models.transaction import Base  # ✅ Shared Base
 
@@ -11,13 +11,14 @@ class Advance(Base):
     country = Column(String, nullable=False)
     currency_from = Column(String, nullable=False)
     currency_to = Column(String, nullable=False)
-    amount_from = Column(Float, nullable=False)
-    amount_to = Column(Float, nullable=False)
-    amount = Column(Float, nullable=False)
-    market_rate = Column(Float, nullable=False)
+    amount_from = Column(Numeric(18, 6), nullable=False)
+    amount_to = Column(Numeric(18, 6), nullable=False)
+    amount = Column(Numeric(18, 6), nullable=False)
+    market_rate = Column(Numeric(18, 6), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)  # ✅ Timestamp for audit trail
 
 from pydantic import BaseModel
+from decimal import Decimal
 
 class AdvanceRequest(BaseModel):
     user_id: int
@@ -25,7 +26,7 @@ class AdvanceRequest(BaseModel):
     country: str
     currency_from: str
     currency_to: str
-    amount_from: float
-    amount_to: float
-    amount: float
-    market_rate: float
+    amount_from: Decimal
+    amount_to: Decimal
+    amount: Decimal
+    market_rate: Decimal

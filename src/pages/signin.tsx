@@ -56,20 +56,21 @@ export default function SignInPage(): React.JSX.Element {
       }
 
       if (body && body.mfa_required) {
-        router.push(`/mfa?mfa_token=${encodeURIComponent(body.mfa_token)}&tid=${encodeURIComponent(body.tid || '')}`);
+        router.push(`/auth/mfa?mfa_token=${encodeURIComponent(body.mfa_token)}&tid=${encodeURIComponent(body.tid || '')}`);
         return;
       }
 
       if (body && body.session) {
         // Store session data in localStorage for greeting
         localStorage.setItem('trueque_session', JSON.stringify(body.session));
+        localStorage.setItem('is_logged_in', 'true');
 
-        // Redirect to swap page instead of /app
-        router.replace('/swap');
+        // Redirect to Flow B (Amount Selection) per "Budget-First" rule
+        router.replace('/amount-selection');
         return;
       }
-      // Redirect to swap page
-      router.replace('/swap');
+      // Redirect to Flow B
+      router.replace('/beneficiary-selection');
     } catch (err: any) {
       console.error('signin unexpected error', err);
       setServerMessage(err?.message || 'Network error during sign in');
@@ -132,7 +133,13 @@ export default function SignInPage(): React.JSX.Element {
             Welcome back to Trueque
           </h1>
           <button
-            onClick={() => router.push('/welcome')}
+            onClick={() => {
+              // Logout Audit: "Back to Welcome" triggers complete clear
+              sessionStorage.clear();
+              localStorage.removeItem('token');
+              localStorage.removeItem('trueque_session');
+              router.push('/');
+            }}
             style={{
               background: 'rgba(255,255,255,0.2)',
               border: 'none',

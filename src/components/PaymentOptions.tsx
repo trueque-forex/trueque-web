@@ -31,6 +31,7 @@ type Props = {
     finalReceive: number,
     payer: PayerAccount
   ) => void;
+  availableMethods?: { id: string; name: string }[];
 };
 
 export default function PaymentOptions({
@@ -44,6 +45,7 @@ export default function PaymentOptions({
   payerAccount,
   onBack,
   onConfirm,
+  availableMethods,
 }: Props) {
   const [confirmed, setConfirmed] = useState(false);
   const [useNewMethod, setUseNewMethod] = useState(false);
@@ -154,9 +156,19 @@ export default function PaymentOptions({
                 onChange={(e) => setNewAccount({ ...newAccount, accountType: e.target.value })}
                 className="mt-1 block w-full border rounded px-2 py-1"
               >
-                <option value="bank">Bank</option>
-                <option value="wallet">Wallet</option>
-                <option value="card">Card</option>
+                {availableMethods && availableMethods.length > 0 ? (
+                  availableMethods.map((method: any) => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="bank">Bank</option>
+                    <option value="wallet">Wallet</option>
+                    <option value="card">Card</option>
+                  </>
+                )}
               </select>
             </label>
             <label className="text-sm text-gray-600 block">
@@ -193,9 +205,8 @@ export default function PaymentOptions({
         <button
           onClick={handleConfirm}
           disabled={!confirmed}
-          className={`px-4 py-2 rounded ${
-            confirmed ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-          }`}
+          className={`px-4 py-2 rounded ${confirmed ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           type="button"
         >
           Confirm & Pay

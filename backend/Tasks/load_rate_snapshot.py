@@ -17,7 +17,7 @@ def fetch_and_store_rate(base: str, target: str):
             return
 
         rate = data["rates"][target]
-        timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
         conn = sqlite3.connect("trueque.db")
         cursor = conn.cursor()

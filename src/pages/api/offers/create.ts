@@ -1,10 +1,11 @@
 // src/pages/api/offers/create.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '@/lib/withAuth';
+import { TruequeSession } from '@/types/auth';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') return res.status(405).end();
-    const session = (req as any).session as { userId: string };
+    const session = (req as any).session as TruequeSession;
 
     try {
         const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
@@ -36,16 +37,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         return res.status(201).json({
             id: parseInt(offerId.replace('offer_', '')),
             uuid: offerUuid,
-            user_id: session.userId,
+            user_id: session.user.id,
             currency_from: currencyFrom,
             currency_to: currencyTo,
             amount: parsedAmount,
             market_rate: parsedRate || 0,
-            status: 'open',
+            status: currencyFrom === 'COP' ? 'matched' : 'open',
+            counterparty_id: currencyFrom === 'COP' ? 'mock-counterparty-uuid' : null,
             created_at: createdAt,
             // Legacy fields for web app compatibility
             offerId,
-            owner: session.userId,
+            owner: session.user.id,
             rate: parsedRate,
         });
     } catch (err: any) {

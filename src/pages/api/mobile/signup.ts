@@ -74,7 +74,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const passwordHash = await bcrypt.hash(password, 10);
 
         // Generate Trueque ID
-        const now = new Date();
+        const now = getUtcDate();
         const truequeId = typeof generateTruequeId === 'function'
             ? generateTruequeId(now, country || 'CO', Math.floor(Math.random() * 10000))
             : `TRQ-${Date.now()}`;

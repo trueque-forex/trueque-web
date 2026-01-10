@@ -5,7 +5,7 @@ import KYCRetryModal from '@/components/KYCRetryModal';
 type AuditEntry = {
   exchangeId: string;
   sender: {
-    userId: string;
+    id: string;
     fullName: string;
     amountPaid: number;
     verifiedIdentity: boolean;
@@ -80,7 +80,7 @@ export default function AuditDashboardTable({ entries, offers, debug = false }: 
               <td className="px-2 py-1">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : ''}</td>
               <td className="px-2 py-1">
                 {!entry.sender?.verifiedIdentity && (
-                  <button className="text-blue-600 underline" onClick={() => handleRetryClick(entry.sender.userId)}>
+                  <button className="text-blue-600 underline" onClick={() => handleRetryClick(entry.sender.id)}>
                     Retry KYC
                   </button>
                 )}

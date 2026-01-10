@@ -2,10 +2,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
 import { promises as fs } from 'fs';
-import { getSession } from '@/lib/session';
+import { withAuth } from '@/lib/withAuth';
 import { saveFile } from '@/lib/storage';
 import { query } from '@/lib/server/db';
 import { v4 as uuidv4 } from 'uuid';
+import { TruequeSession } from '@/types/auth';
 
 export const config = { api: { bodyParser: false } };
 
@@ -20,14 +21,13 @@ async function parseForm(req: NextApiRequest): Promise<{ fields: Record<string, 
   });
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).end();
   }
 
-  const session = await getSession(req);
-  if (!session?.userId) return res.status(401).json({ error: 'Authentication required' });
+  const session = (req as any).session as TruequeSession;
 
   try {
     const { fields, files } = await parseForm(req);
@@ -48,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const saved = await saveFile(buffer, originalName);
 
     // create submission + file records
-    const userId = session.userId;
+    const userId = session.user.id;
     const submissionId = uuidv4();
 
     await query(
@@ -82,3 +82,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'internal_error' });
   }
 }
+
+export default withAuth(handler);

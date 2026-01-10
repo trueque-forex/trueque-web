@@ -1,831 +1,1025 @@
-// src/pages/beneficiary.tsx
 import { useRouter } from 'next/router';
 import React, { useState, useEffect } from 'react';
+import Header from '../components/Header';
+import { useSwap } from '../context/SwapContext';
+import { useRequireAuth } from '../hooks/useRequireAuth';
+import { useAuth } from '../context/AuthContext';
 
-type AccountType = 'checking' | 'savings' | 'card' | 'wallet';
-type RelationshipType = 'self' | 'family' | 'friend' | 'business' | 'other';
+// Types
+type AccountType = 'checking' | 'savings';
+type RelationshipType = 'self' | 'family' | 'friend' | 'business';
+
+// Validation RegEx patterns
+const PATTERNS = {
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  CBU: /^\d{22}$/,         // Argentina CBU: 22 digits
+  CUIT: /^\d{11}$/,        // Argentina CUIT: 11 digits
+  CLABE: /^\d{18}$/,       // Mexico CLABE: 18 digits 
+  IBAN: /^[A-Z]{2}\d{2}[A-Z\d]{4,30}$/, // Basic IBAN check
+  BIC: /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/ // SWIFT/BIC
+};
+
+// UI Components
+const InputGroup = ({ label, error, children }: { label: string, error?: string, children: React.ReactNode }) => (
+  <div style={{ marginBottom: '20px' }}>
+    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#34495e', fontSize: '14px' }}>
+      {label}
+    </label>
+    {children}
+    {error && <div style={{ color: '#e74c3c', fontSize: '13px', marginTop: '5px' }}>{error}</div>}
+  </div>
+);
 
 export default function BeneficiaryPage() {
+  const { user } = useAuth(); // DIRECT SOURCE OF TRUTH
+  useRequireAuth(); // Auth Guard
   const router = useRouter();
+  const { swapIntent, beneficiary: contextForm, setBeneficiary, savedBeneficiaries, setEditingIndex, editingIndex, saveCurrentBeneficiary } = useSwap();
 
-  // Get swap context from query params
-  const { from, to, amountIntent, expectedReceive, rate, timeFrame } = router.query;
+  // 1. Query Params (Fallback)
+  const { amountIntent } = router.query;
 
-  // User info
-  const [userName, setUserName] = useState('User');
-  const [existingBeneficiary, setExistingBeneficiary] = useState<any>(null);
-
-  // Form state
-  const [useSelf, setUseSelf] = useState(false);
-  const [showAccountNumber, setShowAccountNumber] = useState(false);
-  const [form, setForm] = useState({
-    // Personal Information
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    relationship: 'self' as RelationshipType,
-
-    // Banking Information
-    accountType: 'checking' as AccountType,
-    bankName: '',
-    branchCode: '',
-    routingNumber: '',
-    accountNumber: '',
-    accountNumberConfirm: '',
-
-    // Tax & Legal Information
-    taxId: '',
-    taxIdType: 'SSN' as 'SSN' | 'ITIN' | 'EIN' | 'Foreign',
-
-    // Address Information
-    street: '',
-    street2: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: ''
-  });
-
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // 2. State for Wizard Flow
+  const [viewMode, setViewMode] = useState<'selection' | 'form'>('form'); // Default to Form
+  const [step, setStep] = useState<1 | 2>(1); // Step 1: Personal, Step 2: Banking
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [targetBeneficiaryId, setTargetBeneficiaryId] = useState<string | null>(null); // For PUT updates
 
-  // Fetch user and beneficiary info on mount
+  // Phone State (Harmonized with Signup)
+  const [phoneCode, setPhoneCode] = useState('+54'); // Default to AR/Source
+  const [phoneNumber, setPhoneNumber] = useState('');
+
+  // 3. Sandbox Logic - DISABLED here to allow flow to proceed to Review
+  // We will enforce the limit at the "Confirm" step in ReviewPage.
+  /*
   useEffect(() => {
-    const sessionData = localStorage.getItem('trueque_session');
-    if (sessionData) {
-      try {
-        const session = JSON.parse(sessionData);
-        setUserName(session.firstName || session.email?.split('@')[0] || 'User');
+    if (!user) return;
+    const rawUser = user as any;
+    const kyc = (rawUser.kycStatus || rawUser.kyc_status || 'PENDING').toUpperCase();
 
-        // Check if beneficiary exists
-        if (session.beneficiary) {
-          setExistingBeneficiary(session.beneficiary);
-          // Pre-fill form with existing beneficiary
-          setForm(prev => ({
-            ...prev,
-            firstName: session.beneficiary.name?.split(' ')[0] || '',
-            lastName: session.beneficiary.name?.split(' ').slice(1).join(' ') || '',
-            accountType: session.beneficiary.type || 'checking',
-            accountNumber: session.beneficiary.account || ''
+    if (kyc === 'PENDING' && router.isReady) {
+       // ... (Logic moved/delegated to Review)
+    }
+  }, [user, amountIntent, swapIntent, router.isReady, router]);
+  */
+
+  // Hydrate Phone State from Context on Mount
+  useEffect(() => {
+    if (contextForm.personal.phone && !phoneNumber) {
+      // Simple heuristic split if saved as "+54 9 11..."
+      const parts = contextForm.personal.phone.split(' ');
+      if (parts.length >= 2) {
+        setPhoneCode(parts[0]);
+        setPhoneNumber(parts.slice(1).join(''));
+      } else {
+        setPhoneNumber(contextForm.personal.phone);
+      }
+    }
+  }, [contextForm.personal.phone]);
+
+  // NEW: Hydrate from Query Param (Flow B: Selection -> Verification)
+  useEffect(() => {
+    if (router.isReady && router.query.beneficiaryId && savedBeneficiaries.length > 0) {
+      // Find by ID
+      const bId = router.query.beneficiaryId as string;
+      const index = savedBeneficiaries.findIndex((b: any) => b.id === bId);
+      if (index >= 0) {
+        setBeneficiary(savedBeneficiaries[index]);
+        setEditingIndex(index);
+      }
+    }
+  }, [router.isReady, router.query.beneficiaryId, savedBeneficiaries]);
+
+  // 4. User & Country Context
+  const getDestinationCountry = () => {
+    const to = swapIntent?.currencyTo || 'ARS';
+    if (to === 'ARS') return 'AR';
+    if (to === 'EUR') return 'EU';
+    if (to === 'MXN') return 'MX';
+    if (to === 'BRL') return 'BR';
+    if (to === 'USD') return 'US';
+    return 'US'; // Default
+  };
+  const destCountry = getDestinationCountry();
+  const isVoucher = swapIntent?.offerType === 'retail_voucher' || swapIntent?.offerType === 'merchant_voucher';
+
+  // 6. Fetch Corridor Config
+  const [corridorOptions, setCorridorOptions] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/config/corridors')
+      .then(res => res.json())
+      .then(data => {
+        if (destCountry && data[destCountry]) {
+          const fees = data[destCountry].outbound_fees;
+          const opts = Object.keys(fees).map(key => ({
+            id: key,
+            label: fees[key].display_name || key.replace('_', ' ').toUpperCase()
           }));
+          setCorridorOptions(opts);
         }
-      } catch (e) {
-        console.error('Error loading session:', e);
+      })
+      .catch(err => console.error("Failed to load corridor options", err));
+  }, [destCountry]);
+
+  // Fallback if config fails
+  const displayOptions = corridorOptions.length > 0
+    ? corridorOptions
+    : [
+      { id: 'bank_rtp', label: 'Bank (RTP)' },
+      { id: 'card_push', label: 'Debit Card' },
+      { id: 'wallet', label: 'Wallet' }
+    ];
+
+  // Initialize View Mode logic
+  useEffect(() => {
+    // If explicit ID in URL, we are editing -> Form
+    if (router.query.beneficiaryId) {
+      setViewMode('form');
+      return;
+    }
+
+    // Otherwise, if we have saved beneficiaries, prefer selection
+    // Ignoring contextForm.personal.firstName allows us to show the list even if a draft exists
+    if (savedBeneficiaries.length > 0) {
+      setViewMode('selection');
+    }
+  }, [savedBeneficiaries.length, router.query.beneficiaryId]); // Explicit dependencies
+
+  // Handlers
+  const handlePersonalChange = (field: keyof typeof contextForm.personal, value: string) => {
+    setBeneficiary(prev => ({
+      ...prev,
+      personal: { ...prev.personal, [field]: value }
+    }));
+    if (errors[field]) {
+      setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+    }
+  };
+
+  const handleBankingChange = (field: keyof typeof contextForm.banking, value: string) => {
+    setBeneficiary(prev => ({
+      ...prev,
+      banking: { ...prev.banking, [field]: value }
+    }));
+    if (errors[field]) {
+      setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
+    }
+  };
+
+  // Sync Phone on Change
+  useEffect(() => {
+    const combined = `${phoneCode} ${phoneNumber}`;
+    if (combined !== contextForm.personal.phone && phoneNumber) {
+      setBeneficiary(prev => ({
+        ...prev,
+        personal: { ...prev.personal, phone: combined }
+      }));
+    }
+  }, [phoneCode, phoneNumber]);
+
+  // MARIA'S DATA FIX: Aggressive Persistence for "Active Draft"
+  useEffect(() => {
+    // Wherever contextForm changes (user types), save to localStorage
+    if (contextForm.personal.firstName || contextForm.personal.lastName) {
+      // ANCHOR MARIA: Save Full Object using requested key
+      localStorage.setItem('selected_beneficiary', JSON.stringify(contextForm));
+    }
+  }, [contextForm]);
+
+  // Load from Persistence on Mount (if Context is Empty)
+  useEffect(() => {
+    if (!contextForm.personal.firstName && !contextForm.personal.lastName) {
+      const saved = localStorage.getItem('selected_beneficiary');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setBeneficiary(parsed);
+          // Also hydrate local phone state
+          const phone = parsed.personal?.phone || '';
+          if (phone) {
+            const parts = phone.split(' ');
+            if (parts.length >= 2) {
+              setPhoneCode(parts[0]);
+              setPhoneNumber(parts.slice(1).join(''));
+            } else {
+              setPhoneNumber(phone);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to hydrate active beneficiary", e);
+        }
       }
     }
   }, []);
 
-  // Auto-fill user's own information if "I am the beneficiary" is checked
-  useEffect(() => {
-    if (useSelf) {
-      const sessionData = localStorage.getItem('trueque_session');
-      if (sessionData) {
-        try {
-          const session = JSON.parse(sessionData);
-          setForm(prev => ({
-            ...prev,
-            firstName: session.firstName || '',
-            lastName: session.lastName || '',
-            email: session.email || '',
-            relationship: 'self',
-            street: session.address || '',
-            country: session.country_of_residence || ''
-          }));
-        } catch (e) {
-          console.error('Error loading user data:', e);
-        }
-      }
-    }
-  }, [useSelf]);
 
-  const handleChange = (k: keyof typeof form) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    setForm(prev => ({ ...prev, [k]: e.target.value }));
-    setFieldErrors(prev => ({ ...prev, [k]: '' }));
+  // Validation Logic
+  const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+    if (!contextForm.personal.firstName) newErrors.firstName = 'First Name is required';
+    if (!contextForm.personal.lastName) newErrors.lastName = 'Last Name is required';
+    if (!contextForm.personal.email || !PATTERNS.EMAIL.test(contextForm.personal.email)) newErrors.email = 'Valid email is required';
+    if (!phoneNumber || phoneNumber.length < 5) newErrors.phone = 'Phone number is required';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const validate = () => {
-    const errors: Record<string, string> = {};
+  const validateStep2 = () => {
+    const newErrors: Record<string, string> = {};
+    const { deliveryMethod, bankName, cbu, iban, clabe, accountNumber, cardNumber, cardExpiry, walletProvider, walletId } = contextForm.banking;
 
-    // Personal Information
-    if (!form.firstName.trim()) errors.firstName = 'First name is required';
-    if (!form.lastName.trim()) errors.lastName = 'Last name is required';
-    if (!form.email.trim()) errors.email = 'Email is required';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-      errors.email = 'Invalid email format';
+    if (isVoucher) {
+      // For Vouchers, we only need the Phone Number from Step 1.
+      // We can add a specific check here if we want to validte checking "Whatsapp enabled" checkbox or similar.
+      // For now, rely on Step 1 phone validation.
+      return true;
     }
-    if (!form.phone.trim()) errors.phone = 'Phone number is required';
 
-    // Banking Information
-    if (!form.bankName.trim()) errors.bankName = 'Bank name is required';
-    if (form.accountType === 'checking' || form.accountType === 'savings') {
-      if (!form.routingNumber.trim()) {
-        errors.routingNumber = 'Routing/branch code is required';
+    if (deliveryMethod === 'bank_rtp') {
+      if (!bankName) newErrors.bankName = 'Bank Name is required';
+      if (destCountry === 'AR') {
+        const cleanCBU = cbu.replace(/\D/g, '');
+        if (!PATTERNS.CBU.test(cleanCBU)) newErrors.cbu = 'CBU must be exactly 22 digits';
+      } else if (destCountry === 'EU') {
+        const cleanIBAN = (iban || '').replace(/\s/g, '').toUpperCase();
+        if (!PATTERNS.IBAN.test(cleanIBAN)) newErrors.iban = 'Invalid IBAN format';
+      } else if (destCountry === 'MX') {
+        const cleanCLABE = (clabe || '').replace(/\D/g, '');
+        if (!PATTERNS.CLABE.test(cleanCLABE)) newErrors.clabe = 'CLABE must be exactly 18 digits';
+      } else {
+        if (!accountNumber) newErrors.accountNumber = 'Account Number required';
       }
     }
-    if (!form.accountNumber.trim()) errors.accountNumber = 'Account number is required';
-    if (form.accountNumber !== form.accountNumberConfirm) {
-      errors.accountNumberConfirm = 'Account numbers do not match';
+
+    if (deliveryMethod === 'card_push') {
+      if (!cardNumber || cardNumber.replace(/\D/g, '').length < 16)
+        newErrors.cardNumber = 'Valid 16-digit Card Number required';
+      if (!cardExpiry) newErrors.cardExpiry = 'Expiry required';
     }
 
-    // Tax Information
-    if (!form.taxId.trim()) errors.taxId = 'Tax ID is required';
+    if (deliveryMethod === 'wallet') {
+      if (!walletProvider) newErrors.walletProvider = 'Select a provider';
+      if (!walletId) newErrors.walletId = 'ID required';
+    }
 
-    // Address
-    if (!form.street.trim()) errors.street = 'Street address is required';
-    if (!form.city.trim()) errors.city = 'City is required';
-    if (!form.state.trim()) errors.state = 'State/Province is required';
-    if (!form.zipCode.trim()) errors.zipCode = 'ZIP/Postal code is required';
-    if (!form.country.trim()) errors.country = 'Country is required';
-
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const handleNext = () => {
+    if (step === 1) {
+      if (validateStep1()) setStep(2);
+    } else {
+      // Final Submit
+      if (validateStep2()) {
+        handleSubmit();
+      }
+    }
+  };
 
+  const handleSubmit = async () => {
     setLoading(true);
 
-    // Prepare beneficiary data
-    const beneficiaryData = {
-      personal: {
-        firstName: form.firstName.trim(),
-        middleName: form.middleName.trim(),
-        lastName: form.lastName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        relationship: form.relationship
-      },
-      banking: {
-        accountType: form.accountType,
-        bankName: form.bankName.trim(),
-        branchCode: form.branchCode.trim(),
-        routingNumber: form.routingNumber.trim(),
-        accountNumber: form.accountNumber.trim()
-      },
-      tax: {
-        taxId: form.taxId.trim(),
-        taxIdType: form.taxIdType
-      },
-      address: {
-        street: form.street.trim(),
-        street2: form.street2.trim(),
-        city: form.city.trim(),
-        state: form.state.trim(),
-        zipCode: form.zipCode.trim(),
-        country: form.country.trim()
-      },
-      swapContext: {
-        from,
-        to,
-        amountIntent,
-        expectedReceive,
-        rate,
-        timeFrame
-      }
-    };
+    try {
+      const { personal, banking } = contextForm;
 
-    // TODO: Save beneficiary and proceed to review/confirmation
-    console.log('Beneficiary data:', beneficiaryData);
+      // Determine Account Number based on country/method
+      let finalAccountNumber = banking.accountNumber;
+      if (destCountry === 'AR') finalAccountNumber = banking.cbu;
+      else if (destCountry === 'EU') finalAccountNumber = banking.iban;
+      else if (destCountry === 'MX') finalAccountNumber = banking.clabe;
+      else if (banking.deliveryMethod === 'card_push') finalAccountNumber = banking.cardNumber;
 
-    // Navigate to review page (to be created)
-    router.push({
-      pathname: '/review',
-      query: {
-        beneficiary: JSON.stringify(beneficiaryData)
-      }
-    });
+      const payload = {
+        name: `${personal.firstName} ${personal.lastName}`.trim(),
+        method: banking.deliveryMethod,
+        identifiers: {
+          email: personal.email,
+          phone_number: personal.phone, // "identifiers.phone_number"
+          bank_name: banking.bankName,
+          account_type: banking.accountType,
+          account_number: finalAccountNumber,
+          cbu: banking.cbu, // Pass explicitly for redundancy
+          alias: banking.alias,
+          wallet_provider: banking.walletProvider,
+          country: destCountry // Helpful for backend context
+        },
+        country: destCountry, // Top-level for API indexing
+        id: targetBeneficiaryId // Include if updating
+      };
 
-    setLoading(false);
+      // Determine Method: POST (Create) or PUT (Update/Add Method)
+      const apiMethod = targetBeneficiaryId ? 'PUT' : 'POST';
+
+      const res = await fetch('/api/beneficiaries', {
+        method: apiMethod,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Ensure session cookie is passed
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Failed to save beneficiary');
+
+      // CAPTURE ID & HANDOVER TO REVIEW
+      const savedData = await res.json();
+
+      // Merge ID and SAVED_METHODS into current state
+      // CRITICAL: We must merge 'saved_methods' from backend to ensure Switcher works locally immediatley
+      const finale = {
+        ...contextForm,
+        id: savedData.id,
+        saved_methods: savedData.saved_methods
+      };
+
+      // Update Context & Persistence
+      setBeneficiary(finale);
+      localStorage.setItem('selected_beneficiary', JSON.stringify(finale));
+
+      // UPDATE LIST CACHE IMMEDIATELY
+      // This ensures if we go back to "Selection" mode, the new rail is visible
+      saveCurrentBeneficiary();
+
+      // Success -> Step 5 (Review)
+      router.push('/review');
+    } catch (err) {
+      console.error(err);
+      alert('Error saving beneficiary. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Common styles (matching swap.tsx)
-  const inputStyle: React.CSSProperties = {
+  // UI Components
+  const inputStyle = {
     width: '100%',
-    padding: '14px',
+    padding: '12px',
+    borderRadius: '8px',
+    border: '1px solid #bdc3c7',
     fontSize: '16px',
-    border: '2px solid #e1e8ed',
-    borderRadius: '10px',
-    backgroundColor: 'white',
-    transition: 'border-color 0.2s',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box' as const,
   };
 
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '10px',
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#34495e'
-  };
-
-  const errorStyle: React.CSSProperties = {
-    color: '#e74c3c',
-    fontSize: '13px',
-    marginTop: '6px',
-    fontWeight: '500'
-  };
-
-  const helpStyle: React.CSSProperties = {
-    fontSize: '13px',
-    color: '#7f8c8d',
-    marginTop: '6px'
-  };
-
-  const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: '20px',
-    fontWeight: '600',
-    marginBottom: '25px',
-    color: '#2c3e50',
-    paddingBottom: '12px',
-    borderBottom: '2px solid #e1e8ed'
-  };
+  // 5. User Name Loading
+  const [userName, setUserName] = useState('');
+  useEffect(() => {
+    const s = localStorage.getItem('trueque_session');
+    if (s) {
+      try {
+        const sess = JSON.parse(s);
+        setUserName(sess.firstName || 'Friend');
+      } catch { }
+    }
+  }, []);
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      {/* Header */}
-      <header style={{
-        background: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-        padding: '30px 40px',
-        color: 'white',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h1 style={{
-            fontSize: '32px',
-            fontWeight: '600',
-            margin: 0
-          }}>
-            Hello {userName}, Add Beneficiary Details
-          </h1>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <button
-              onClick={() => router.back()}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              Back
-            </button>
-          </div>
-        </div>
-      </header>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: 'sans-serif' }}>
+      <Header />
 
-      {/* Main Content */}
-      <main style={{
-        maxWidth: 900,
-        margin: '40px auto',
-        padding: '0 40px'
-      }}>
-        {/* Swap Summary Card */}
-        {amountIntent && (
+      <main style={{ maxWidth: 600, margin: '40px auto', padding: '0 20px' }}>
+
+        {/* SELECTION SCREEN */}
+        {viewMode === 'selection' && (
           <div style={{
-            backgroundColor: '#e8f4fd',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '30px',
-            border: '2px solid #4A90E2'
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '40px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
           }}>
-            <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '16px' }}>
-              Transaction Summary
-            </h3>
-            <div style={{ fontSize: '14px', color: '#34495e' }}>
-              You're sending <strong>{amountIntent} {from}</strong> to receive <strong>{expectedReceive} {to}</strong>
-              {timeFrame && <> within <strong>{timeFrame}</strong></>}
+            {/* Navigation Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <button
+                onClick={() => {
+                  router.push({
+                    pathname: '/offers',
+                    query: {
+                      amountIntent: swapIntent?.amount || router.query.amountIntent,
+                      rate: swapIntent?.rate || router.query.rate,
+                      from: swapIntent?.currencyFrom || router.query.from,
+                      to: swapIntent?.currencyTo || router.query.to
+                    }
+                  });
+                }}
+                style={{
+                  background: 'none', border: 'none', color: '#7f8c8d', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                }}
+              >
+                ← Back to Offers
+              </button>
+
+              <button
+                onClick={() => {
+                  sessionStorage.removeItem('trueque_swap_state');
+                  router.push('/dashboard');
+                }}
+                style={{
+                  background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer'
+                }}
+              >
+                Cancel ✕
+              </button>
+            </div>
+
+            <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', textAlign: 'center' }}>Select Beneficiary</h2>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {(() => {
+                // GROUPING LOGIC
+                // Group by "First Last" -> { personal: ..., ids: { 'bank_rtp': ID, 'wallet': ID } }
+                const remoteList = savedBeneficiaries || [];
+                // DEBUG: Log the list to see what we are grouping
+                console.log("[Beneficiary] Grouping List:", remoteList);
+
+                const groups: Record<string, any> = {};
+
+                remoteList.forEach((b: any) => {
+                  const nameKey = `${b.personal.firstName} ${b.personal.lastName}`.trim();
+                  if (!groups[nameKey]) {
+                    groups[nameKey] = {
+                      personal: b.personal,
+                      methods: {}, // map method -> { id, detail, fullObj }
+                      primaryId: b.id // Default ID for updates
+                    };
+                  }
+
+                  // Add main method of this row
+                  const mainMethod = b.banking.deliveryMethod || 'bank_rtp';
+                  if (!groups[nameKey].methods[mainMethod]) {
+                    groups[nameKey].methods[mainMethod] = { id: b.id, data: b.banking, full: b };
+                  }
+
+                  // Add nested/saved_methods if present (from PUT updates)
+                  if (b.saved_methods) {
+                    Object.keys(b.saved_methods).forEach(mKey => {
+                      // We don't have full banking struct, but we have identifiers. 
+                      // We'll treat the main row ID as the carrier.
+                      if (!groups[nameKey].methods[mKey]) {
+                        groups[nameKey].methods[mKey] = {
+                          id: b.id,
+                          data: { ...b.banking, ...b.saved_methods[mKey], deliveryMethod: mKey }, // heuristic merge
+                          isNested: true,
+                          full: b
+                        };
+                      }
+                    });
+                  }
+                });
+
+                return Object.entries(groups).map(([name, group], i) => (
+                  <div key={i} style={{
+                    padding: '20px', border: '1px solid #e1e8ed', borderRadius: '12px',
+                    backgroundColor: '#f8f9fa', marginBottom: '10px'
+                  }}>
+                    {/* Header: Name + Phone */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ fontSize: '20px', background: '#e1e8ed', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
+                        <div>
+                          <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '16px' }}>{name}</div>
+                          <div style={{ fontSize: '13px', color: '#7f8c8d' }}>{group.personal.phone}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rail Switcher */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                      {displayOptions.map(opt => {
+                        const rail = opt.id;
+
+                        // Filter Wallet if strict logic needed, but Config should be truth.
+                        // if (method === 'wallet' && !['AR', 'EU'].includes(destCountry)) return null;
+
+                        const existing = group.methods[rail];
+
+                        return (
+                          <button
+                            key={rail}
+                            onClick={() => {
+                              if (existing) {
+                                // SELECT EXISTING
+                                setBeneficiary(existing.full); // Populate Context
+
+                                // If nested, we might need to patch the banking details in context
+                                if (existing.isNested) {
+                                  setBeneficiary((prev: any) => ({
+                                    ...prev,
+                                    banking: { ...prev.banking, ...existing.data }
+                                  }));
+                                }
+
+                                // Hydrate Phone Local State
+                                const phone = group.personal.phone || '';
+                                const parts = phone.split(' ');
+                                if (parts.length >= 2) {
+                                  setPhoneCode(parts[0]);
+                                  setPhoneNumber(parts.slice(1).join(''));
+                                } else {
+                                  setPhoneNumber(phone);
+                                }
+
+                                // Direct Proceed Logic (Review)? Or Edit?
+                                const finalObj = existing.isNested
+                                  ? { ...existing.full, banking: { ...existing.full.banking, ...existing.data } }
+                                  : existing.full;
+
+                                setBeneficiary(finalObj);
+                                localStorage.setItem('selected_beneficiary', JSON.stringify(finalObj));
+                                router.push('/review');
+
+                              } else {
+                                // ADD NEW RAIL (IN-PLACE)
+                                // Pre-fill Personal from Group
+                                setBeneficiary({
+                                  ...group.full || { personal: group.personal, banking: {} }, // Fallback
+                                  personal: group.personal,
+                                  banking: {
+                                    deliveryMethod: rail,
+                                    bankName: '', cbu: '', iban: '', clabe: '',
+                                    accountNumber: '', accountType: 'checking',
+                                    cardNumber: '', cardExpiry: '', walletProvider: '', walletId: ''
+                                  }
+                                });
+
+                                // Set Update Triggers
+                                setTargetBeneficiaryId(group.primaryId); // Tells handleSubmit to PUT
+                                setEditingIndex(999); // Flag as "Editing"
+
+                                // Phone Hydration
+                                const phone = group.personal.phone || '';
+                                const parts = phone.split(' ');
+                                if (parts.length >= 2) {
+                                  setPhoneCode(parts[0]);
+                                  setPhoneNumber(parts.slice(1).join(''));
+                                }
+
+                                // Go to Form -> Step 2 (Banking) directly?
+                                setStep(2);
+                                setViewMode('form');
+                              }
+                            }}
+                            style={{
+                              flex: 1, padding: '8px 12px', borderRadius: '8px',
+                              border: existing ? '1px solid #4A90E2' : '1px dashed #bdc3c7',
+                              backgroundColor: existing ? '#eef6fc' : 'white',
+                              color: existing ? '#4A90E2' : '#95a5a6',
+                              fontWeight: '600', fontSize: '13px', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                            }}
+                          >
+                            {existing && <span>✓</span>} {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                  </div>
+                ));
+              })()}
+
+              <button onClick={() => {
+                // Clear context for New Person
+                setBeneficiary({
+                  personal: { firstName: '', lastName: '', email: '', phone: '' },
+                  banking: {
+                    deliveryMethod: 'bank_rtp',
+                    bankName: '', cbu: '', alias: '', // Added missing alias
+                    iban: '', clabe: '', accountNumber: '',
+                    accountType: 'checking',
+                    cardNumber: '', cardExpiry: '',
+                    walletProvider: '', walletId: ''
+                  }
+                });
+                setEditingIndex(-1);
+                setTargetBeneficiaryId(null);
+                setPhoneNumber('');
+                setStep(1);
+                setViewMode('form');
+              }} style={{
+                padding: '15px', border: '2px dashed #bdc3c7', borderRadius: '10px',
+                cursor: 'pointer', textAlign: 'center', color: '#7f8c8d', fontWeight: 'bold',
+                marginTop: '10px'
+              }}>
+                + Add New Beneficiary
+              </button>
             </div>
           </div>
         )}
 
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          padding: '40px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-        }}>
-          {/* Existing Beneficiary Notice */}
-          {existingBeneficiary && (
-            <div style={{
-              backgroundColor: '#d4edda',
-              border: '2px solid #28a745',
-              borderRadius: '10px',
-              padding: '16px',
-              marginBottom: '30px'
-            }}>
-              <p style={{ margin: 0, color: '#155724', fontWeight: '500' }}>
-                ✓ You have an existing beneficiary on file: <strong>{existingBeneficiary.name}</strong>
-              </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: '14px', color: '#155724' }}>
-                You can use this beneficiary or enter new details below.
-              </p>
-            </div>
-          )}
-
-          {/* Self Beneficiary Option */}
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              padding: '16px',
-              backgroundColor: useSelf ? '#e8f4fd' : '#f8f9fa',
-              borderRadius: '10px',
-              border: useSelf ? '2px solid #4A90E2' : '2px solid #e1e8ed',
-              transition: 'all 0.2s'
-            }}>
-              <input
-                type="checkbox"
-                checked={useSelf}
-                onChange={(e) => setUseSelf(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-              />
-              <span style={{ fontSize: '15px', fontWeight: '600', color: '#34495e' }}>
-                I am the beneficiary (receiving the funds myself)
-              </span>
-            </label>
-          </div>
-
-          <form onSubmit={handleSubmit} noValidate>
-            {/* Personal Information Section */}
-            <h2 style={sectionHeaderStyle}>Personal Information</h2>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '25px',
-              marginBottom: '30px'
-            }}>
-              {/* First Name */}
-              <div>
-                <label htmlFor="firstName" style={labelStyle}>First Name *</label>
-                <input
-                  id="firstName"
-                  required
-                  value={form.firstName}
-                  onChange={handleChange('firstName')}
-                  placeholder="John"
-                  style={inputStyle}
-                />
-                {fieldErrors.firstName && <div style={errorStyle}>{fieldErrors.firstName}</div>}
-              </div>
-
-              {/* Middle Name */}
-              <div>
-                <label htmlFor="middleName" style={labelStyle}>Middle Name (Optional)</label>
-                <input
-                  id="middleName"
-                  value={form.middleName}
-                  onChange={handleChange('middleName')}
-                  placeholder="Michael"
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* Last Name */}
-              <div>
-                <label htmlFor="lastName" style={labelStyle}>Last Name *</label>
-                <input
-                  id="lastName"
-                  required
-                  value={form.lastName}
-                  onChange={handleChange('lastName')}
-                  placeholder="Doe"
-                  style={inputStyle}
-                />
-                {fieldErrors.lastName && <div style={errorStyle}>{fieldErrors.lastName}</div>}
-              </div>
-
-              {/* Relationship */}
-              <div>
-                <label htmlFor="relationship" style={labelStyle}>Relationship to You *</label>
-                <select
-                  id="relationship"
-                  value={form.relationship}
-                  onChange={handleChange('relationship')}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                  disabled={useSelf}
-                >
-                  <option value="self">Self</option>
-                  <option value="family">Family Member</option>
-                  <option value="friend">Friend</option>
-                  <option value="business">Business Contact</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              {/* Email */}
-              <div>
-                <label htmlFor="email" style={labelStyle}>Email Address *</label>
-                <input
-                  id="email"
-                  type="email"
-                  required
-                  value={form.email}
-                  onChange={handleChange('email')}
-                  placeholder="beneficiary@example.com"
-                  style={inputStyle}
-                />
-                {fieldErrors.email && <div style={errorStyle}>{fieldErrors.email}</div>}
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label htmlFor="phone" style={labelStyle}>Phone Number *</label>
-                <input
-                  id="phone"
-                  type="tel"
-                  required
-                  value={form.phone}
-                  onChange={handleChange('phone')}
-                  placeholder="+1 (555) 123-4567"
-                  style={inputStyle}
-                />
-                <div style={helpStyle}>Include country code</div>
-                {fieldErrors.phone && <div style={errorStyle}>{fieldErrors.phone}</div>}
-              </div>
-            </div>
-
-            {/* Banking Information Section */}
-            <h2 style={sectionHeaderStyle}>Banking Information</h2>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '25px',
-              marginBottom: '30px'
-            }}>
-              {/* Account Type */}
-              <div>
-                <label htmlFor="accountType" style={labelStyle}>Account Type *</label>
-                <select
-                  id="accountType"
-                  value={form.accountType}
-                  onChange={handleChange('accountType')}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                >
-                  <option value="checking">Checking Account</option>
-                  <option value="savings">Savings Account</option>
-                  <option value="card">Debit Card</option>
-                  <option value="wallet">Digital Wallet</option>
-                </select>
-              </div>
-
-              {/* Bank Name */}
-              <div>
-                <label htmlFor="bankName" style={labelStyle}>Bank/Institution Name *</label>
-                <input
-                  id="bankName"
-                  required
-                  value={form.bankName}
-                  onChange={handleChange('bankName')}
-                  placeholder="e.g., Chase Bank"
-                  style={inputStyle}
-                />
-                {fieldErrors.bankName && <div style={errorStyle}>{fieldErrors.bankName}</div>}
-              </div>
-
-              {/* Routing Number */}
-              {(form.accountType === 'checking' || form.accountType === 'savings') && (
-                <div>
-                  <label htmlFor="routingNumber" style={labelStyle}>Routing Number *</label>
-                  <input
-                    id="routingNumber"
-                    required
-                    value={form.routingNumber}
-                    onChange={handleChange('routingNumber')}
-                    placeholder="9 digits"
-                    style={inputStyle}
-                  />
-                  <div style={helpStyle}>9-digit routing number (US banks)</div>
-                  {fieldErrors.routingNumber && <div style={errorStyle}>{fieldErrors.routingNumber}</div>}
-                </div>
-              )}
-
-              {/* Branch Code */}
-              {(form.accountType === 'checking' || form.accountType === 'savings') && (
-                <div>
-                  <label htmlFor="branchCode" style={labelStyle}>Branch Code (Optional)</label>
-                  <input
-                    id="branchCode"
-                    value={form.branchCode}
-                    onChange={handleChange('branchCode')}
-                    placeholder="Branch identifier"
-                    style={inputStyle}
-                  />
-                  <div style={helpStyle}>Required for some international banks</div>
-                </div>
-              )}
-
-              {/* Account Number */}
-              <div style={{ position: 'relative' }}>
-                <label htmlFor="accountNumber" style={labelStyle}>
-                  {form.accountType === 'wallet' ? 'Wallet ID' : 'Account Number'} *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="accountNumber"
-                    required
-                    value={form.accountNumber}
-                    onChange={handleChange('accountNumber')}
-                    placeholder={form.accountType === 'wallet' ? 'username@provider' : 'Account number'}
-                    style={{ ...inputStyle, paddingRight: '40px' }}
-                    type={showAccountNumber ? "text" : "password"}
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAccountNumber(!showAccountNumber)}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      color: '#7f8c8d'
-                    }}
-                  >
-                    {showAccountNumber ? '👁️' : '👁️‍🗨️'}
-                  </button>
-                </div>
-                {fieldErrors.accountNumber && <div style={errorStyle}>{fieldErrors.accountNumber}</div>}
-              </div>
-
-              {/* Confirm Account Number */}
-              <div style={{ position: 'relative' }}>
-                <label htmlFor="accountNumberConfirm" style={labelStyle}>
-                  Confirm {form.accountType === 'wallet' ? 'Wallet ID' : 'Account Number'} *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    id="accountNumberConfirm"
-                    required
-                    value={form.accountNumberConfirm}
-                    onChange={handleChange('accountNumberConfirm')}
-                    placeholder="Re-enter to confirm"
-                    style={{ ...inputStyle, paddingRight: '40px' }}
-                    type={showAccountNumber ? "text" : "password"}
-                    autoComplete="off"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAccountNumber(!showAccountNumber)}
-                    style={{
-                      position: 'absolute',
-                      right: '10px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      color: '#7f8c8d'
-                    }}
-                  >
-                    {showAccountNumber ? '👁️' : '👁️‍🗨️'}
-                  </button>
-                </div>
-                {fieldErrors.accountNumberConfirm && <div style={errorStyle}>{fieldErrors.accountNumberConfirm}</div>}
-              </div>
-            </div>
-
-            {/* Tax & Legal Information Section */}
-            <h2 style={sectionHeaderStyle}>Tax & Legal Information</h2>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '25px',
-              marginBottom: '30px'
-            }}>
-              {/* Tax ID Type */}
-              <div>
-                <label htmlFor="taxIdType" style={labelStyle}>Tax ID Type *</label>
-                <select
-                  id="taxIdType"
-                  value={form.taxIdType}
-                  onChange={handleChange('taxIdType')}
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                >
-                  <option value="SSN">SSN (Social Security Number)</option>
-                  <option value="ITIN">ITIN (Individual Taxpayer ID)</option>
-                  <option value="EIN">EIN (Employer ID Number)</option>
-                  <option value="Foreign">Foreign Tax ID</option>
-                </select>
-              </div>
-
-              {/* Tax ID */}
-              <div>
-                <label htmlFor="taxId" style={labelStyle}>Tax ID Number *</label>
-                <input
-                  id="taxId"
-                  required
-                  value={form.taxId}
-                  onChange={handleChange('taxId')}
-                  placeholder="XXX-XX-XXXX"
-                  style={inputStyle}
-                  type="password"
-                  autoComplete="off"
-                />
-                <div style={helpStyle}>Required for tax reporting and compliance</div>
-                {fieldErrors.taxId && <div style={errorStyle}>{fieldErrors.taxId}</div>}
-              </div>
-            </div>
-
-            {/* Address Information Section */}
-            <h2 style={sectionHeaderStyle}>Address Information</h2>
-
-            {/* Note for self-beneficiary */}
-            <div style={{
-              marginBottom: '20px',
-              padding: '12px',
-              backgroundColor: '#e8f4fd',
-              borderLeft: '4px solid #4A90E2',
-              borderRadius: '4px',
-              fontSize: '14px',
-              color: '#34495e'
-            }}>
-              <strong>Note:</strong> If you are sending funds to yourself, please use the <strong>address of the bank</strong> in the destination country.
-            </div>
-
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '25px',
-              marginBottom: '30px'
-            }}>
-              {/* Street Address - Full Width */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="street" style={labelStyle}>Street Address *</label>
-                <input
-                  id="street"
-                  required
-                  value={form.street}
-                  onChange={handleChange('street')}
-                  placeholder="123 Main Street"
-                  style={inputStyle}
-                />
-                {fieldErrors.street && <div style={errorStyle}>{fieldErrors.street}</div>}
-              </div>
-
-              {/* Street Address 2 - Full Width */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label htmlFor="street2" style={labelStyle}>Apartment, Suite, etc. (Optional)</label>
-                <input
-                  id="street2"
-                  value={form.street2}
-                  onChange={handleChange('street2')}
-                  placeholder="Apt 4B"
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* City */}
-              <div>
-                <label htmlFor="city" style={labelStyle}>City *</label>
-                <input
-                  id="city"
-                  required
-                  value={form.city}
-                  onChange={handleChange('city')}
-                  placeholder="New York"
-                  style={inputStyle}
-                />
-                {fieldErrors.city && <div style={errorStyle}>{fieldErrors.city}</div>}
-              </div>
-
-              {/* State */}
-              <div>
-                <label htmlFor="state" style={labelStyle}>State/Province *</label>
-                <input
-                  id="state"
-                  required
-                  value={form.state}
-                  onChange={handleChange('state')}
-                  placeholder="NY"
-                  style={inputStyle}
-                />
-                {fieldErrors.state && <div style={errorStyle}>{fieldErrors.state}</div>}
-              </div>
-
-              {/* ZIP Code */}
-              <div>
-                <label htmlFor="zipCode" style={labelStyle}>ZIP/Postal Code *</label>
-                <input
-                  id="zipCode"
-                  required
-                  value={form.zipCode}
-                  onChange={handleChange('zipCode')}
-                  placeholder="10001"
-                  style={inputStyle}
-                />
-                {fieldErrors.zipCode && <div style={errorStyle}>{fieldErrors.zipCode}</div>}
-              </div>
-
-              {/* Country */}
-              <div>
-                <label htmlFor="country" style={labelStyle}>Country *</label>
-                <input
-                  id="country"
-                  required
-                  value={form.country}
-                  onChange={handleChange('country')}
-                  placeholder="United States"
-                  style={inputStyle}
-                />
-                {fieldErrors.country && <div style={errorStyle}>{fieldErrors.country}</div>}
-              </div>
-            </div>
-
-            {/* Compliance Notice */}
-            <div style={{
-              backgroundColor: '#fff9e6',
-              border: '2px solid #ffc107',
-              borderRadius: '10px',
-              padding: '16px',
-              marginBottom: '30px'
-            }}>
-              <p style={{ margin: '0 0 8px 0', fontWeight: '600', color: '#856404' }}>
-                ℹ️ Regulatory Compliance Notice
-              </p>
-              <p style={{ margin: 0, fontSize: '14px', color: '#856404' }}>
-                All information is collected in compliance with US and international anti-money laundering (AML)
-                and know-your-customer (KYC) regulations. Your data is encrypted and stored securely.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '15px',
-              marginTop: '30px'
-            }}>
+        {/* FORM SCREEN */}
+        {viewMode === 'form' && (
+          <>
+            {/* Navigation Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <button
-                type="submit"
-                disabled={loading}
+                onClick={() => {
+                  if (savedBeneficiaries && savedBeneficiaries.length > 0) {
+                    setViewMode('selection');
+                    // Reset editing index if strictly "adding new" (999) to cancel draft
+                    if (editingIndex === 999) {
+                      setEditingIndex(-1);
+                      setBeneficiary({
+                        personal: { firstName: '', lastName: '', email: '', phone: '' },
+                        banking: {
+                          deliveryMethod: 'bank_rtp',
+                          bankName: '', cbu: '', alias: '', iban: '', clabe: '', accountNumber: '',
+                          accountType: 'checking', cardNumber: '', cardExpiry: '', walletProvider: '', walletId: ''
+                        }
+                      });
+                    }
+                  } else {
+                    router.push({
+                      pathname: '/offers',
+                      query: {
+                        amountIntent: swapIntent?.amount || router.query.amountIntent,
+                        rate: swapIntent?.rate || router.query.rate,
+                        from: swapIntent?.currencyFrom || router.query.from,
+                        to: swapIntent?.currencyTo || router.query.to
+                      }
+                    });
+                  }
+                }}
                 style={{
-                  flex: 2,
-                  padding: '18px',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'white',
-                  background: loading
-                    ? '#bdc3c7'
-                    : 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: loading ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.3)'
+                  background: 'none', border: 'none', color: '#7f8c8d', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
                 }}
               >
-                {loading ? 'Processing...' : 'Continue to Review'}
+                ← {savedBeneficiaries && savedBeneficiaries.length > 0 ? 'Back to List' : 'Back to Offers'}
               </button>
 
               <button
-                type="button"
-                onClick={() => router.back()}
+                onClick={() => {
+                  sessionStorage.removeItem('trueque_swap_state');
+                  router.push('/dashboard');
+                }}
                 style={{
-                  flex: 1,
-                  padding: '18px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  color: '#7f8c8d',
-                  background: 'white',
-                  border: '2px solid #e1e8ed',
-                  borderRadius: '12px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease'
+                  background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
+                  fontWeight: '600', cursor: 'pointer'
                 }}
               >
-                Back
+                Cancel ✕
               </button>
             </div>
-          </form>
-        </div>
+
+            {/* Progress Stepper */}
+            <div style={{ display: 'flex', marginBottom: '30px', justifyContent: 'center', gap: '10px' }}>
+              <div style={{
+                width: '120px', height: '4px', borderRadius: '2px',
+                backgroundColor: step >= 1 ? '#4A90E2' : '#e1e8ed'
+              }} />
+              <div style={{
+                width: '120px', height: '4px', borderRadius: '2px',
+                backgroundColor: step >= 2 ? '#4A90E2' : '#e1e8ed'
+              }} />
+            </div>
+
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '16px',
+              padding: '40px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+            }}>
+              {userName && (
+                <h3 style={{ margin: '0 0 15px 0', color: '#4A90E2', fontSize: '18px' }}>
+                  Hello, {userName} 👋
+                </h3>
+              )}
+              <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>
+                {step === 1 ? 'Beneficiary Details' : 'Banking Information'}
+              </h2>
+
+              {/* Context Summary */}
+              {swapIntent && (
+                <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', fontSize: '14px', color: '#7f8c8d' }}>
+                  Swapping {swapIntent.amount} {swapIntent.currencyFrom} for {swapIntent.currencyTo}
+                </div>
+              )}
+
+              {/* SAVED BENEFICIARIES SELECTOR */}
+              {savedBeneficiaries && savedBeneficiaries.length > 0 && step === 1 && (
+                <div style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#f0f9ff', borderRadius: '12px', border: '1px solid #d0e8f8' }}>
+                  <label style={{ display: 'block', marginBottom: '10px', fontWeight: 'bold', color: '#2980b9', fontSize: '14px' }}>
+                    ⚡ Quick Fill: Select a Saved Beneficiary
+                  </label>
+                  <select
+                    onChange={(e) => {
+                      const idx = parseInt(e.target.value);
+                      if (idx >= 0) {
+                        setBeneficiary(savedBeneficiaries[idx]);
+                        setEditingIndex(idx);
+                        // Force update local phone state too
+                        const phone = savedBeneficiaries[idx].personal.phone || '';
+                        const parts = phone.split(' ');
+                        if (parts.length >= 2) {
+                          setPhoneCode(parts[0]);
+                          setPhoneNumber(parts.slice(1).join(''));
+                        } else {
+                          setPhoneNumber(phone);
+                        }
+                      }
+                    }}
+                    style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #bdc3c7', fontSize: '14px' }}
+                  >
+                    <option value="-1">-- Make a Selection --</option>
+                    {savedBeneficiaries.map((b, i) => (
+                      <option key={i} value={i}>
+                        {b.personal.firstName} {b.personal.lastName} - {b.banking.bankName || b.banking.walletProvider || 'Saved'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* STEP 1: PERSONAL */}
+              {step === 1 && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                    <InputGroup label="First Name" error={errors.firstName}>
+                      <input
+                        style={inputStyle}
+                        value={contextForm.personal.firstName}
+                        onChange={(e) => handlePersonalChange('firstName', e.target.value)}
+                        placeholder="e.g. Maria"
+                      />
+                    </InputGroup>
+                    <InputGroup label="Last Name" error={errors.lastName}>
+                      <input
+                        style={inputStyle}
+                        value={contextForm.personal.lastName}
+                        onChange={(e) => handlePersonalChange('lastName', e.target.value)}
+                        placeholder="e.g. Gonzalez"
+                      />
+                    </InputGroup>
+                  </div>
+
+                  {/* Harmonized Phone Input */}
+                  <InputGroup label="Mobile Phone" error={errors.phone}>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <select
+                        value={phoneCode}
+                        onChange={(e) => setPhoneCode(e.target.value)}
+                        style={{ ...inputStyle, width: '100px' }}
+                      >
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+54">🇦🇷 +54</option>
+                        <option value="+52">🇲🇽 +52</option>
+                        <option value="+55">🇧🇷 +55</option>
+                        <option value="+57">🇨🇴 +57</option>
+                        <option value="+34">🇪🇸 +34</option>
+                      </select>
+                      <input
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Mobile Number"
+                        style={{ ...inputStyle, flex: 1 }}
+                      />
+                    </div>
+                  </InputGroup>
+
+                  <InputGroup label="Email" error={errors.email}>
+                    <input
+                      style={inputStyle}
+                      type="email"
+                      value={contextForm.personal.email}
+                      onChange={(e) => handlePersonalChange('email', e.target.value)}
+                      placeholder="maria@example.com"
+                    />
+                  </InputGroup>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  {isVoucher ? (
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <h3 style={{ color: '#27ae60' }}>
+                        {swapIntent?.offerType === 'merchant_voucher' ? '🏙️ Merchant Voucher Delivery' : '🎟️ Retail Voucher Delivery'}
+                      </h3>
+                      <p style={{ color: '#7f8c8d' }}>
+                        The voucher code will be sent to <strong>{contextForm.personal.phone}</strong> via WhatsApp/SMS.
+                      </p>
+                      <div style={{ fontSize: '13px', marginTop: '10px', color: '#e67e22' }}>
+                        Please ensure the number is correct in Step 1.
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Delivery Method Toggle */}
+                      <div style={{ marginBottom: '25px' }}>
+                        <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#34495e', fontSize: '14px' }}>
+                          Delivery Method
+                        </label>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {displayOptions.map(opt => {
+                            const method = opt.id;
+                            const isSelected = contextForm.banking.deliveryMethod === method;
+
+                            return (
+                              <button
+                                key={method}
+                                onClick={() => handleBankingChange('deliveryMethod', method)}
+                                style={{
+                                  flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
+                                  borderColor: isSelected ? '#4A90E2' : '#e1e8ed',
+                                  backgroundColor: isSelected ? '#eef6fc' : 'white',
+                                  color: isSelected ? '#4A90E2' : '#7f8c8d',
+                                  fontWeight: '600', cursor: 'pointer', fontSize: '13px'
+                                }}>
+                                {isSelected && <span>✓</span>} {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* === BANK RTP Inputs === */}
+                      {contextForm.banking.deliveryMethod === 'bank_rtp' && (
+                        <>
+                          <InputGroup label="Bank Name" error={errors.bankName}>
+                            <input
+                              style={inputStyle}
+                              value={contextForm.banking.bankName}
+                              onChange={(e) => handleBankingChange('bankName', e.target.value)}
+                              placeholder={destCountry === 'AR' ? 'e.g. Banco Galicia' : 'Bank Name'}
+                            />
+                          </InputGroup>
+
+                          {destCountry === 'AR' && (
+                            <>
+                              <div style={{ marginBottom: '15px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: '#34495e', fontSize: '14px' }}>Account Type</label>
+                                <div style={{ display: 'flex', gap: '15px', background: '#f8f9fa', padding: '10px', borderRadius: '8px', border: '1px solid #e1e8ed' }}>
+                                  <div
+                                    onClick={() => handleBankingChange('accountType', 'CBU')}
+                                    style={{
+                                      flex: 1,
+                                      padding: '12px 10px', borderRadius: '8px',
+                                      border: (contextForm.banking.accountType !== 'CVU') ? '2px solid #4A90E2' : '1px solid #bdc3c7',
+                                      backgroundColor: (contextForm.banking.accountType !== 'CVU') ? '#eef6fc' : 'white',
+                                      color: (contextForm.banking.accountType !== 'CVU') ? '#4A90E2' : '#7f8c8d',
+                                      cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', transition: 'all 0.2s',
+                                      boxShadow: (contextForm.banking.accountType !== 'CVU') ? '0 2px 5px rgba(74, 144, 226, 0.2)' : 'none'
+                                    }}>
+                                    🏦 Bank (CBU)
+                                  </div>
+                                  <div
+                                    onClick={() => handleBankingChange('accountType', 'CVU')}
+                                    style={{
+                                      flex: 1,
+                                      padding: '12px 10px', borderRadius: '8px',
+                                      border: (contextForm.banking.accountType === 'CVU') ? '2px solid #9b59b6' : '1px solid #bdc3c7',
+                                      backgroundColor: (contextForm.banking.accountType === 'CVU') ? '#f5eef8' : 'white',
+                                      color: (contextForm.banking.accountType === 'CVU') ? '#9b59b6' : '#7f8c8d',
+                                      cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', transition: 'all 0.2s',
+                                      boxShadow: (contextForm.banking.accountType === 'CVU') ? '0 2px 5px rgba(155, 89, 182, 0.2)' : 'none'
+                                    }}>
+                                    📱 Wallet (CVU)
+                                  </div>
+                                </div>
+                              </div>
+                              <InputGroup label={`${contextForm.banking.accountType === 'CVU' ? 'CVU' : 'CBU'} (22 digits)`} error={errors.cbu}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.cbu}
+                                  onChange={(e) => handleBankingChange('cbu', e.target.value)}
+                                  placeholder="0000000000000000000000"
+                                  maxLength={22}
+                                />
+                              </InputGroup>
+                            </>
+                          )}
+                          {destCountry === 'EU' && (
+                            <InputGroup label="IBAN" error={errors.iban}>
+                              <input
+                                style={inputStyle}
+                                value={contextForm.banking.iban || ''}
+                                onChange={(e) => handleBankingChange('iban', e.target.value)}
+                                placeholder="ES12..."
+                              />
+                            </InputGroup>
+                          )}
+                          {destCountry === 'MX' && (
+                            <InputGroup label="CLABE (18 digits)" error={errors.clabe}>
+                              <input
+                                style={inputStyle}
+                                value={contextForm.banking.clabe || ''}
+                                onChange={(e) => handleBankingChange('clabe', e.target.value)}
+                                placeholder="000000000000000000"
+                                maxLength={18}
+                              />
+                            </InputGroup>
+                          )}
+                          {(!['AR', 'EU', 'MX'].includes(destCountry)) && (
+                            <InputGroup label="Account Number" error={errors.accountNumber}>
+                              <input style={inputStyle} value={contextForm.banking.accountNumber} onChange={(e) => handleBankingChange('accountNumber', e.target.value)} />
+                            </InputGroup>
+                          )}
+                        </>
+                      )}
+                      {/* === CARD Inputs === */}
+                      {contextForm.banking.deliveryMethod === 'card_push' && (
+                        <>
+                          <InputGroup label="Card Number" error={errors.cardNumber}>
+                            <input style={inputStyle} value={contextForm.banking.cardNumber} onChange={(e) => handleBankingChange('cardNumber', e.target.value)} maxLength={19} placeholder="Card Number" />
+                          </InputGroup>
+                          <InputGroup label="Expiry (MM/YY)" error={errors.cardExpiry}>
+                            <input style={inputStyle} value={contextForm.banking.cardExpiry} onChange={(e) => handleBankingChange('cardExpiry', e.target.value)} maxLength={5} placeholder="MM/YY" />
+                          </InputGroup>
+                        </>
+                      )}
+
+                      {/* === WALLET Inputs === */}
+                      {contextForm.banking.deliveryMethod === 'wallet' && (
+                        <>
+                          <InputGroup label="Wallet Provider" error={errors.walletProvider}>
+                            <select style={inputStyle} value={contextForm.banking.walletProvider} onChange={e => handleBankingChange('walletProvider', e.target.value)}>
+                              <option value="">Select Provider</option>
+                              <option value="paypal">PayPal</option>
+                              <option value="mercadopago">Mercado Pago</option>
+                            </select>
+                          </InputGroup>
+                          <InputGroup label="Wallet ID" error={errors.walletId}>
+                            <input style={inputStyle} value={contextForm.banking.walletId} onChange={(e) => handleBankingChange('walletId', e.target.value)} />
+                          </InputGroup>
+                        </>
+                      )}
+
+                    </>
+                  )}
+
+
+                </>
+              )}
+
+              {/* Footer Actions - NOW VISIBLE FOR ALL STEPS */}
+              <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
+                {savedBeneficiaries.length > 0 && viewMode === 'form' && step === 1 && (
+                  <button
+                    onClick={() => setViewMode('selection')}
+                    style={{
+                      padding: '14px', borderRadius: '10px',
+                      border: '2px solid #3498db', backgroundColor: 'transparent',
+                      color: '#3498db', fontWeight: 'bold', cursor: 'pointer',
+                      transition: 'all 0.2s', whiteSpace: 'nowrap'
+                    }}
+                  >
+                    View Saved
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    if (step === 2) setStep(1);
+                    else router.back();
+                  }}
+                  style={{
+                    flex: 1, padding: '14px', borderRadius: '10px',
+                    border: '2px solid #e1e8ed', backgroundColor: 'transparent',
+                    color: '#7f8c8d', fontWeight: 'bold', cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Back
+                </button>
+
+                {/* UPDATE CHECKBOX (Only if editing a saved entry) */}
+                {editingIndex !== null && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '0 10px' }}>
+                    <input
+                      type="checkbox"
+                      id="updateSaved"
+                      defaultChecked={true}
+                      onChange={(e) => {
+                        if (!e.target.checked) setEditingIndex(null); // Opt-out triggers "Create New" path
+                      }}
+                    />
+                    <label htmlFor="updateSaved" style={{ fontSize: '12px', color: '#7f8c8d', cursor: 'pointer' }}>
+                      Update saved details?
+                    </label>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleNext}
+                  className="action-button"
+                  disabled={loading}
+                  style={{
+                    flex: 2, padding: '14px', borderRadius: '10px',
+                    border: 'none', backgroundColor: '#4A90E2',
+                    color: 'white', fontWeight: 'bold', cursor: 'pointer',
+                    opacity: loading ? 0.7 : 1
+                  }}
+                >
+                  {step === 1 ? 'Next Step' : 'Review & Confirm'}
+                </button>
+              </div>
+
+            </div>
+            {/* Closing the form view and the container */}
+          </>
+        )}
+
       </main>
     </div>
   );

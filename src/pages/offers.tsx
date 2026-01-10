@@ -1,475 +1,484 @@
 // src/pages/offers.tsx
 import { useRouter } from 'next/router';
+import { useSwap } from '../context/SwapContext';
 import React, { useState, useEffect } from 'react';
+import Header from '../components/Header';
 
+// Types including quote data (even if some fields are hidden now)
 type Offer = {
   id: string;
-  userId: string;
-  offerSend: number;
-  marketReceive: number;
-
-  // Itemized fees
-  gatewayFee: number;
-  paymentMethodFee: number;
-  truequeFee: number;
-  totalFees: number;
-
-  offerReceive: number;
-  effectiveRate: number;
+  provider: string;
+  amount: number;
+  rate: number;
+  min: number;
+  max: number;
+  speed: string;
+  trust: number;
+  offerAmount: number;
   currencyFrom: string;
   currencyTo: string;
   marketRate: number;
-  timeFrame: string;
-  paymentMethod: string;
-  reputation?: number;
-  completedTransactions?: number;
+  totalCost?: number;
+  effectiveRate?: number;
+  isRound?: boolean;
 };
 
-export default function OffersPage() {
+// Helper to generate a mock Trueque ID format: T YYYYMMDD CC SSSS K
+const getMockTruequeID = (country: string, index: number) => {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const seq = String(index + 1).padStart(4, '0');
+  // Simple mock checksum char
+  const checksum = "X";
+  return `T${date}${country}${seq}${checksum}`;
+};
+
+const generateMockOffers = (
+  amountIntent: number,
+  currencyFrom: string,
+  currencyTo: string,
+  marketRate: number
+): Offer[] => {
+  // Mock Profiles - Now anonymous, just Country based routing logic ideally
+  // but we can just assign random countries for diversity in the ID
+  const baseProfiles = [
+    { country: 'AR', min: 10, max: 500, trust: 4.8 },
+    { country: 'MX', min: 50, max: 1000, trust: 4.9 },
+    { country: 'CO', min: 100, max: 2000, trust: 4.7 },
+    { country: 'BR', min: 20, max: 300, trust: 4.6 },
+    { country: 'US', min: 200, max: 5000, trust: 5.0 },
+  ];
+
+  const offers: Offer[] = [];
+  const target = amountIntent;
+
+  // Helper to create an offer object
+  const createOffer = (amount: number, profileIndex: number, idSuffix: string, isRound: boolean): Offer => {
+    const profile = baseProfiles[profileIndex % baseProfiles.length];
+    const providerId = getMockTruequeID(profile.country, profileIndex * 100 + Math.floor(amount)); // Unique-ish ID
+
+    return {
+      id: `OFF${amount}${idSuffix}`,
+      provider: providerId, // NOW AN ID, NOT A NAME
+      amount: amount,
+      rate: marketRate,
+      min: profile.min,
+      max: profile.max,
+      speed: 'Instant',
+      trust: profile.trust,
+      offerAmount: amount,
+      currencyFrom,
+      currencyTo,
+      marketRate,
+      isRound
+    };
+  };
+
+  // Inject specific test offers for Sandbox Verification (ES -> AR)
+  // Offer 1: 120,000 ARS (Available, approx €114)
+  offers.push(createOffer(120000, 0, 'ARS1', true));
+
+  // Offer 2: 250,000 ARS (Restricted, approx €238 > €190)
+  offers.push(createOffer(250000, 1, 'ARS2', false));
+
+  // Offer 3: 1,000,000 ARS (Restricted, approx €952 > €190)
+  offers.push(createOffer(1000000, 2, 'ARS3', true));
+
+  // Return mixed sorted offers
+  return offers.sort((a, b) => a.amount - b.amount);
+};
+
+export default function Offers() {
   const router = useRouter();
+  const { setSwapIntent } = useSwap();
+  const {
+    amountIntent: amountIntentQuery,
+    rate: rateQuery,
+    from,
+    to,
+    timeFrame // Should be 0 (Instant) from swap.tsx
+  } = router.query;
 
-  const { from, to, amountIntent, expectedReceive, rate, timeFrame } = router.query;
-
-  const [userName, setUserName] = useState('User');
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
+  const [activeBracket, setActiveBracket] = useState(0); // Default to Instant (0)
+
+  // Initialize
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    // Ensure we have necessary data, default to ES->AR values if missing
+    const amount = parseFloat(amountIntentQuery as string) || 100000;
+    const rate = parseFloat(rateQuery as string) || 1050.00; // EUR->ARS rate
+    const cFrom = from as string || 'EUR';
+    const cTo = to as string || 'ARS';
+
+    // if (isNaN(amount) || isNaN(rate)) return; -> Removed to allow direct access
+
+    // Use passed timeFrame if available (mapped to bracket), or default to 0
+    let bracket = 0;
+    if (timeFrame) {
+      bracket = parseInt(timeFrame as string);
+    }
+    setActiveBracket(bracket);
+
+    // Generate mock offers
+    const generatedOffers = generateMockOffers(amount, cFrom, cTo, rate);
+    setOffers(generatedOffers);
+    setLoading(false);
+
+  }, [router.isReady, amountIntentQuery, rateQuery, from, to, timeFrame]);
+
+  // Sandbox / KYC Logic
+  const [kycStatus, setKycStatus] = useState<string>('');
+  const [txCount, setTxCount] = useState<number>(0);
 
   useEffect(() => {
-    const sessionData = localStorage.getItem('trueque_session');
-    if (sessionData) {
+    const sessionStr = localStorage.getItem('trueque_session');
+    if (sessionStr) {
       try {
-        const session = JSON.parse(sessionData);
-        setUserName(session.firstName || session.email?.split('@')[0] || 'User');
-      } catch (e) {
-        console.error('Error loading session:', e);
-      }
+        const s = JSON.parse(sessionStr);
+        setKycStatus(s.kycStatus || s.kyc_status || '');
+        setTxCount(s.txCount || 0);
+      } catch { }
     }
   }, []);
 
+  const isSandbox = (kycStatus || '').toUpperCase() === 'PENDING';
+  const SANDBOX_LIMIT = 190; // €190 Limit (approx $200 USD)
+
+  // Fetch Quotes for offers (Background - optional now if we hide friction)
+  // We might still want to fetch it to have the QuoteID ready for the next step?
+  // User says: "Remove friction columns... Show only 'Match Amount' and 'Market Rate'"
+  // So we don't strictly *need* to display the quote data here, but fetching it might pre-warm the cache or validation.
+  // For simplicity and performance, effectively we just show the mock offers now. 
+  // However, let's keep the fetch logic but not display the friction, to ensure backend connectivity is healthy.
+
   useEffect(() => {
-    const fetchOffers = async () => {
-      setLoading(true);
-      try {
-        // TODO: Backend API call
-        // const response = await fetch(`/api/offers?send=${amountIntent}&from=${from}&to=${to}`);
+    const fetchQuotes = async () => {
+      if (offers.length === 0) return;
 
-        const sendAmount = parseFloat(amountIntent as string) || 0;
-        const marketRate = parseFloat(rate as string) || 1;
-        const marketValue = sendAmount * marketRate;
-
-        // Different counterparties use different payment methods with different fee structures
-        const mockOffers: Offer[] = [
-          {
-            id: '1',
-            userId: 'USR-7392',
-            offerSend: sendAmount,
-            marketReceive: marketValue,
-            paymentMethod: 'Bank Transfer',
-            gatewayFee: marketValue * 0.002, // 0.2% gateway
-            paymentMethodFee: 0, // Bank transfer has no extra fee
-            truequeFee: marketValue * 0.003, // 0.3% Trueque platform fee
-            totalFees: marketValue * 0.005,
-            offerReceive: marketValue - (marketValue * 0.005),
-            effectiveRate: marketRate * 0.995,
-            currencyFrom: from as string || 'USD',
-            currencyTo: to as string || 'MXN',
-            marketRate: marketRate,
-            timeFrame: timeFrame as string || '24 hours',
-            reputation: 4.9,
-            completedTransactions: 203
-          },
-          {
-            id: '2',
-            userId: 'USR-5418',
-            offerSend: sendAmount,
-            marketReceive: marketValue,
-            paymentMethod: 'Bank Transfer',
-            gatewayFee: marketValue * 0.0025,
-            paymentMethodFee: 0,
-            truequeFee: marketValue * 0.003,
-            totalFees: marketValue * 0.0055,
-            offerReceive: marketValue - (marketValue * 0.0055),
-            effectiveRate: marketRate * 0.9945,
-            currencyFrom: from as string || 'USD',
-            currencyTo: to as string || 'MXN',
-            marketRate: marketRate,
-            timeFrame: timeFrame as string || '24 hours',
-            reputation: 5.0,
-            completedTransactions: 156
-          },
-          {
-            id: '3',
-            userId: 'USR-9276',
-            offerSend: sendAmount,
-            marketReceive: marketValue,
-            paymentMethod: 'Debit Card',
-            gatewayFee: marketValue * 0.005, // 0.5% gateway
-            paymentMethodFee: marketValue * 0.003, // 0.3% debit card processing
-            truequeFee: marketValue * 0.003, // 0.3% Trueque
-            totalFees: marketValue * 0.011,
-            offerReceive: marketValue - (marketValue * 0.011),
-            effectiveRate: marketRate * 0.989,
-            currencyFrom: from as string || 'USD',
-            currencyTo: to as string || 'MXN',
-            marketRate: marketRate,
-            timeFrame: timeFrame as string || '24 hours',
-            reputation: 4.8,
-            completedTransactions: 89
-          },
-          {
-            id: '4',
-            userId: 'USR-3164',
-            offerSend: sendAmount,
-            marketReceive: marketValue,
-            paymentMethod: 'Debit Card',
-            gatewayFee: marketValue * 0.006,
-            paymentMethodFee: marketValue * 0.004,
-            truequeFee: marketValue * 0.003,
-            totalFees: marketValue * 0.013,
-            offerReceive: marketValue - (marketValue * 0.013),
-            effectiveRate: marketRate * 0.987,
-            currencyFrom: from as string || 'USD',
-            currencyTo: to as string || 'MXN',
-            marketRate: marketRate,
-            timeFrame: timeFrame as string || '24 hours',
-            reputation: 4.7,
-            completedTransactions: 67
-          },
-          {
-            id: '5',
-            userId: 'USR-8241',
-            offerSend: sendAmount,
-            marketReceive: marketValue,
-            paymentMethod: 'Credit Card',
-            gatewayFee: marketValue * 0.007, // 0.7% gateway
-            paymentMethodFee: marketValue * 0.023, // 2.3% credit card processing
-            truequeFee: marketValue * 0.003, // 0.3% Trueque
-            totalFees: marketValue * 0.033,
-            offerReceive: marketValue - (marketValue * 0.033),
-            effectiveRate: marketRate * 0.967,
-            currencyFrom: from as string || 'USD',
-            currencyTo: to as string || 'MXN',
-            marketRate: marketRate,
-            timeFrame: timeFrame as string || '24 hours',
-            reputation: 4.6,
-            completedTransactions: 45
+      const updatedOffers = await Promise.all(offers.map(async (offer) => {
+        try {
+          // Hardcoding bracket to 0 as per new requirements "The system should automatically flag all matches as instant_priority"
+          const url = `http://localhost:8001/api/quotes/transparent?amount=${offer.offerAmount}&currency_from=${offer.currencyFrom}&currency_to=${offer.currencyTo}&rate=${offer.marketRate}&settlement_bracket=0`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            return {
+              ...offer,
+              totalCost: data.total_cost_to_sender, // Stored but hidden
+              effectiveRate: data.effective_exchange_rate // Stored but hidden
+              // We could store quote_id here if needed
+            };
           }
-        ];
-
-        mockOffers.sort((a, b) => b.offerReceive - a.offerReceive);
-        setOffers(mockOffers);
-      } catch (error) {
-        console.error('Error fetching offers:', error);
-      } finally {
-        setLoading(false);
-      }
+        } catch (e) {
+          console.error("Failed to fetch quote for offer", offer.id, e);
+        }
+        return offer;
+      }));
+      setOffers(updatedOffers);
     };
 
-    if (from && to && amountIntent) {
-      fetchOffers();
+    // Slight delay to allow initial render
+    if (!loading && offers.length > 0 && !offers[0].totalCost) {
+      fetchQuotes();
     }
-  }, [from, to, amountIntent, rate, timeFrame]);
+  }, [loading, activeBracket]); // Adjusted dependencies
 
-  const handleSwap = (offer: Offer) => {
+
+  const handleSelectOffer = (offer: Offer) => {
+    // Redundant Security Check (Hard Click-Block)
+    // Redundant Security Check (Hard Click-Block)
+    const eurEquivalent = offer.offerAmount / 1050; // Fixed divisor as per requirement
+    const isOverLimit = isSandbox && eurEquivalent > SANDBOX_LIMIT;
+    const isTrialExhausted = isSandbox && txCount >= 1;
+
+    if (isOverLimit || isTrialExhausted) {
+      alert("Trial Limit Reached: This swap exceeds your $200 limit. Please complete KYC for full access.");
+      console.warn("Transfer blocked by Sandbox Rules");
+      return;
+    }
+
+    // Navigate to Beneficiary first (Step 2.5) -> Then Review/Payment (Step 3)
+    // GLOBAL STATE: Set Swap Intent
+    setSwapIntent({
+      amount: offer.offerAmount,
+      currencyFrom: offer.currencyFrom, // EUR
+      currencyTo: offer.currencyTo || 'ARS',
+      rate: offer.marketRate,
+      timeFrame: 0, // Hardcoded Instant
+      provider: offer.provider
+    });
+
     router.push({
       pathname: '/beneficiary',
       query: {
-        offerId: offer.id,
-        userId: offer.userId,
-        from,
-        to,
-        amountIntent: offer.offerSend.toFixed(2),
-        expectedReceive: offer.offerReceive.toFixed(2),
-        marketRate: offer.marketRate.toFixed(4),
-        effectiveRate: offer.effectiveRate.toFixed(4),
-        totalFees: offer.totalFees.toFixed(2),
-        paymentMethod: offer.paymentMethod,
-        timeFrame: offer.timeFrame
+        amountIntent: offer.offerAmount,
+        expectedReceive: (offer.offerAmount * offer.marketRate).toFixed(2),
+        rate: offer.marketRate,
+        from: offer.currencyFrom,
+        to: offer.currencyTo,
+        timeFrame: 0,
+        provider: offer.provider
       }
     });
   };
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      <header style={{
-        background: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-        padding: '30px 40px',
-        color: 'white',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '600', margin: 0 }}>
-            Hello {userName},
-          </h1>
-          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-            <button
-              onClick={() => router.push('/app')}
-              style={{
-                background: 'rgba(255,255,255,0.2)',
-                border: 'none',
-                color: 'white',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                transition: 'background 0.2s'
-              }}
-            >
-              Dashboard
-            </button>
-            <span style={{ fontSize: '24px', cursor: 'pointer' }}>🔔</span>
-          </div>
-        </div>
-      </header>
+  const getCurrencyCode = (val: string) => {
+    if (!val) return '';
+    // val might be "Country-Code" or just "Code"
+    if (val.includes('-')) return val.split('-')[1];
+    return val;
+  };
 
-      <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 40px' }}>
+  const cFromCode = getCurrencyCode(from as string);
+
+  return (
+    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
+      <Header />
+      <main style={{ padding: '0 40px', maxWidth: '1000px', margin: '40px auto' }}>
         <div style={{
           backgroundColor: 'white',
           borderRadius: '16px',
           padding: '40px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
         }}>
-          <h2 style={{ fontSize: '24px', fontWeight: '600', marginBottom: '10px', color: '#2c3e50' }}>
-            Available Swap Matches
-          </h2>
-          <p style={{ fontSize: '15px', color: '#7f8c8d', marginBottom: '25px' }}>
-            All swaps start at market rate. Fees are itemized and transparent.
-          </p>
-
-          <div style={{
-            backgroundColor: '#e8f4fd',
-            borderRadius: '12px',
-            padding: '20px',
-            marginBottom: '30px',
-            border: '2px solid #4A90E2'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '4px' }}>You're Sending</div>
-                <div style={{ fontSize: '28px', fontWeight: '600', color: '#2c3e50' }}>
-                  {parseFloat(amountIntent as string || '0').toFixed(2)} {from}
-                </div>
-              </div>
-              <div style={{ textAlign: 'center', padding: '0 20px' }}>
-                <div style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '4px' }}>Market Rate</div>
-                <div style={{ fontSize: '20px', fontWeight: '600', color: '#4A90E2' }}>
-                  1 {from} = {parseFloat(rate as string || '0').toFixed(4)} {to}
-                </div>
-                <div style={{ fontSize: '13px', color: '#95a5a6', marginTop: '4px' }}>
-                  (1 {to} = {(1 / (parseFloat(rate as string) || 1)).toFixed(4)} {from})
-                </div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '14px', color: '#7f8c8d', marginBottom: '4px' }}>At Market Rate</div>
-                <div style={{ fontSize: '28px', fontWeight: '600', color: '#27ae60' }}>
-                  {parseFloat(expectedReceive as string || '0').toFixed(2)} {to}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px', color: '#7f8c8d' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-              <div>Finding best matches...</div>
-            </div>
-          ) : offers.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '60px',
-              backgroundColor: '#f8f9fa',
-              borderRadius: '12px',
-              border: '2px solid #e1e8ed'
-            }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>😔</div>
-              <div style={{ fontSize: '18px', fontWeight: '600', color: '#2c3e50', marginBottom: '8px' }}>
-                No matches available
-              </div>
-              <div style={{ fontSize: '14px', color: '#7f8c8d' }}>
-                Try adjusting your amount or time frame
-              </div>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {offers.map((offer, index) => {
-
-                return (
-                  <div
-                    key={offer.id}
-                    onClick={() => setSelectedOffer(offer.id)}
-                    style={{
-                      padding: '24px',
-                      backgroundColor: selectedOffer === offer.id ? '#f0f8ff' : '#fafbfc',
-                      border: selectedOffer === offer.id ? '2px solid #4A90E2' : '2px solid #e1e8ed',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (selectedOffer !== offer.id) {
-                        e.currentTarget.style.borderColor = '#b8d4f1';
-                        e.currentTarget.style.backgroundColor = '#fcfdfe';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (selectedOffer !== offer.id) {
-                        e.currentTarget.style.borderColor = '#e1e8ed';
-                        e.currentTarget.style.backgroundColor = '#fafbfc';
-                      }
-                    }}
-                  >
-                    {index === 0 && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '-10px',
-                        right: '20px',
-                        backgroundColor: '#27ae60',
-                        color: 'white',
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: '600'
-                      }}>
-                        Lowest Fees
-                      </div>
-                    )}
-
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'auto 1fr 1fr auto',
-                      gap: '20px',
-                      alignItems: 'center'
-                    }}>
-                      {/* Rank */}
-                      <div style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: index === 0
-                          ? 'linear-gradient(135deg, #27ae60 0%, #229954 100%)'
-                          : 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '18px',
-                        fontWeight: '600'
-                      }}>
-                        {index + 1}
-                      </div>
-
-                      {/* User Info */}
-                      <div>
-                        <div style={{ fontSize: '13px', color: '#7f8c8d', marginBottom: '4px', fontWeight: '500' }}>
-                          User ID
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: '600', color: '#2c3e50', fontFamily: 'monospace' }}>
-                          {offer.userId}
-                        </div>
-                        {offer.reputation && (
-                          <div style={{ fontSize: '13px', color: '#f39c12', marginTop: '4px' }}>
-                            ⭐ {offer.reputation.toFixed(1)} • {offer.completedTransactions} swaps
-                          </div>
-                        )}
-                      </div>
-
-                      {/* You Receive */}
-                      <div>
-                        <div style={{ fontSize: '13px', color: '#7f8c8d', marginBottom: '4px', fontWeight: '500' }}>
-                          You Receive (Est.)
-                        </div>
-                        <div style={{ fontSize: '22px', fontWeight: '600', color: '#27ae60' }}>
-                          {offer.marketReceive.toFixed(2)} {offer.currencyTo}
-                        </div>
-                        <div style={{ fontSize: '12px', color: '#95a5a6', marginTop: '2px' }}>
-                          Market Rate: {offer.marketRate.toFixed(4)}
-                        </div>
-                      </div>
-
-                      {/* Swap Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSwap(offer);
-                        }}
-                        style={{
-                          padding: '14px 28px',
-                          fontSize: '16px',
-                          fontWeight: '600',
-                          color: 'white',
-                          background: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                          border: 'none',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          boxShadow: '0 4px 12px rgba(74, 144, 226, 0.3)',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseOver={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(74, 144, 226, 0.4)';
-                        }}
-                        onMouseOut={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(74, 144, 226, 0.3)';
-                        }}
-                      >
-                        Swap →
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Transparency Note */}
-          <div style={{
-            marginTop: '30px',
-            padding: '16px',
-            backgroundColor: '#fff9e6',
-            border: '2px solid #ffc107',
-            borderRadius: '10px'
-          }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#856404', lineHeight: '1.6' }}>
-              💡 <strong>Full Transparency:</strong> Transactions are shown at <strong>market rate</strong> with <strong>no rate margin fee</strong>.
-              The final amount will be adjusted after Gateway, Payment Method, and Trueque fees are applied during the review step.
-            </p>
-          </div>
-
-          {/* Back Button */}
-          <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'center' }}>
+          {/* Navigation Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <button
-              onClick={() => router.back()}
+              onClick={() => router.push({ pathname: '/amount-selection', query: router.query })}
               style={{
-                padding: '14px 28px',
-                fontSize: '16px',
-                fontWeight: '600',
+                background: 'none',
+                border: 'none',
                 color: '#7f8c8d',
-                background: 'white',
-                border: '2px solid #e1e8ed',
-                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '600',
                 cursor: 'pointer',
-                transition: 'all 0.2s'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px'
               }}
             >
               ← Back to Swap
             </button>
+
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('trueque_swap_state');
+                router.push('/dashboard');
+              }}
+              style={{
+                background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
+                fontWeight: '600', cursor: 'pointer'
+              }}
+            >
+              Cancel ✕
+            </button>
           </div>
-        </div>
-      </main>
-    </div>
+
+          <h2 style={{
+            fontSize: '24px',
+            fontWeight: '600',
+            marginBottom: '10px',
+            color: '#2c3e50'
+          }}>
+            Select a Counterparty
+          </h2>
+          {isSandbox && (
+            <div style={{
+              backgroundColor: '#fff3cd',
+              border: '1px solid #ffeeba',
+              borderRadius: '10px',
+              padding: '15px',
+              marginBottom: '25px',
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'start'
+            }}>
+              <span style={{ fontSize: '20px' }}>🚧</span>
+              <div>
+                <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
+                  Account Verification in Progress
+                </strong>
+                <span style={{ fontSize: '14px', color: '#856404' }}>
+                  Your identity verification is currently in progress. To help you get started immediately, you are eligible for <strong>one trial swap of up to €{SANDBOX_LIMIT}</strong> until your KYC is fully approved.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>
+            Choose a match to proceed. Transaction speed is <strong>Instant</strong>.
+          </p>
+
+          {loading ? (
+            <div>Loading offers...</div>
+          ) : (
+            <div style={{ display: 'grid', gap: '15px' }}>
+              {offers.filter(o => o.currencyTo === 'ARS').map((offer) => {
+                const isExact = Math.abs(offer.amount - parseFloat(amountIntentQuery as string)) < 0.01;
+
+                // ES-AR Logic:
+                // Market Rate is EUR->ARS (e.g. 1050).
+                // Offer Amount is in ARS.
+                // Cost in EUR = Amount / Rate.
+                const costInEur = offer.offerAmount / offer.marketRate;
+                const eurEquivalent = offer.offerAmount / 1050; // Fixed check for limit
+
+                // Sandbox Enforcement
+                const hasUsedTrial = isSandbox && txCount >= 1;
+                const isOverLimit = isSandbox && eurEquivalent > SANDBOX_LIMIT;
+
+                // Lockout Logic
+                // If single swap used, EVERYTHING is view-only (disabled).
+                // If over limit, specific offer is disabled.
+                const isLocallyDisabled = isOverLimit;
+                const isGloballyLocked = hasUsedTrial;
+                const isDisabled = isGloballyLocked || isLocallyDisabled;
+
+                // Visual State
+                const opacity = isDisabled ? 0.4 : 1; // Updated to 0.4
+                const pointerEvents = isDisabled ? 'none' : 'auto';
+
+                // Tooltip & Badge Message
+                let badgeMsg = "";
+                let titleMsg = "";
+
+                if (isGloballyLocked) {
+                  titleMsg = "Trial completed. View Only.";
+                  badgeMsg = "Trial Completed - View Only";
+                } else if (isOverLimit) {
+                  titleMsg = `Trial Limit Reached: This swap exceeds your $200 limit.`;
+                  badgeMsg = "Trial Limit Exceeded";
+                }
+
+                return (
+                  <div
+                    key={offer.id}
+                    title={titleMsg}
+                    onClick={() => !isDisabled && handleSelectOffer(offer)}
+                    style={{
+                      border: isExact ? '2px solid #4A90E2' : '1px solid #e1e8ed',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      cursor: isDisabled ? 'not-allowed' : 'pointer',
+                      backgroundColor: isDisabled ? '#f9f9f9' : (isExact ? '#f0f7ff' : 'white'),
+                      opacity: opacity,
+                      transition: 'transform 0.2s, box-shadow 0.2s',
+                      position: 'relative'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isDisabled) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.05)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isDisabled) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }
+                    }}
+                  >
+                    {/* Badge Overlay for Restricted Items */}
+                    {isDisabled && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '-10px',
+                        right: '20px',
+                        backgroundColor: isGloballyLocked ? '#7f8c8d' : '#e74c3c',
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                      }}>
+                        {badgeMsg}
+                      </div>
+                    )}
+
+                    {/* 1. Left: Provider Info */}
+                    <div style={{ flex: '0 0 25%' }}>
+                      <div style={{ fontWeight: '700', fontSize: '18px', color: '#2c3e50' }}>
+                        {offer.provider}
+                      </div>
+                      <div style={{ fontSize: '14px', color: '#7f8c8d', marginTop: '4px' }}>
+                        Trust Score: {offer.trust} ⭐
+                      </div>
+                      {offer.isRound && (
+                        <div style={{
+                          marginTop: '5px',
+                          color: '#27ae60',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          backgroundColor: '#e8f5e9',
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '4px'
+                        }}>
+                          Efficient Match ✨
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. Center-Left: Match Amount (ARS) */}
+                    <div style={{ flex: '0 0 20%', textAlign: 'left' }}>
+                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        You Get
+                      </div>
+                      <div style={{ fontWeight: '700', fontSize: '20px', color: '#27ae60' }}>
+                        {offer.offerAmount.toLocaleString()} ARS
+                      </div>
+                    </div>
+
+                    {/* 3. Center: Rate (The Bridge) */}
+                    <div style={{ flex: '0 0 15%', textAlign: 'center' }}>
+                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        ARS/EUR
+                      </div>
+                      <div style={{ fontWeight: '600', fontSize: '16px', color: '#34495e', backgroundColor: '#ecf0f1', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                        {offer.marketRate.toFixed(2)}
+                      </div>
+                    </div>
+
+                    {/* 4. Center-Right: Cost (EUR) */}
+                    <div style={{ flex: '0 0 20%', textAlign: 'right' }}>
+                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        You Swap
+                      </div>
+                      <div style={{ fontWeight: '700', fontSize: '18px', color: '#2c3e50' }}>
+                        €{costInEur.toFixed(2)}
+                      </div>
+                      {isOverLimit && (
+                        <div style={{ fontSize: '11px', color: '#e74c3c', marginTop: '2px', fontWeight: 'bold' }}>
+                          Above Trial Limit
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 5. Right: Action Arrow */}
+                    <div style={{
+                      flex: '0 0 10%',
+                      textAlign: 'right',
+                      color: isDisabled ? '#bdc3c7' : '#4A90E2',
+                      fontWeight: 'bold',
+                      fontSize: '24px'
+                    }}>
+                      &rarr;
+                    </div>
+                  </div>
+                );
+              })}
+            </div >
+          )}
+        </div >
+      </main >
+    </div >
   );
 }

@@ -78,7 +78,7 @@ def write_signup_log(phone_number: str, trueque_id: str, corridor: str = "BR-US"
     log_dir = os.path.join(os.path.dirname(__file__), "../../protocol/audit")
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, filename)
-    timestamp = datetime.utcnow().isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()
     line = f"{timestamp} | {corridor} | {phone_number} | {trueque_id}\n"
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(line)
@@ -127,7 +127,7 @@ def signup(payload: SignupPayload):
             "id": user_id,
             "phone_number": payload.phone,
             "trueque_id": trueque_id,
-            "created_at": datetime.utcnow(),
+            "created_at": datetime.now(timezone.utc),
             "email": placeholder_email
         })
         db.commit()
