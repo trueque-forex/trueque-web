@@ -1,103 +1,87 @@
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
+import Link from 'next/link';
+import Head from 'next/head';
+import { useState } from 'react';
 
-export default function ForgotPasswordPage() {
-    const router = useRouter();
+export default function ForgotPassword() {
     const [email, setEmail] = useState('');
     const [submitted, setSubmitted] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // Logic to send recovery email would go here
+        // Logic for password reset would go here
         setSubmitted(true);
     };
 
     return (
-        <div style={{
-            minHeight: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#f5f7fa',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        }}>
-            <div style={{
-                background: 'white',
-                padding: '40px',
-                borderRadius: '16px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
-                width: '100%',
-                maxWidth: '400px',
-                textAlign: 'center'
-            }}>
-                <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '10px' }}>
-                    Recover your account
-                </h1>
+        <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col relative overflow-hidden">
+            <Head>
+                <title>Forgot Password - Symmetri</title>
+            </Head>
 
-                {!submitted ? (
-                    <>
-                        <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>
-                            Enter your email and we'll send you a link to reset your password.
-                        </p>
-                        <form onSubmit={handleSubmit}>
-                            <input
-                                type="email"
-                                required
-                                placeholder="name@example.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e1e8ed',
-                                    marginBottom: '20px',
-                                    boxSizing: 'border-box'
-                                }}
-                            />
-                            <button
-                                type="submit"
-                                style={{
-                                    width: '100%',
-                                    padding: '12px',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    backgroundColor: '#3498db',
-                                    color: 'white',
-                                    fontWeight: '600',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Send Recovery Link
-                            </button>
-                        </form>
-                    </>
-                ) : (
-                    <div style={{ color: '#27ae60' }}>
-                        <p>If an account exists for <strong>{email}</strong>, you will receive an email shortly.</p>
-                        <button
-                            onClick={() => router.push('/signin')}
-                            style={{
-                                marginTop: '20px',
-                                background: 'none',
-                                border: 'none',
-                                color: '#3498db',
-                                cursor: 'pointer',
-                                textDecoration: 'underline'
-                            }}
-                        >
-                            Back to Sign In
-                        </button>
+            {/* Decorative Glow */}
+            <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-[#1A73E8]/10 rounded-full blur-[100px] pointer-events-none" />
+
+            {/* Navigation */}
+            <nav className="absolute top-0 left-0 p-8 z-50">
+                <Link href="/signin" className="text-gray-500 hover:text-black transition-colors flex items-center gap-2 font-medium">
+                    ← Back to Sign In
+                </Link>
+            </nav>
+
+            <main className="flex-grow flex items-center justify-center p-6">
+                <div className="w-full max-w-md">
+
+                    <div className="text-center mb-10">
+                        <Link href="/" className="text-4xl font-bold tracking-tighter text-gray-900 block mb-2">
+                            Symmetri
+                        </Link>
                     </div>
-                )}
 
-                <div style={{ marginTop: '30px', borderTop: '1px solid #e1e8ed', paddingTop: '20px' }}>
-                    <a href="/support" style={{ fontSize: '14px', color: '#95a5a6', textDecoration: 'none' }}>
-                        Need help? Contact Support
-                    </a>
+                    <div className="bg-white border border-gray-200 shadow-xl shadow-gray-200/50 rounded-2xl p-8 md:p-10">
+                        {!submitted ? (
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="text-center mb-6">
+                                    <h2 className="text-2xl font-bold text-gray-900">Forgot Password?</h2>
+                                    <p className="text-gray-500 text-sm mt-2">Enter your email and we'll send you a link to reset your password.</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                                    <input
+                                        className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-[#1A73E8] focus:ring-1 focus:ring-[#1A73E8] transition-all"
+                                        type="email"
+                                        placeholder="name@example.com"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        required
+                                    />
+                                </div>
+
+                                <button
+                                    className="w-full py-4 bg-black text-white rounded-xl font-bold text-lg hover:bg-gray-800 transition-colors shadow-lg"
+                                >
+                                    Send Reset Link
+                                </button>
+                            </form>
+                        ) : (
+                            <div className="text-center py-8">
+                                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
+                                <p className="text-gray-500 mb-6">If an account exists for {email}, we have sent a password reset link.</p>
+                                <button
+                                    onClick={() => setSubmitted(false)}
+                                    className="text-[#1A73E8] font-bold hover:underline"
+                                >
+                                    Try another email
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                 </div>
-            </div>
+            </main>
         </div>
     );
 }

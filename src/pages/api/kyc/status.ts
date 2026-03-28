@@ -32,7 +32,7 @@ export function generateTruequeId(date: Date, countryCode: string, seq: number):
 }
 
 async function resolveSession(req: NextApiRequest): Promise<any | null> {
-  let session = await getSession(req);
+  let session: any = await getSession(req);
 
   if (!session && process.env.NODE_ENV !== 'production') {
     const auth = (req.headers.authorization || '').trim();
@@ -78,12 +78,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const userId = session.userId ?? session.user?.id ?? null;
+    // STRICT: Prefer session.user.id
+    const userId = session.user?.id || (session as any).userId || null;
+
+    // STRICT: Prefer session.user.kycStatus
     const kycStatus = (
-      session.kycStatus ??
-      session.kyc_status ??
-      session.user?.kycStatus ??
-      session.user?.kyc_status ??
+      session.user?.kycStatus ||
+      (session as any).kycStatus ||
+      (session as any).kyc_status ||
+      (session.user as any)?.kyc_status ||
       'unknown'
     ).toUpperCase();
 
@@ -96,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const user = await db('users').where({ id: userId }).first();
         if (user) {
-          trueque_id = user.trueque_id ?? null;
+          trueque_id = user.tid ?? null;
           kyc_verified_at = user.kyc_verified_at ?? null;
         }
       } catch (err) {

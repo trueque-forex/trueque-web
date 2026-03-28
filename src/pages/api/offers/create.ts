@@ -1,58 +1,85 @@
-// src/pages/api/offers/create.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/withAuth';
-import { TruequeSession } from '@/types/auth';
+import { query } from '../../../lib/db'; // Uses your existing, working DB connection
 
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method !== 'POST') return res.status(405).end();
-    const session = (req as any).session as TruequeSession;
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  // 1. Method Guard: Only allow POST
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
 
-    try {
-        const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+  try {
+    // 2. Destructure Inputs
+    const {
+      user_id,
+      swap_type,
+      amount_offered,
+      currency_offered,
+      amount_wanted,
+      currency_wanted,
+      exchange_rate,
+      fee_total,
+      fee_details
+    } = req.body;
 
-        // Support both camelCase and snake_case
-        const amount = body.amount;
-        const rate = body.rate;
-        const currencyFrom = body.currencyFrom || body.currency_from;
-        const currencyTo = body.currencyTo || body.currency_to;
-
-        if (!amount || Number.isNaN(Number(amount))) {
-            return res.status(400).json({ error: 'invalid_amount' });
-        }
-
-        if (!currencyFrom || !currencyTo) {
-            return res.status(400).json({ error: 'missing_currencies', message: 'currencyFrom and currencyTo are required' });
-        }
-
-        // For now, if rate is null the server may apply market rate later.
-        const parsedAmount = Number(amount);
-        const parsedRate = rate == null ? null : Number(rate);
-
-        // TODO: persist offer in DB and validate maker permissions/KYC if required.
-        const offerId = `offer_${Date.now()}`;
-        const offerUuid = `uuid_${Date.now()}`;
-        const createdAt = new Date().toISOString();
-
-        // Return payload matching mobile app expectations
-        return res.status(201).json({
-            id: parseInt(offerId.replace('offer_', '')),
-            uuid: offerUuid,
-            user_id: session.user.id,
-            currency_from: currencyFrom,
-            currency_to: currencyTo,
-            amount: parsedAmount,
-            market_rate: parsedRate || 0,
-            status: currencyFrom === 'COP' ? 'matched' : 'open',
-            counterparty_id: currencyFrom === 'COP' ? 'mock-counterparty-uuid' : null,
-            created_at: createdAt,
-            // Legacy fields for web app compatibility
-            offerId,
-            owner: session.user.id,
-            rate: parsedRate,
-        });
-    } catch (err: any) {
-        return res.status(500).json({ error: 'internal_error', message: err?.message || String(err) });
+    // 3. Basic Validation
+    if (
+      !user_id || 
+      !swap_type || 
+      !amount_offered || 
+      !currency_offered || 
+      !amount_wanted || 
+      !currency_wanted ||
+      !exchange_rate
+    ) {
+      return res.status(400).json({ error: 'Missing required fields for Offer creation.' });
     }
-}
 
-export default withAuth(handler);
+    // 4. SQL Insertion
+    // We use standard SQL here instead of the Supabase client wrapper
+    const sql = `
+      INSERT INTO offers (
+        user_id,
+        swap_type,
+        amount_offered,
+        currency_offered,
+        amount_wanted,
+        currency_wanted,
+        exchange_rate,
+        fee_total,
+        fee_details
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING *;
+    `;
+
+    const values = [
+      user_id,
+      swap_type,
+      amount_offered,
+      currency_offered,
+      amount_wanted,
+      currency_wanted,
+      exchange_rate,
+      fee_total || 0,
+      fee_details || {} // Postgres will handle the JSON stringifying automatically
+    ];
+
+    const result = await query(sql, values);
+    const newOffer = result.rows[0];
+
+    // 5. Success Response
+    return res.status(201).json({
+      success: true,
+      offer: newOffer,
+    });
+
+  } catch (err: any) {
+    console.error('Server Error:', err);
+    // Return the actual error message to help with debugging
+    return res.status(500).json({ error: err.message || 'Internal Server Error' });
+  }
+}

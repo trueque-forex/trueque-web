@@ -22,16 +22,16 @@ export function generateTruequeId(date: Date, countryCode: string, seq: number):
   const dd = date.getUTCDate().toString().padStart(2, '0');
   const seqStr = seq.toString().padStart(4, '0');
   const cc = (countryCode || 'XX').toUpperCase().slice(0, 2);
-  const payload = `T${yyyy}${mm}${dd}${cc}${seqStr}`;
+  const payload = `S${yyyy}${mm}${dd}${cc}${seqStr}`;
   const checksum = computeChecksum(payload);
   return `${payload}${checksum}`;
 }
 
 export function parseTruequeId(id: string): { countryCode: string; seq: number } | null {
-  if (!id || id.length !== 16 || !id.startsWith('T')) {
+  if (!id || id.length !== 16 || !id.startsWith('S')) {
     return null;
   }
-  // T YYYY MM DD CC SSSS K
+  // S YYYY MM DD CC SSSS K
   // 0 1234 56 78 90 1234 5
   const cc = id.slice(9, 11);
   const seqStr = id.slice(11, 15);

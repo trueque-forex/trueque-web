@@ -180,37 +180,34 @@ export default function KYCPage() {
         // Base pre-fill from session (Data Anchor)
         // PRIORITY: Context User -> Local Session -> Default
         const source = user || session;
-        // JOAO PATCH: If it's the test user, inject correct data if missing
-        const isJoao = (source.name || source.firstName || '').includes('Joao');
         let prefill: any = {
           // STEP 1: Personal
-          fullLegalName: source.name || `${session.firstName} ${session.lastName}`,
-          country: senderCountry || source.countryOfResidence || session.countryOfResidence || (isJoao ? 'US' : ''),
-          nationality: (source as any).nationality || session.nationality || (isJoao ? 'PT' : senderCountry) || '',
-          dateOfBirth: (source as any).dateOfBirth || (source as any).dob || session.dateOfBirth || session.dob || (isJoao ? '1990-01-01' : ''),
-          occupation: (source as any).occupation || session.occupation || (isJoao ? 'Software Engineer' : ''),
+          fullLegalName: source.name || (session.firstName ? `${session.firstName} ${session.lastName || ''}`.trim() : ''),
+          country: senderCountry || source.countryOfResidence || session.countryOfResidence || '',
+          nationality: (source as any).nationality || session.nationality || senderCountry || '',
+          dateOfBirth: (source as any).dateOfBirth || (source as any).dob || session.dateOfBirth || session.dob || '',
+          occupation: (source as any).occupation || session.occupation || '',
 
-          // STEP 2: Address (Joao Injection or Signup Sync)
-          // STEP 2: Address (Joao Injection or Signup Sync)
-          street_address: (source.street_address || session.street_address || source.address || session.address || (isJoao ? '123 Tech Boulevard' : '')),
+          // STEP 2: Address (Signup Sync)
+          street_address: (source.street_address || session.street_address || source.address || session.address || ''),
           apartment: (source.apartment || session.apartment || ''),
-          city: (source.city || session.city || (isJoao ? 'San Francisco' : '')),
-          state: (source.state_province || session.state_province || (isJoao ? 'CA' : '')),
-          postalCode: (source.postal_code || session.postal_code || (isJoao ? '94107' : '')),
+          city: (source.city || session.city || ''),
+          state: (source.state_province || session.state_province || ''),
+          postalCode: (source.postal_code || session.postal_code || ''),
 
-          // STEP 3: Documents (Joao Injection)
-          documentType: (isJoao ? 'passport' : 'passport'),
-          documentNumber: (isJoao ? 'P12345678' : ''),
-          documentIssueDate: (isJoao ? '2020-01-01' : ''),
-          documentExpiryDate: (isJoao ? '2030-01-01' : ''),
-          documentIssuingCountry: senderCountry || (isJoao ? 'PT' : ''),
+          // STEP 3: Documents
+          documentType: 'passport',
+          documentNumber: (source as any).documentNumber || '',
+          documentIssueDate: (source as any).documentIssueDate || '',
+          documentExpiryDate: (source as any).documentExpiryDate || '',
+          documentIssuingCountry: senderCountry || '',
 
-          // STEP 4: Additional Info (Joao Injection)
-          sourceOfFunds: (isJoao ? 'employment' : ''),
-          purposeOfTransaction: (isJoao ? 'Family support' : ''),
-          estimatedMonthlyVolume: (isJoao ? '1000-5000' : ''),
-          agreedToDataProcessing: (isJoao ? true : false),
-          agreedToScreening: (isJoao ? true : false)
+          // STEP 4: Additional Info
+          sourceOfFunds: (source as any).sourceOfFunds || '',
+          purposeOfTransaction: (source as any).purposeOfTransaction || '',
+          estimatedMonthlyVolume: (source as any).estimatedMonthlyVolume || '',
+          agreedToDataProcessing: (source as any).agreedToDataProcessing || false,
+          agreedToScreening: (source as any).agreedToScreening || false
         };
 
         // Enhanced pre-fill from Draft (if available)
@@ -545,10 +542,10 @@ export default function KYCPage() {
             borderRadius: '12px'
           }}>
             <h2 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '20px' }}>
-              🎉 Welcome to Trueque, {userName}!
+              🎉 Welcome to Symmetri, {userName}!
             </h2>
             <p style={{ margin: 0, color: '#34495e', lineHeight: '1.6' }}>
-              Before you can make your first swap, we need to complete a quick verification process. This helps us keep Trueque safe and compliant. Don't worry - this is just a test environment, so you can use fake information!
+              Before you can make your first swap, we need to complete a quick verification process. This helps us keep Symmetri safe and compliant. Don't worry - this is just a test environment, so you can use fake information!
             </p>
           </div>
         )}
@@ -1122,7 +1119,7 @@ export default function KYCPage() {
                     margin: '0 auto 30px auto'
                   }}>
                     <div style={{ fontSize: '14px', color: '#95a5a6', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      YOUR TRUEQUE ID
+                      YOUR SYMMETRI ID
                     </div>
                     <div style={{
                       fontSize: '28px',
@@ -1136,7 +1133,7 @@ export default function KYCPage() {
                     </div>
                     <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f6f3', borderRadius: '8px', borderLeft: '4px solid #27ae60' }}>
                       <p style={{ margin: 0, fontSize: '14px', color: '#16a085', textAlign: 'left' }}>
-                        This is your Trueque ID. It is your permanent key for secure account recovery and ensures your privacy and safety during peer-to-peer swaps. Store it in a safe, offline location.
+                        This is your Symmetri ID. It is your permanent key for secure account recovery and ensures your privacy and safety during peer-to-peer swaps. Store it in a safe, offline location.
                       </p>
                     </div>
                   </div>

@@ -41,8 +41,42 @@ export default function HistoryPage() {
                     ) : transactions.length === 0 ? (
                         <div style={{ padding: '40px', textAlign: 'center', backgroundColor: '#f8f9fa', borderRadius: '12px' }}>
                             <div style={{ fontSize: '48px', marginBottom: '10px' }}>📝</div>
-                            <p style={{ fontSize: '18px', color: '#95a5a6', margin: 0 }}>No past transactions found.</p>
-                        </div>
+                            <div style={{ marginTop: '20px', color: '#95a5a6' }}>
+                                No past transactions found.
+                            </div>
+
+                            <div style={{ marginTop: '30px', display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                                <button
+                                    onClick={() => router.push('/dashboard')}
+                                    style={{
+                                        padding: '12px 24px',
+                                        border: '1px solid #bdc3c7',
+                                        backgroundColor: 'white',
+                                        color: '#7f8c8d',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: '600'
+                                    }}
+                                >
+                                    ← Back to Dashboard
+                                </button>
+
+                                <button
+                                    onClick={() => router.push('/amount-selection')}
+                                    style={{
+                                        padding: '12px 24px',
+                                        border: 'none',
+                                        backgroundColor: '#4A90E2',
+                                        color: 'white',
+                                        borderRadius: '8px',
+                                        cursor: 'pointer',
+                                        fontWeight: '600',
+                                        boxShadow: '0 4px 12px rgba(74, 144, 226, 0.3)'
+                                    }}
+                                >
+                                    Start New Swap →
+                                </button>
+                            </div>          </div>
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                             {transactions.map((tx) => (

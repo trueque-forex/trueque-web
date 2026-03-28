@@ -49,7 +49,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<KycSubmitRespon
   if (req.method !== 'POST') return res.status(405).json({ code: 'METHOD_NOT_ALLOWED', message: 'Use POST' });
 
   const session = (req as any).session;
-  if (!session?.userId) return res.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
+  if (!session?.user?.id) return res.status(401).json({ code: 'UNAUTHENTICATED', message: 'Authentication required' });
 
   try {
     const { fields, files } = await parseForm(req);
@@ -61,15 +61,15 @@ async function handler(req: NextApiRequest, res: NextApiResponse<KycSubmitRespon
       });
     }
 
-    if (session.tid) {
-      console.log(`KYC submitted for TID: ${session.tid}`);
+    if (session.user.tid) {
+      console.log(`KYC submitted for TID: ${session.user.tid}`);
     }
 
     const fileKeys: Record<string, string | null> = {};
     for (const key of Object.keys(files)) {
       const f = files[key];
       if (f) {
-        const ref = await storeFileSecure(session.userId, f);
+        const ref = await storeFileSecure(session.user.id, f);
         fileKeys[key] = ref;
       } else {
         fileKeys[key] = null;
@@ -77,7 +77,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<KycSubmitRespon
     }
 
     const saved = await saveKycSubmissionToDb({
-      userId: session.userId,
+      userId: session.user.id,
       fields,
       file_refs: fileKeys,
     });

@@ -13,27 +13,7 @@ export const DEV_USERS = {
     is_test: true
   },
 
-  'joao.teste@trueque.dev': {
-    id: '11111111-1111-1111-1111-111111111111',
-    email: 'joao.teste@trueque.dev',
-    full_name: 'Joao Teste',
-    // bcrypt hash for plaintext 'jt123456'
-    passwordHash: '$2b$12$HQC8V.RY/YXZ2HG/mL0IoeA1oP6RaUqSonBfZWQqUfsU7poVC6e2G',
-    mfa_enabled: true,
-    tid: 'TDEV000111',
-    created_at: new Date().toISOString(),
-    kyc_status: 'approved',
-    // Mock profile data for auto-fill
-    address: 'Av. Paulista 1000',
-    city: 'São Paulo',
-    state: 'SP',
-    zip: '01310-100',
-    dob: '1990-01-01', // Mock DOB for recovery
-    country: 'Brazil',
-    phone: '+55 11 99999-9999',
-    document_number: '123456789', // Last 4: 6789
-    is_test: true
-  }
+
 };
 
 if (typeof global !== 'undefined') {

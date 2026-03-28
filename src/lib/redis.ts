@@ -1,53 +1,47 @@
-// src/lib/redis.ts
-type RedisClient = {
-  on: (ev: string, cb: (...args: any[]) => void) => void;
-  quit?: () => Promise<void>;
-  disconnect?: () => void;
-  [k: string]: any;
-};
+import Redis, { RedisOptions } from 'ioredis';
 
-let _redis: RedisClient | null = null;
+// Singleton Redis Client for Next.js HMR
+// Prevents connection limits and "Connection is closed" errors during dev
 
-export function getRedis(): RedisClient | null {
-  if (_redis) return _redis;
-  const url = process.env.REDIS_URL;
-  if (!url) return null;
-  try {
-    // lazy require so bundler doesn't include ioredis in client builds
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const IORedis = require('ioredis');
-    const client = new IORedis(url, { lazyConnect: false, connectTimeout: 10000 }) as RedisClient;
-    client.on('error', (err: unknown) => {
-      const msg = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : String(err);
-      console.warn('[redis] client error:', msg);
-    });
-    client.on('connect', () => {
-      console.debug('[redis] connected');
-    });
-    client.on('close', () => {
-      console.debug('[redis] closed');
-    });
-    _redis = client;
-    return _redis;
-  } catch (e: unknown) {
-    const msg = (e && typeof e === 'object' && 'message' in e) ? (e as any).message : String(e);
-    console.warn('ioredis not installed or failed to init:', msg);
-    return null;
-  }
-}
+const isProduction = process.env.NODE_ENV === 'production';
 
-export async function closeRedis(): Promise<void> {
-  if (!_redis) return;
-  try {
-    if (typeof _redis.quit === 'function') {
-      await _redis.quit();
-    } else if (typeof _redis.disconnect === 'function') {
-      _redis.disconnect();
+const redisOptions: RedisOptions = isProduction
+  ? { tls: { rejectUnauthorized: false } }
+  : {
+    maxRetriesPerRequest: null,
+    retryStrategy: (times: number) => {
+      // Linear backoff: 50ms, 100ms, 150ms... max 2s
+      const delay = Math.min(times * 50, 2000);
+      return delay;
     }
-  } catch (e: unknown) {
-    const msg = (e && typeof e === 'object' && 'message' in e) ? (e as any).message : String(e);
-    console.warn('error closing redis client:', msg);
-  } finally {
-    _redis = null;
-  }
+  };
+
+const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+
+// Global declaration to prevent TS errors
+declare global {
+  var redis: Redis | undefined;
 }
+
+let redisClient: Redis;
+
+if (!global.redis) {
+  console.log('[REDIS] Initializing New Client:', redisUrl.replace(/:[^:]*@/, ':****@'));
+  global.redis = new Redis(redisUrl, redisOptions);
+
+  global.redis.on('error', (err) => {
+    if ((err as any).code === 'ECONNREFUSED') {
+      // console.warn('[REDIS] Connection refused'); 
+    } else {
+      console.error('[REDIS] Error:', err);
+    }
+  });
+
+  global.redis.on('connect', () => {
+    console.log('[REDIS] Connected');
+  });
+}
+
+redisClient = global.redis;
+
+export const redis = redisClient;

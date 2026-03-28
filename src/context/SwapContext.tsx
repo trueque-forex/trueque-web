@@ -18,6 +18,7 @@ interface BeneficiaryData {
         lastName: string;
         phone: string;
         email: string;
+        relationship?: 'self' | 'family' | 'friend' | 'business';
     };
     banking: {
         deliveryMethod: string;
@@ -33,6 +34,13 @@ interface BeneficiaryData {
         cardExpiry?: string;     // Optional: Card
         cvv?: string;            // Optional: Card
         clabe?: string;          // Optional: MX
+        routingNumber?: string;   // Optional: US
+        pixKey?: string;         // Optional: BR
+        taxId?: string;          // Optional: BR/VE/DO
+        mobileNumber?: string;   // Optional: CO/VE
+        idNumber?: string;       // Optional: CO/VE/DO
+        cci?: string;            // Optional: PE
+        beneficiaryName?: string; // Optional: ES/MX/PE
     };
     // NEW: Support for Delivery Switcher Persistence
     saved_methods?: Record<string, any>;
@@ -63,14 +71,15 @@ const defaultBeneficiary: BeneficiaryData = {
         deliveryMethod: 'bank_rtp',
         cbu: '', alias: '', bankName: '', accountType: 'savings',
         cardNumber: '', walletProvider: '', walletId: '',
-        iban: '', accountNumber: '', cardExpiry: '', cvv: '', clabe: ''
+        iban: '', accountNumber: '', cardExpiry: '', cvv: '', clabe: '',
+        routingNumber: '', pixKey: '', taxId: '', mobileNumber: '', idNumber: '', cci: '', beneficiaryName: ''
     }
 };
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
-    const { user } = useAuth(); // Access User State
+    const { user, logout } = useAuth(); // Access User State & Logout for 401s
     const [swapIntent, setSwapIntentState] = useState<SwapIntent | null>(null);
     const [beneficiary, setBeneficiary] = useState<BeneficiaryData>(defaultBeneficiary);
     // NEW USER GUARDRAIL STATE
@@ -106,55 +115,59 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
     // NEW: Sync from API on Login
     useEffect(() => {
-        if (user) {
+        // Prevent fetching protected data if we are awaiting MFA verification
+        if (user && window.location.pathname !== '/verify-mfa') {
             console.log("SwapContext: User logged in, fetching beneficiaries...");
-            fetch('/api/beneficiaries')
-                .then(res => res.json())
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        // Parse API format to Internal Format (if needed, but usually matches)
-                        // API returns flat-ish structure. Map it if needed.
-                        // Current API returns { id, personal..., banking... } structure?
-                        // Lets check the API GET again.
-                        // API GET: { id, user_id, name, country, method, identifiers: {...}, saved_methods: {...} }
-                        // Context expects: { personal: { firstName... }, banking: { ... }, saved_methods }
+            // Use Centralized apiFetch for automatic 401 handling & redirect
+            import('../lib/apiFetch').then(({ default: apiFetch }) => {
+                apiFetch('/api/beneficiaries')
+                    .then(({ json }) => {
+                        const data = json;
+                        if (!data) return;
 
-                        const mapped = data.map((b: any) => {
-                            // Heuristic Name Split
-                            const [first, ...rest] = (b.name || '').split(' ');
-                            const last = rest.join(' ');
+                        if (Array.isArray(data)) {
+                            // Parse API format to Internal Format (if needed, but usually matches)
+                            // API returns flat-ish structure. Map it if needed.
+                            // Current API returns { id, user_id, name, country, method, identifiers: {...}, saved_methods: {...} }
+                            // Context expects: { personal: { firstName... }, banking: { ... }, saved_methods }
 
-                            return {
-                                id: b.id, // Keep ID for updates
-                                personal: {
-                                    firstName: first || '',
-                                    lastName: last || '',
-                                    phone: b.identifiers?.phone_number || '', // Map Check
-                                    email: b.identifiers?.email || ''
-                                },
-                                banking: {
-                                    deliveryMethod: b.method,
-                                    bankName: b.identifiers?.bank_name || '',
-                                    accountNumber: b.identifiers?.account_number || '',
-                                    cbu: b.identifiers?.cbu || '',
-                                    alias: b.identifiers?.alias || '',
-                                    walletProvider: b.identifiers?.wallet_provider || '',
-                                    walletId: b.identifiers?.wallet_id || '', // Check backend naming?
-                                    // ... map others
-                                    accountType: 'checking', // Default or fetch
-                                    iban: b.identifiers?.iban || '',
-                                    clabe: b.identifiers?.clabe || '',
-                                    cardNumber: b.identifiers?.card_number || ''
-                                },
-                                saved_methods: b.saved_methods
-                            };
-                        });
+                            const mapped = data.map((b: any) => {
+                                // Heuristic Name Split
+                                const [first, ...rest] = (b.name || '').split(' ');
+                                const last = rest.join(' ');
 
-                        setSavedBeneficiaries(mapped);
-                        localStorage.setItem('trueque_saved_beneficiaries', JSON.stringify(mapped));
-                    }
-                })
-                .catch(err => console.error("Failed to fetch beneficiaries", err));
+                                return {
+                                    id: b.id, // Keep ID for updates
+                                    personal: {
+                                        firstName: first || '',
+                                        lastName: last || '',
+                                        phone: b.identifiers?.phone_number || '', // Map Check
+                                        email: b.identifiers?.email || ''
+                                    },
+                                    banking: {
+                                        deliveryMethod: b.method,
+                                        bankName: b.identifiers?.bank_name || '',
+                                        accountNumber: b.identifiers?.account_number || '',
+                                        cbu: b.identifiers?.cbu || '',
+                                        alias: b.identifiers?.alias || '',
+                                        walletProvider: b.identifiers?.wallet_provider || '',
+                                        walletId: b.identifiers?.wallet_id || '', // Check backend naming?
+                                        // ... map others
+                                        accountType: 'checking', // Default or fetch
+                                        iban: b.identifiers?.iban || '',
+                                        clabe: b.identifiers?.clabe || '',
+                                        cardNumber: b.identifiers?.card_number || ''
+                                    },
+                                    saved_methods: b.saved_methods
+                                };
+                            });
+
+                            setSavedBeneficiaries(mapped);
+                            localStorage.setItem('trueque_saved_beneficiaries', JSON.stringify(mapped));
+                        }
+                    })
+                    .catch(err => console.error("Failed to fetch beneficiaries", err)); // apiFetch throws on error
+            });
         }
     }, [user]);
 

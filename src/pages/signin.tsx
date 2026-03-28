@@ -1,331 +1,221 @@
-// src/pages/signin.tsx
-import React, { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
+import Head from 'next/head';
 
-export default function SignInPage(): React.JSX.Element {
-  const router = useRouter();
-  const { prefill } = router.query;
-  const [identifier, setIdentifier] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [serverMessage, setServerMessage] = useState<string | null>(null);
+export default function Signin() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const idRef = useRef<HTMLInputElement | null>(null);
-  const passRef = useRef<HTMLInputElement | null>(null);
+  const [mfa, setMfa] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    if (typeof prefill === 'string' && prefill.length) {
-      setIdentifier(prefill);
-      setTimeout(() => passRef.current?.focus(), 0);
-    } else {
-      idRef.current?.focus();
-    }
-  }, [prefill]);
-
-  // Debug-friendly submit helper: sends { email, password } and returns parsed body
-  async function submitSignInPayload(identifierValue: string, passwordValue: string) {
-    console.log('DEBUG sending signin payload', { email: identifierValue, password: passwordValue });
-    const resp = await fetch('/api/auth/signin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: identifierValue, password: passwordValue })
-    });
-    const body = await resp.json().catch(() => null);
-    return { status: resp.status, ok: resp.ok, body };
-  }
-
-  async function submitSignIn(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    setServerMessage(null);
+  const handleSignin = async (e: any) => {
+    e.preventDefault();
     setLoading(true);
+    setError('');
 
     try {
-      const { status, ok, body } = await submitSignInPayload(identifier, password);
-      console.log('DEBUG signin response', { status, ok, body });
+      const res = await fetch('/api/auth/signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
 
-      if (!ok) {
-        if (body && (body.error === 'missing_fields' || body.code === 'MISSING_FIELDS')) {
-          setServerMessage('Missing email or password. Please fill both fields.');
-        } else if (body && body.error === 'invalid_credentials') {
-          setServerMessage('Invalid credentials. Try again or use Forgot password.');
-        } else {
-          setServerMessage(body?.message || `Sign in failed (${status})`);
-        }
-        setLoading(false);
-        return;
+      if (!res.ok) throw new Error(data.error || 'Sign in failed');
+
+      if (data.mfa_required) {
+        setMfa(data);
+      } else {
+        router.push('/dashboard');
       }
-
-      if (body && body.mfa_required) {
-        router.push(`/auth/mfa?mfa_token=${encodeURIComponent(body.mfa_token)}&tid=${encodeURIComponent(body.tid || '')}`);
-        return;
-      }
-
-      if (body && body.session) {
-        // Store session data in localStorage for greeting
-        localStorage.setItem('trueque_session', JSON.stringify(body.session));
-        localStorage.setItem('is_logged_in', 'true');
-
-        // Redirect to Flow B (Amount Selection) per "Budget-First" rule
-        router.replace('/amount-selection');
-        return;
-      }
-      // Redirect to Flow B
-      router.replace('/beneficiary-selection');
     } catch (err: any) {
-      console.error('signin unexpected error', err);
-      setServerMessage(err?.message || 'Network error during sign in');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  if (mfa) {
+    return <MfaView mfa={mfa} onSuccess={() => router.push('/dashboard')} onCancel={() => setMfa(null)} />;
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '14px',
-    fontSize: '16px',
-    border: '2px solid #e1e8ed',
-    borderRadius: '10px',
-    backgroundColor: 'white',
-    transition: 'border-color 0.2s',
-    boxSizing: 'border-box'
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    marginBottom: '10px',
-    fontSize: '15px',
-    fontWeight: '600',
-    color: '#34495e'
-  };
-
-  const errorStyle: React.CSSProperties = {
-    color: '#e74c3c',
-    fontSize: '14px',
-    marginTop: '12px',
-    padding: '12px',
-    backgroundColor: '#fff5f5',
-    border: '2px solid #e74c3c',
-    borderRadius: '8px',
-    fontWeight: '500'
-  };
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      {/* Header */}
-      <header style={{
-        background: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-        padding: '30px 40px',
-        color: 'white',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '600', margin: 0 }}>
-            Welcome back to Trueque
-          </h1>
-          <button
-            onClick={() => {
-              // Logout Audit: "Back to Welcome" triggers complete clear
-              sessionStorage.clear();
-              localStorage.removeItem('token');
-              localStorage.removeItem('trueque_session');
-              router.push('/');
-            }}
-            style={{
-              background: 'rgba(255,255,255,0.2)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 16px',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              transition: 'background 0.2s'
-            }}
-          >
-            Back to Welcome
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col relative overflow-hidden">
+      <Head>
+        <title>Sign In - Symmetri</title>
+      </Head>
 
-      {/* Main Content */}
-      <main style={{ maxWidth: 600, margin: '40px auto', padding: '0 40px' }}>
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          padding: '40px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-        }}>
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            marginBottom: '30px',
-            color: '#2c3e50',
-            textAlign: 'center'
-          }}>
-            Sign in to your account
-          </h2>
+      {/* Decorative Glow */}
+      <div className="absolute top-[-20%] right-[-10%] w-[500px] h-[500px] bg-brand/10 rounded-full blur-[100px] pointer-events-none" />
 
-          <form onSubmit={submitSignIn} noValidate>
-            <div style={{ display: 'grid', gap: '25px' }}>
-              {/* Username or Email */}
-              <div>
-                <label htmlFor="identifier" style={labelStyle}>Username or Email</label>
-                <input
-                  id="identifier"
-                  ref={idRef}
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="you@example.com or username"
-                  required
-                  autoComplete="username email"
-                  style={inputStyle}
-                />
-              </div>
+      {/* Navigation */}
+      <nav className="absolute top-0 left-0 p-8 z-50">
+        <Link href="/" className="text-gray-500 hover:text-black transition-colors flex items-center gap-2 font-medium">
+          ← Back to Home
+        </Link>
+      </nav>
 
-              {/* Password */}
-              <div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '10px'
-                }}>
-                  <label htmlFor="password" style={{ ...labelStyle, marginBottom: 0 }}>Password</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPassword((s) => !s);
-                      setTimeout(() => passRef.current?.focus(), 0);
-                    }}
-                    aria-pressed={showPassword}
-                    aria-controls="password"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#4A90E2',
-                      cursor: 'pointer',
-                      padding: 0,
-                      fontSize: '14px',
-                      fontWeight: '600'
-                    }}
-                  >
-                    {showPassword ? 'Hide' : 'Show'}
-                  </button>
-                </div>
+      <main className="flex-grow flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
 
-                <input
-                  id="password"
-                  ref={passRef}
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  style={inputStyle}
-                  placeholder="Enter your password"
-                />
-              </div>
+          <div className="text-center mb-10">
+            <Link href="/" className="text-4xl font-bold tracking-tighter text-gray-900 block mb-2">
+              Symmetri
+            </Link>
+            <p className="text-gray-500">Welcome back, please sign in.</p>
+          </div>
 
-              {/* Error Message */}
-              {serverMessage && (
-                <div role="alert" style={errorStyle}>
-                  {serverMessage}
+          <div className="bg-white border border-gray-200 shadow-xl shadow-gray-200/50 rounded-2xl p-8 md:p-10">
+            <form onSubmit={handleSignin} className="space-y-5">
+
+              {error && (
+                <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100">
+                  {error}
                 </div>
               )}
 
-              {/* Sign In Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  fontSize: '18px',
-                  fontWeight: '600',
-                  color: 'white',
-                  background: loading
-                    ? '#bdc3c7'
-                    : 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                  border: 'none',
-                  borderRadius: '12px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: loading ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.3)',
-                  marginTop: '10px'
-                }}
-              >
-                {loading ? 'Signing in…' : 'Sign In'}
-              </button>
-
-              {/* Secondary Actions */}
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                marginTop: '10px',
-                flexWrap: 'wrap',
-                justifyContent: 'center'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => router.push('/forgot-password')}
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#4A90E2',
-                    background: 'white',
-                    border: '2px solid #4A90E2',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  Forgot Password?
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => router.push('/signup')}
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    color: '#7f8c8d',
-                    background: 'white',
-                    border: '2px solid #e1e8ed',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  Create Account
-                </button>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                <input
+                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
+                  type="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
               </div>
-            </div>
-          </form>
 
-          {/* Additional Help Text */}
-          <p style={{
-            marginTop: '30px',
-            textAlign: 'center',
-            fontSize: '14px',
-            color: '#7f8c8d',
-            lineHeight: '1.6'
-          }}>
-            By signing in, you agree to Trueque's Terms of Service and Privacy Policy.
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-bold text-gray-700">Password</label>
+                  <Link href="/forgot-password" className="text-xs text-brand hover:underline font-medium">
+                    Forgot Password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <input
+                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all pr-12"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                disabled={loading}
+                className="w-full py-4 bg-brand text-white rounded-xl font-bold text-lg hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div className="mt-8 text-center">
+              <p className="text-gray-500 text-sm">
+                New to Symmetri?{' '}
+                <Link href="/signup" className="text-brand font-bold hover:underline">
+                  Create Account
+                </Link>
+              </p>
+            </div>
+          </div>
+
+          <p className="text-center text-xs text-gray-400 mt-8">
+            By signing in, you agree to our Terms of Service.
           </p>
+
         </div>
       </main>
+    </div>
+  );
+}
+
+function MfaView({ mfa, onSuccess, onCancel }: any) {
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const verify = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfa_token: mfa.mfa_token, code }),
+      });
+      if (res.ok) {
+        onSuccess();
+      } else {
+        const data = await res.json();
+        throw new Error(data.error || 'Verification failed');
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col items-center justify-center p-6 relative overflow-hidden">
+
+      {/* Decorative Glow */}
+      <div className="absolute bottom-[-20%] left-[-10%] w-[500px] h-[500px] bg-brand/10 rounded-full blur-[100px] pointer-events-none" />
+
+      <div className="w-full max-w-sm bg-white border border-gray-200 shadow-xl shadow-gray-200/50 rounded-2xl p-8 md:p-10 text-center">
+        <div className="mb-6">
+          <div className="w-16 h-16 bg-brand/10 rounded-full flex items-center justify-center mx-auto mb-4 text-brand">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Security Check</h2>
+          <p className="text-gray-500 text-sm">Enter the code sent to your device ending in ...{mfa.last4 || 'XX'}</p>
+        </div>
+
+        <form onSubmit={verify} className="space-y-6">
+          {error && <div className="text-red-500 text-sm font-medium">{error}</div>}
+
+          <input
+            className="w-full p-4 text-center text-4xl font-mono tracking-widest bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
+            maxLength={6}
+            placeholder="000000"
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            autoFocus
+          />
+
+          <button
+            disabled={loading}
+            className="w-full py-4 bg-black text-white rounded-xl font-bold text-lg hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50"
+          >
+            {loading ? 'Verifying...' : 'Verify Identity'}
+          </button>
+        </form>
+
+        <button onClick={onCancel} className="mt-6 text-sm text-gray-400 hover:text-gray-800 transition-colors">
+          Cancel and go back
+        </button>
+      </div>
     </div>
   );
 }

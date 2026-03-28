@@ -12,7 +12,7 @@ export default function SecureSwapPage() {
 
     // Transaction Data
     const [txData, setTxData] = useState({
-        total: 119.76, principal: 114.29, fees: 5.47, tid: 'JOAO TID', currency: 'EUR', methodType: 'RTP', amountReceive: 0
+        total: 119.76, principal: 114.29, fees: 5.47, tid: 'TX-PENDING', currency: 'EUR', methodType: 'RTP', amountReceive: 0
     });
 
     // Timer State
@@ -39,7 +39,7 @@ export default function SecureSwapPage() {
         } else {
             // B. Initialize from Query (New Transaction or Forced Init)
             const { amountTotal, amountPrincipal, amountFees, tid, transactionId, currency, methodType, amountReceive } = router.query;
-            const finalId = (transactionId as string) || (tid as string) || 'JOAO TID';
+            const finalId = (transactionId as string) || (tid as string) || 'TX-PENDING';
 
             if (amountTotal) {
                 const newData = {
@@ -213,7 +213,7 @@ export default function SecureSwapPage() {
                             <>
                                 <h2 style={{ fontSize: '20px', color: '#2c3e50', marginTop: 0 }}>Funding Instructions</h2>
                                 <p style={{ fontSize: '16px', lineHeight: '1.6', color: '#34495e', marginBottom: '25px' }}>
-                                    <span style={{ fontWeight: 'bold' }}>Joao</span>, please authorize the transfer of <span style={{ fontWeight: '800', color: '#2c3e50' }}>€{txData.total.toFixed(2)}</span> to the secure Adyen gateway in Spain.
+                                    <span style={{ fontWeight: 'bold' }}>{txData.tid === 'TX-PENDING' ? 'User' : 'Customer'}</span>, please authorize the transfer of <span style={{ fontWeight: '800', color: '#2c3e50' }}>€{txData.total.toFixed(2)}</span> to the secure Adyen gateway in Spain.
                                 </p>
                                 <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #4A90E2', marginBottom: '25px', fontSize: '14px', color: '#57606f' }}>
                                     This includes your swapped <span style={{ fontWeight: 'bold' }}>€{txData.principal.toFixed(2)}</span> and the <span style={{ fontWeight: 'bold' }}>€{txData.fees.toFixed(2)}</span> in fees.
@@ -257,7 +257,7 @@ export default function SecureSwapPage() {
                                             {/* Primary Action - Harmonized Blue */}
                                             <button onClick={handleSimulateSwap} style={{
                                                 display: 'block', width: '100%', padding: '16px',
-                                                backgroundColor: '#4A90E2', // Trueque Blue
+                                                backgroundColor: '#4A90E2', // Symmetri Blue
                                                 color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', fontSize: '16px',
                                                 boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)'
                                             }}>

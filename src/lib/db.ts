@@ -1,5 +1,5 @@
-// src/lib/db.ts
 import { Pool, PoolConfig } from "pg";
+import knex, { Knex } from "knex"; // Standard import to avoid require() ambiguity
 
 function mask(s: any) {
   try {
@@ -62,19 +62,28 @@ function createPool(): Pool {
 }
 
 export default function getPool(): Pool {
+  // Singleton Pattern for Next.js HMR (Prevent Connection Exhaustion)
+  if (process.env.NODE_ENV === 'development') {
+    if ((global as any).__PG_POOL) {
+      return (global as any).__PG_POOL;
+    }
+  }
+
   if (_pool) return _pool;
   _pool = createPool();
 
+  // Cache in global for dev
+  if (process.env.NODE_ENV === 'development') {
+    (global as any).__PG_POOL = _pool;
+  }
+
   // DEV-ONLY: pool-level query logger — remove after troubleshooting
-  // Logs each executed SQL and params and surfaces DB errors with SQL context.
-  // Active only when NODE_ENV === "development".
   if (process.env.NODE_ENV === "development") {
     try {
       const realQuery = (_pool as any).query.bind(_pool);
       (_pool as any).query = async function (text: any, params?: any[]) {
         try {
           const shortSql = String(text).replace(/\s+/g, " ").trim();
-          // mask very long param values for safety in logs
           const safeParams = (params || []).map((p: any) => {
             try {
               const s = String(p ?? "");
@@ -90,7 +99,6 @@ export default function getPool(): Pool {
         try {
           return await realQuery(text, params);
         } catch (err: any) {
-          // surface DB error with the SQL and params so we can capture root cause
           console.error(
             "[SQL ERROR]",
             err && err.message ? err.message : err,
@@ -107,11 +115,10 @@ export default function getPool(): Pool {
     }
   }
 
-  // surface unexpected client errors
   (_pool as any).on("error", (err: any) => {
     console.error("Unexpected PG client error (src/lib/db):", err);
   });
-  return _pool;
+  return _pool!;
 }
 
 export const query = async (text: string, params?: any[]) => {
@@ -135,13 +142,18 @@ export const transaction = async <T>(callback: (client: any) => Promise<T>): Pro
   }
 };
 
-export function getKnex() {
+// ADDED EXPORT KEYWORD AND SINGLETON CHECK
+export function getKnex(): Knex {
   if ((global as any).__KNEX_INSTANCE) return (global as any).__KNEX_INSTANCE;
-  const k = require('knex')({
+
+  const k = knex({
     client: 'pg',
     connection: process.env.DATABASE_URL,
     searchPath: ['public'],
   });
-  (global as any).__KNEX_INSTANCE = k;
+
+  if (process.env.NODE_ENV === 'development') {
+    (global as any).__KNEX_INSTANCE = k;
+  }
   return k;
 }

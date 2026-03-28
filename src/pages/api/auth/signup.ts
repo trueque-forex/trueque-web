@@ -1,24 +1,29 @@
 import { AppError, ErrorCode } from '../../../lib/errors';
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getKnex } from '../../../lib/db';
-import { buildTidAndReserve } from '../../../lib/buildTID'; // corrected relative path to src/lib/buildTID.ts
+import bcrypt from 'bcryptjs';
+import { encrypt, computeBlindIndex } from '../../../lib/crypto';
+import { generateMfaToken } from '../../../lib/mfaToken';
 import { respondWithSession } from '../../../lib/authResponse';
 import { getUtcDate } from '../../../lib/time';
+import { generateTruequeId } from '../../../lib/truequeId';
+import { mapUserToUI } from '../../../lib/mappers';
+
+// Helper: safe null
+const safeNull = (val: any) => (val && val !== '' ? val : null);
 
 async function createUserTransaction(db: any, payload: any) {
-  // ... (keep payload destructuring)
   const {
     email,
+    password, // Raw password
     firstName,
     lastName,
-    dob,
-    countryOfResidence,
-    countryDestiny,
-    address,
-    street_address,
-    apartment,
+    country, // Mapped from countryOfResidence/country_of_residence
+    street_address, // Mapped from address
+    address, // Fallback/Alternate source
     city,
-    state_province,
+    state, // Mapped from state_province
+    state_province, // specific payload field
     postal_code,
     beneficiary,
     phone,
@@ -26,7 +31,7 @@ async function createUserTransaction(db: any, payload: any) {
   } = payload;
 
   return await db.transaction(async (tx: any) => {
-    // ... (keep dev cleanup)
+    // 1. Check Existence
     if (isDev) {
       try {
         await tx.transaction(async (innerTx: any) => {
@@ -36,31 +41,43 @@ async function createUserTransaction(db: any, payload: any) {
             await innerTx('users').where({ id: existing.id }).del();
           }
         });
-      } catch (e) { console.warn('Dev cleanup failed', e); }
+      } catch (e) {
+        console.warn('Dev cleanup failed', e);
+      }
     } else {
-      // Enforce Unique Email for Prod
       const existing = await tx('users').where({ email }).first();
       if (existing) {
         throw new AppError(ErrorCode.AUTH_USER_ALREADY_EXISTS, 'User already exists', 409);
       }
     }
 
-    // ... (keep formatting)
+    // 2. Hash Password
+    let password_hash = null;
+    if (password) {
+      password_hash = await bcrypt.hash(password, 10);
+    }
+
+    // 3. Generate Smart TID (S + YYYYMMDD + CC + RandomSequence)
+    const now = getUtcDate();
+    const randomSequence = Math.floor(1000 + Math.random() * 8999); // 4 digits
+    const tid = generateTruequeId(now, country || 'US', randomSequence);
+
+    // 4. Insert User
     const toInsert = {
-      first_name: firstName || null,
-      last_name: lastName || null,
-      email: email || null,
-      phone: phone || null,
-      dob: dob || null,
-      country_of_residence: countryOfResidence || null,
-      country_destiny: countryDestiny || null,
-      address: address || null,
-      street_address: street_address || null,
-      apartment: apartment || null,
-      city: city || null,
-      state_province: state_province || null,
-      postal_code: postal_code || null,
-      is_test: isDev ? true : false,
+      first_name: safeNull(firstName),
+      last_name: safeNull(lastName),
+      email: safeNull(email),
+      phone_number: safeNull(phone) ? encrypt(phone) : null,
+      password_hash,
+      country: safeNull(country),
+      street_address: safeNull(street_address) ? encrypt(street_address) : (safeNull(address) ? encrypt(address) : null), // Prefer street_address, fallback to address
+      city: safeNull(city), // Cities usually not encrypted for analytics
+      state: safeNull(state) || safeNull(state_province), // Map state_province to state
+      postal_code: safeNull(postal_code), // Postcode often kept plain for geo
+      kyc_status: 'INCOMPLETE',
+      mfa_enabled: false,
+      mfa_method: null,
+      tid: tid, // AIMED: Included in the initial INSERT
       created_at: getUtcDate(),
     };
 
@@ -68,19 +85,13 @@ async function createUserTransaction(db: any, payload: any) {
     const inserted = Array.isArray(insertResult) ? (insertResult[0] ?? insertResult) : insertResult;
     const newId = inserted.id ?? inserted;
 
-    // ... (keep TID generation)
-    // Build canonical TID when not dev. Reserve sequence and set tid inside same transaction.
-    let tid: string;
-    if (isDev) {
-      tid = `TDEV${String(newId).padStart(6, '0')}`;
-    } else {
-      const randomSuffix = Math.floor(100000 + Math.random() * 900000); // 6 digits
-      tid = `TRQ-PENDING-${randomSuffix}`;
+    if (!newId) {
+      throw new Error("Database insert failed to return ID");
     }
 
-    await tx('users').where({ id: newId }).update({ tid });
+    // (Update logic removed as it's now part of Insert)
 
-    // ... (keep beneficiary insert)
+    // 5. Insert Beneficiary (if any)
     if (beneficiary?.name && beneficiary?.account) {
       await tx('beneficiaries').insert({
         user_id: newId,
@@ -91,11 +102,12 @@ async function createUserTransaction(db: any, payload: any) {
       });
     }
 
-    // ... (keep helper)
+    // 6. Return User Row
     const [userRow] = await tx('users')
-      .select('id', 'email', 'first_name', 'last_name', 'tid', 'created_at', 'country_of_residence', 'street_address', 'apartment', 'city', 'state_province', 'postal_code')
+      .select('id', 'email', 'first_name', 'last_name', 'tid', 'created_at', 'country', 'kyc_status', 'street_address', 'city', 'state', 'postal_code', 'phone_number') // inclusive select
       .where({ id: newId })
       .limit(1);
+
     return userRow;
   });
 }
@@ -107,54 +119,84 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const db = getKnex();
-    // ... (keep body parsing)
     const bodyRaw = req.body;
-    // ... (keep parsedBody IIFE - assumed same logic for brevity or copy if strict)
     const parsedBody = typeof bodyRaw === 'string' ? JSON.parse(bodyRaw) : bodyRaw;
 
+    // Destructure & Validate (Handle both camelCase and snake_case)
     const {
       email,
+      password,
       phone,
-      firstName,
-      lastName,
-      dob,
+      firstName: fnCamel,
+      first_name: fnSnake,
+      lastName: lnCamel,
+      last_name: lnSnake,
       countryOfResidence,
-      countryDestiny,
+      country_of_residence, // Client sends snake_case
       address,
       beneficiary,
       is_test
     } = parsedBody || {};
 
-    // Validate
-    if (!email) {
-      throw new AppError(ErrorCode.BAD_REQUEST, 'Email is required', 400);
-    }
+    const firstName = fnCamel || fnSnake;
+    const lastName = lnCamel || lnSnake;
+    const residence = countryOfResidence || country_of_residence;
 
-    const payloadForInsert = {
-      email,
-      phone,
-      firstName,
-      lastName,
-      dob,
-      countryOfResidence,
-      countryDestiny,
-      address,
-      beneficiary,
+    // --- RELAXED VALIDATION (Fast Signup Rule) ---
+    if (!email) throw new AppError(ErrorCode.BAD_REQUEST, 'Email is required', 400);
+    if (!password) throw new AppError(ErrorCode.BAD_REQUEST, 'Password is required', 400);
+    if (!firstName) throw new AppError(ErrorCode.BAD_REQUEST, 'First name is required', 400);
+    if (!lastName) throw new AppError(ErrorCode.BAD_REQUEST, 'Last name is required', 400);
+    if (!phone) throw new AppError(ErrorCode.BAD_REQUEST, 'Phone number is required', 400);
+    if (!residence) throw new AppError(ErrorCode.BAD_REQUEST, 'Country of residence is required', 400);
+
+    const payload = {
+      ...parsedBody,
+      country: residence, // Map resolved residence to 'country' for DB logic
+      firstName: firstName, // Use resolved value
+      lastName: lastName, // Use resolved value
       isDev: process.env.NODE_ENV === 'development' || is_test === true,
     };
 
-    const user = await createUserTransaction(db, payloadForInsert);
-    return await respondWithSession(res, user);
+    const user = await createUserTransaction(db, payload);
+
+    if (!user || !user.id) {
+      throw new AppError(ErrorCode.INTERNAL_SERVER_ERROR, 'Failed to create user (No ID returned)', 500);
+    }
+
+    // Verify DB Creation
+    console.log(`[DB_VERIFY] User created in DB: ${user.email} (ID: ${user.id})`);
+
+    // 7. GENERATE MFA (Restores Console Log)
+    await generateMfaToken(user.email);
+
+    // --- A+ REFACTOR: Use Single Source of Truth Mapper ---
+    const mappedUser = mapUserToUI(user);
+
+    // SESSION UNIFICATION: Use respondWithSession to ensure cookie structure matches verify.ts
+    return await respondWithSession(req, res, mappedUser);
+
   } catch (err: any) {
     if (err instanceof AppError) {
       return res.status(err.statusCode).json(err.toJSON());
     }
-    console.error('signup create error', err);
+    console.error('[SIGNUP] Fatal Error:', err);
+
+    if (err.code === '23505') {
+      return res.status(409).json({
+        error: {
+          code: ErrorCode.AUTH_USER_ALREADY_EXISTS,
+          message: 'Account already exists or ID collision. Please try again.',
+          detail: err.detail
+        }
+      });
+    }
+
     return res.status(500).json({
       error: {
         code: ErrorCode.INTERNAL_SERVER_ERROR,
         message: 'Internal Server Error',
-        detail: err?.message
+        detail: err?.message || 'Unknown error'
       }
     });
   }

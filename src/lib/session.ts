@@ -1,170 +1,131 @@
 // src/lib/session.ts
-import type { IncomingMessage, ServerResponse } from 'http';
-import { serialize, parse } from 'cookie';
+import { SignJWT, jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
+import { NextApiResponse } from 'next';
+import { serialize } from 'cookie';
+import { decrypt as decryptData } from './crypto';
+import { TruequeSession } from '../types/auth'; // IMPORT SHARED TYPE
 
-const TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
-const COOKIE_NAME = 'trueque_sid';
-const redisClient: any = null; // TODO: Initialize Redis client if needed
+const SECRET_KEY = process.env.SESSION_SECRET || 'default_local_secret_change_me_in_prod';
+const key = new TextEncoder().encode(SECRET_KEY);
 
-const inMemoryStore: Map<string, string> =
-  (global as any).__TRUEQUE_SESSION_STORE__ || ((global as any).__TRUEQUE_SESSION_STORE__ = new Map<string, string>());
-
-// Helpers
-function serializeCookie(name: string, value: string, maxAge: number) {
-  return serialize(name, value, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge,
-  });
+// 2. ENCRYPT
+export async function encrypt(payload: TruequeSession) {
+  return await new SignJWT(payload as unknown as Record<string, unknown>)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('24h')
+    .setJti(uuidv4())
+    .sign(key);
 }
 
-function parseCookieHeader(header?: string | null) {
-  if (!header) return {};
+// 3. DECRYPT
+export async function decrypt(input: string): Promise<TruequeSession | null> {
   try {
-    return parse(header);
-  } catch {
-    // fallback simple parse
-    return header.split(';').map((p) => p.split('=')).reduce<Record<string, string>>((acc, [k, v]) => {
-      if (!k) return acc;
-      acc[k.trim()] = (v || '').trim();
-      return acc;
-    }, {});
-  }
-}
-
-// Core functions
-
-import { TruequeSession } from '../types/auth';
-
-// ... imports remain the same ...
-
-// createSession: persists payload and sets cookie on the response.
-// Returns the canonical raw sid (e.g., "sess:...")
-export async function createSession(res: ServerResponse, payload: TruequeSession) {
-  const sid = 'sess:' + uuidv4();
-  const raw = JSON.stringify(payload);
-
-  if (redisClient) {
-    try {
-      await redisClient.set(sid, raw, { EX: TTL_SECONDS });
-    } catch {
-      // fallback to in-memory if Redis set fails
-      inMemoryStore.set(sid, raw);
-    }
-  } else {
-    inMemoryStore.set(sid, raw);
-  }
-
-  res.setHeader('Set-Cookie', serializeCookie(COOKIE_NAME, sid, TTL_SECONDS));
-  console.log('[SESSION] Created Session:', sid, 'Store Size:', inMemoryStore.size);
-  return sid;
-}
-
-// getSessionById accepts either the raw sid or a cookie-like value and returns parsed payload or null.
-// If a raw header value is passed in (from cookie parsing), it will handle either raw sid or encoded sid.
-export async function getSessionById(sidLike?: string | null): Promise<TruequeSession | null> {
-  if (!sidLike) return null;
-  // FIX: Decode the SID to handle URL-encoded colons (%3A) from cookies
-  const sid = decodeURIComponent(String(sidLike));
-
-  // Accept both plain sid and cookie-serialized sid values.
-  const candidate = sid;
-
-  try {
-    if (redisClient) {
-      const v = await redisClient.get(candidate);
-      if (v) return JSON.parse(v) as TruequeSession;
-      return null;
-    } else {
-      const v = inMemoryStore.get(candidate);
-      if (!v) return null;
-      return JSON.parse(v) as TruequeSession;
-    }
-  } catch {
+    const { payload } = await jwtVerify(input, key, { algorithms: ['HS256'] });
+    return payload as unknown as TruequeSession;
+  } catch (error) {
     return null;
   }
 }
 
-// getSession reads cookie from IncomingMessage and returns parsed session payload or null.
-// Also supports Authorization: Bearer <token> for mobile/API clients.
-export async function getSession(req: IncomingMessage): Promise<TruequeSession | null> {
-  // 1. Check for Bearer token (Mobile/API)
-  const authHeader = (req as any).headers?.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
-    try {
-      const jwt = require('jsonwebtoken'); // Lazy load to avoid overhead if not needed
-      const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-      const decoded = jwt.verify(token, secret) as TruequeSession;
-      return decoded;
-    } catch (err) {
-      // Invalid token, fall through to cookie check or return null?
-      // Usually if auth header is present but invalid, we should probably fail, 
-      // but returning null allows mapped handling upstream (e.g. 401).
-      return null;
-    }
-  }
-
-  // 2. Check for Cookie (Web)
-  const header = (req as any).headers?.cookie;
-  if (!header) return null;
-  const parsed = parseCookieHeader(header);
-  const sid = parsed[COOKIE_NAME];
-  if (!sid) return null;
-
-  // DEBUG LOGGING requested by Directive
-  console.log('[SESSION] Raw Cookie SID:', sid);
-  const decoded = decodeURIComponent(sid); // Preview what getSessionById will do
-  console.log('[SESSION] Decoded SID:', decoded);
-
-  return getSessionById(sid);
+// 4. COOKIE HELPERS
+export function setSessionCookie(res: NextApiResponse, token: string) {
+  const cookie = serialize('session', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 60 * 60 * 24,
+    path: '/',
+    sameSite: 'lax',
+  });
+  res.setHeader('Set-Cookie', cookie);
 }
 
-// destroySession deletes the session payload and clears cookie on response if provided.
-export async function destroySession(req: IncomingMessage | null, res: ServerResponse | null) {
-  try {
-    let sid: string | undefined;
-    if (req) {
-      const header = (req as any).headers?.cookie;
-      const parsed = parseCookieHeader(header);
-      sid = parsed[COOKIE_NAME];
-    }
+export function destroySession(res: NextApiResponse) {
+  const cookieOpts: any = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    expires: new Date(0),
+    maxAge: 0,
+    path: '/',
+    sameSite: 'lax',
+  };
 
-    if (sid) {
-      if (redisClient) {
-        try {
-          await redisClient.del(sid);
-        } catch {
-          inMemoryStore.delete(sid);
-        }
-      } else {
-        inMemoryStore.delete(sid);
-      }
-    }
-
-    if (res) {
-      // clear cookie
-      res.setHeader(
-        'Set-Cookie',
-        serialize(COOKIE_NAME, '', {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 0,
-        })
-      );
-    }
-  } catch {
-    // swallow errors to avoid crashing route handlers
-  }
+  res.setHeader('Set-Cookie', [
+    serialize('session', '', cookieOpts),
+    serialize('trueque_sid', '', cookieOpts)
+  ]);
 }
 
-// Small debug helper (only exported in dev)
-export function _DEBUG_getStoredKeys() {
-  if (redisClient) return null;
-  return Array.from(inMemoryStore.keys());
+// 5. SESSION CREATION
+// We accept a partial user, but we MUST ensure it matches SessionUser strictness
+// 5. SESSION CREATION
+// We accept a partial user, but we MUST ensure it matches SessionUser strictness
+export async function createSession(user: any, mfaVerified = false) {
+
+  // SANITIZATION STEP:
+  // We manually pick fields to ensure no hidden functions (like .save() or .update())
+  // from the database object get passed to the JWT generator.
+
+  // STRICT VALIDATION: Ensure ID is present. 
+  // We do NOT allow "sub" fallback here. The caller must normalize the user object.
+  const userId = user.id;
+  if (!userId) {
+    console.warn('[createSession] Missing user.id', user);
+    throw new Error('createSession requires user.id');
+  }
+
+  const cleanUser: TruequeSession['user'] = {
+    id: String(userId),
+    email: user.email,
+    // Map snake_case (DB) to camelCase (Session) if needed, but prefer explicit inputs.
+    kycStatus: user.kyc_status || user.kycStatus || 'NONE',
+    userType: (user.user_type === 'MERCHANT' || user.userType === 'MERCHANT') ? 'MERCHANT' : 'PEER',
+    tid: user.tid,
+    firstName: user.first_name || user.firstName,
+    lastName: user.last_name || user.lastName,
+    name: user.name || [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(' '),
+    txCount: user.tx_count || user.txCount || 0,
+    phone: decryptData(user.phone_number || user.phone) || '',
+    country: user.country || user.country_of_residence || '',
+    street_address: decryptData(user.street_address || user.address) || '',
+    city: user.city || '',
+    state: user.state || user.state_province || '',
+    postalCode: user.postal_code || user.postalCode || ''
+  };
+
+  const sessionData: TruequeSession = {
+    user: cleanUser,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    mfaVerified
+  };
+
+  // Now we are safe to encrypt because cleanUser is pure JSON.
+  return await encrypt(sessionData);
+}
+
+// 6. GET SESSION
+export async function getSession(tokenOrReq: string | any): Promise<TruequeSession | null> {
+  let token = tokenOrReq;
+  // Adapter: handle request object
+  if (typeof tokenOrReq === 'object' && tokenOrReq.cookies) {
+    token = tokenOrReq.cookies.session || tokenOrReq.cookies.trueque_sid;
+  }
+
+  if (!token || typeof token !== 'string') return null;
+  return await decrypt(token);
+}
+
+// Added back for MFA/Totp flows
+export async function getSessionById(cookieString: string | null): Promise<{ userId: string } | null> {
+  if (!cookieString) return null;
+  // Try both cookie names
+  let match = cookieString.match(/session=([^;]+)/);
+  if (!match) match = cookieString.match(/trueque_sid=([^;]+)/);
+
+  const val = match ? match[1] : null;
+  if (!val) return null;
+
+  const sess = await decrypt(val);
+  return sess ? { userId: sess.user.id } : null;
 }

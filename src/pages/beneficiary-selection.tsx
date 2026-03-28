@@ -16,7 +16,7 @@ export default function BeneficiarySelectionPage() {
     const { swapIntent } = useSwap(); // Access Global State
     const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userName, setUserName] = useState('User');
+    const [userName, setUserName] = useState('Guest');
 
     useEffect(() => {
         // 1. ROUTE GUARD (GEMINI CONSTANT 2025)
@@ -33,7 +33,7 @@ export default function BeneficiarySelectionPage() {
             try {
                 const session = JSON.parse(sessionData);
                 // Smart Name Logic: Try firstName, then first part of full_name
-                const name = session.firstName || session.full_name?.split(' ')[0] || 'Joao';
+                const name = session.firstName || session.full_name?.split(' ')[0] || 'Guest';
                 setUserName(name);
                 activeSession = true;
             } catch (e) {

@@ -1,5 +1,7 @@
-// src/pages/api/transactions/submit.ts
 import { NextApiRequest, NextApiResponse } from 'next'
+import { withAuth } from '../../../lib/withAuth'
+import { TruequeSession } from '../../../types/auth'
+import { getUtcDate } from '../../../lib/time'
 
 // Simple in-memory counter (dev only). Use a DB sequence in production.
 let globalCounter = 0
@@ -12,14 +14,16 @@ function corridorCode(from = 'XX', to = 'XX') {
   return (from || 'XX').slice(0, 2).toUpperCase()
 }
 
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
+function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
-  if (!token) return res.status(401).json({ error: 'Missing token' })
+  const session = (req as any).session as TruequeSession
+  if (!session || !session.user || !session.user.id) {
+    return res.status(401).json({ error: 'Unauthorized - Session required' })
+  }
 
   const body = req.body || {}
 
@@ -56,7 +60,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   // Return complete transaction object for mobile app
   return res.status(201).json({
     id: transactionId,
-    user_id: 'user_demo', // TODO: Extract from token
+    user_id: session.user.id,
     counterparty_id: counterpartyId || null,
     currency_from: currencyFrom,
     currency_to: currencyTo,
@@ -75,3 +79,5 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     estimatedDelivery: null,
   })
 }
+
+export default withAuth(handler)

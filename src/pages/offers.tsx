@@ -101,6 +101,7 @@ export default function Offers() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeBracket, setActiveBracket] = useState(0); // Default to Instant (0)
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Initialize
   useEffect(() => {
@@ -108,9 +109,14 @@ export default function Offers() {
 
     // Ensure we have necessary data, default to ES->AR values if missing
     const amount = parseFloat(amountIntentQuery as string) || 100000;
-    const rate = parseFloat(rateQuery as string) || 1050.00; // EUR->ARS rate
     const cFrom = from as string || 'EUR';
     const cTo = to as string || 'ARS';
+
+    let rate = parseFloat(rateQuery as string) || 1055.00; // EUR->ARS rate
+    // Fix for low-magnitude rate passed from previous screen (e.g. 1.055 instead of 1055)
+    if (cTo === 'ARS' && rate < 100) {
+      rate = rate * 1000;
+    }
 
     // if (isNaN(amount) || isNaN(rate)) return; -> Removed to allow direct access
 
@@ -133,14 +139,34 @@ export default function Offers() {
   const [txCount, setTxCount] = useState<number>(0);
 
   useEffect(() => {
-    const sessionStr = localStorage.getItem('trueque_session');
-    if (sessionStr) {
-      try {
-        const s = JSON.parse(sessionStr);
-        setKycStatus(s.kycStatus || s.kyc_status || '');
-        setTxCount(s.txCount || 0);
-      } catch { }
-    }
+    // Fetch fresh session to check KYC status
+    fetch('/api/auth/session')
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          const currentKycStatus = (data.user.kycStatus || data.user.kyc_status || 'NOT_STARTED').toUpperCase();
+          const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+
+          let statusResult = currentKycStatus;
+          if (!data.user.firstName && !data.user.first_name && currentKycStatus === 'NOT_STARTED') {
+            statusResult = 'NOT_STARTED';
+          }
+
+          if (restrictedStatuses.includes(statusResult)) {
+            console.warn(`[Offers Guard] Redirecting to KYC: Status=${statusResult}`);
+            setIsRedirecting(true);
+            router.replace('/kyc');
+            return;
+          }
+
+          setKycStatus(statusResult);
+          setTxCount(data.user.txCount || 0);
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch session, defaulting to RESTRICTED/PENDING for safety");
+        setKycStatus('PENDING');
+      });
   }, []);
 
   const isSandbox = (kycStatus || '').toUpperCase() === 'PENDING';
@@ -189,7 +215,7 @@ export default function Offers() {
   const handleSelectOffer = (offer: Offer) => {
     // Redundant Security Check (Hard Click-Block)
     // Redundant Security Check (Hard Click-Block)
-    const eurEquivalent = offer.offerAmount / 1050; // Fixed divisor as per requirement
+    const eurEquivalent = offer.offerAmount / 1055; // Fixed divisor as per requirement
     const isOverLimit = isSandbox && eurEquivalent > SANDBOX_LIMIT;
     const isTrialExhausted = isSandbox && txCount >= 1;
 
@@ -231,8 +257,15 @@ export default function Offers() {
     return val;
   };
 
-  const cFromCode = getCurrencyCode(from as string);
+  if (loading || isRedirecting) {
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Loading secure matches...</div>;
+  }
 
+  const currentStatus = (kycStatus || '').toUpperCase();
+  const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+  if (restrictedStatuses.includes(currentStatus)) {
+    return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Redirecting to security profile...</div>;
+  }
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
       <Header />
@@ -323,7 +356,7 @@ export default function Offers() {
                 // Offer Amount is in ARS.
                 // Cost in EUR = Amount / Rate.
                 const costInEur = offer.offerAmount / offer.marketRate;
-                const eurEquivalent = offer.offerAmount / 1050; // Fixed check for limit
+                const eurEquivalent = offer.offerAmount / 1055; // Fixed check for limit
 
                 // Sandbox Enforcement
                 const hasUsedTrial = isSandbox && txCount >= 1;

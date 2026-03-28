@@ -64,12 +64,12 @@ export default async function apiFetch<T = any>(
 
   if (res.status === 401) {
     if (typeof window !== 'undefined' && !(opts as any)?.skipAuthRedirect) {
-      // SAFETY-OFF: Disable auto-redirect to prevent loops.
-      // AuthContext will handle state updates using the 401 status.
-      // localStorage.removeItem('trueque_session');
-      // sessionStorage.clear();
-      // window.location.href = '/signin?error=session_expired'; 
-      console.warn('apiFetch: 401 received. Redirect suppressed.');
+      // GRACEFUL REDIRECT: Redirect to Landing with Security Message
+      // AuthContext will handle state updates using the 401 status, but we force navigation here to be safe.
+      localStorage.removeItem('trueque_session');
+      sessionStorage.clear();
+      window.location.href = '/?error=session_expired';
+      console.warn('apiFetch: 401 received. Redirecting to Landing.');
     }
   }
 
@@ -96,9 +96,13 @@ export default async function apiFetch<T = any>(
   const apiErr: ApiError = {
     status: res.status,
     statusText: res.statusText,
-    message:
-      (parsedBody && (parsedBody.message || parsedBody.error)) ||
-      `Request failed: ${res.status} ${res.statusText}`,
+    message: (() => {
+      const errObj = parsedBody?.error || parsedBody;
+      const baseMsg = errObj?.message || errObj?.error || `Request failed: ${res.status} ${res.statusText}`;
+      const detail = errObj?.detail || parsedBody?.detail;
+      if (typeof baseMsg !== 'string') return JSON.stringify(baseMsg);
+      return detail ? `${baseMsg}: ${detail}` : baseMsg;
+    })(),
     body: parsedBody,
     headers: headersObj,
     details: parsedBody?.details ?? undefined,

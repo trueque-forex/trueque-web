@@ -43,7 +43,7 @@ export default function VerifyPage() {
   return (
     <main className="max-w-xl mx-auto p-6 space-y-6">
       <h1 className="text-2xl font-bold">🔐 Verify Identity</h1>
-      <p><strong>Trueque ID:</strong> {userId}</p>
+      <p><strong>Symmetri ID:</strong> {userId}</p>
       <p><strong>Email:</strong> {email}</p>
       <p><strong>Phone:</strong> {phone}</p>
       <p><strong>PEP:</strong> {isPEP === 'true' ? 'Yes' : 'No'}</p>

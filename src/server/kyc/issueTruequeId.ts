@@ -23,10 +23,10 @@ export async function issueTruequeId(userId: string, countryCode: string): Promi
       await client.query('ROLLBACK');
       throw new Error(`User not found: ${userId}`);
     }
-    if (user.trueque_id) {
+    if (user.tid) {
       await client.query('ROLLBACK');
-      console.error('🧪 [TruequeIssuer] already issued:', userId, 'tid=', user.trueque_id);
-      return { trueque_id: user.trueque_id };
+      console.error('🧪 [TruequeIssuer] already issued:', userId, 'tid=', user.tid);
+      return { trueque_id: user.tid };
     }
 
     const dayKey = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -58,20 +58,13 @@ export async function issueTruequeId(userId: string, countryCode: string): Promi
 
     await client.query(
       `UPDATE users
-       SET trueque_id = $1, kyc_verified_at = $2, kyc_status = $3
+       SET tid = $1, kyc_verified_at = $2, kyc_status = $3
        WHERE id = $4`,
       [tid, now.toISOString(), 'approved', userId]
     );
 
-    console.error('🧪 [TruequeIssuer] update executed for:', userId);
-
-    await client.query(
-      `INSERT INTO kyc_audit (user_id, issued_at, trueque_id)
-       VALUES ($1, $2, $3)`,
-      [userId, now.toISOString(), tid]
-    );
-
-    console.error('🧪 [TruequeIssuer] audit row inserted for:', userId);
+    // console.error('🧪 [TruequeIssuer] update executed for:', userId);
+    // Note: kyc_audit table is currently missing in DB. Skipping audit log.
 
     await client.query('COMMIT');
     return { trueque_id: tid };

@@ -10,9 +10,9 @@ export default function PaymentMethodsPage() {
         if (sessionData) {
             try {
                 const session = JSON.parse(sessionData);
-                setUserName(session.name || (session.firstName ? `${session.firstName} ${session.lastName || ''}` : 'Juan Tester'));
+                setUserName(session.name || (session.firstName ? `${session.firstName} ${session.lastName || ''}`.trim() : 'User'));
             } catch (e) {
-                setUserName('Juan Tester');
+                setUserName('User');
             }
         }
     }, []);

@@ -30,8 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { fields, files } = await parseForm(req);
 
     // Defensive: validate expected fields
-    const userId = String(fields.userId || '');
-    if (!userId) return res.status(400).json({ error: 'Missing userId field' });
+    const id = String(fields.id || '');
+    if (!id) return res.status(400).json({ error: 'Missing id field' });
 
     // Example file handling: if a file was uploaded under 'document'
     const incomingFile = files?.document ?? files?.file ?? null;
@@ -49,13 +49,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({
         status: 'ok',
         message: 'KYC retry received',
-        userId,
+        id,
         filename: incomingFile.originalFilename ?? incomingFile.name ?? null,
         size: buffer.length,
       });
     }
 
-    return res.status(200).json({ status: 'ok', message: 'KYC retry received', userId });
+    return res.status(200).json({ status: 'ok', message: 'KYC retry received', id });
   } catch (err: unknown) {
     console.error('KYC retry error', err);
     return res.status(500).json({ error: 'Failed to process request' });

@@ -65,7 +65,7 @@ export default function FeesPage() {
           <strong>Amount to Send:</strong> {parsedAmount} BRL
         </p>
         <p>
-          <strong>Trueque Fee (1.5%):</strong> BRL {truequeFee.toFixed(2)}
+          <strong>Platform Service Fee (1.5%):</strong> BRL {truequeFee.toFixed(2)}
         </p>
         <p>
           <strong>Delivery Fee:</strong> BRL {deliveryFee.toFixed(2)}

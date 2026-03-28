@@ -17,7 +17,7 @@ export default function SupportPage() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !dob || (!last4 && !tid)) {
-      setMessage({ type: 'error', text: 'Please provide Email, Date of Birth, and either Last 4 digits of Phone or Trueque ID.' });
+      setMessage({ type: 'error', text: 'Please provide Email, Date of Birth, and either Last 4 digits of Phone or Symmetri ID.' });
       return;
     }
     setLoading(true);
@@ -58,7 +58,7 @@ export default function SupportPage() {
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
             <h2 style={{ fontSize: '20px', marginBottom: '15px' }}>Common Topics</h2>
             <ul style={{ lineHeight: '2', color: '#34495e' }}>
-              <li><Link href="/how-it-works">How Trueque Works</Link></li>
+              <li><Link href="/how-it-works">How Symmetri Works</Link></li>
               <li><a href="#">Transaction Limits</a></li>
               <li><a href="#">Verification (KYC) Guide</a></li>
             </ul>
@@ -67,7 +67,7 @@ export default function SupportPage() {
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)', borderLeft: '5px solid #e74c3c' }}>
             <h2 style={{ fontSize: '20px', marginBottom: '15px', color: '#c0392b' }}>Lost Device / MFA Reset</h2>
             <p style={{ marginBottom: '20px', color: '#7f8c8d' }}>
-              If you lost your device or cannot access your 2FA method, verify your identity using your registered details or Trueque ID.
+              If you lost your device or cannot access your 2FA method, verify your identity using your registered details or Symmetri ID.
             </p>
 
             {!resetMode ? (
@@ -80,7 +80,7 @@ export default function SupportPage() {
             ) : (
               <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '8px' }}>
                 <h3 style={{ fontSize: '18px', marginBottom: '15px' }}>Identity Challenge</h3>
-                
+
                 {!verified ? (
                   <form onSubmit={handleVerify}>
                     <div style={{ marginBottom: '15px' }}>
@@ -120,7 +120,7 @@ export default function SupportPage() {
                     </div>
 
                     <div style={{ marginBottom: '15px' }}>
-                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>Trueque ID (T+YYYYMMDD+CC0000-X)</label>
+                      <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>Symmetri ID (T+YYYYMMDD+CC0000-X)</label>
                       <input
                         type="text"
                         value={tid}

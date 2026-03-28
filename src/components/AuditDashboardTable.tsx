@@ -31,17 +31,17 @@ type Props = {
 export default function AuditDashboardTable({ entries, offers, debug = false }: Props) {
   const rows: AuditEntry[] = (entries as AuditEntry[]) ?? (offers as any[] ?? []);
   const [showModal, setShowModal] = useState(false);
-  const [retryUserId, setRetryUserId] = useState<string | null>(null);
+  const [retryId, setRetryId] = useState<string | null>(null);
 
-  function handleRetryClick(userId: string) {
-    setRetryUserId(userId);
+  function handleRetryClick(id: string) {
+    setRetryId(id);
     setShowModal(true);
-    if (debug) console.log('Retrying KYC for user:', userId);
+    if (debug) console.log('Retrying KYC for user:', id);
   }
 
   // allow failureReason to be string | null | undefined
   function handleRetryComplete({ verified, failureReason }: { verified: boolean; failureReason?: string | null }) {
-    console.log('Retry result:', verified ? '✅ Verified' : `❌ Failed: ${failureReason}`);
+    console.log('Retry result:', verified ? '✅ Verified' : `❌ Failed: ${failureReason} `);
     // Optionally refetch entries or show toast
   }
 
@@ -90,8 +90,8 @@ export default function AuditDashboardTable({ entries, offers, debug = false }: 
         </tbody>
       </table>
 
-      {showModal && retryUserId && (
-        <KYCRetryModal userId={retryUserId} onClose={() => setShowModal(false)} onRetryComplete={handleRetryComplete} />
+      {showModal && retryId && (
+        <KYCRetryModal id={retryId} onClose={() => setShowModal(false)} onRetryComplete={handleRetryComplete} />
       )}
     </>
   );

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import { useSwap } from '../context/SwapContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
+import brandConfig from '../config/brand_config.json';
 
 // ----------------------
 // TYPES & MOCKS
@@ -72,7 +73,6 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
 // CONFIGURATION
 // ----------------------
 const GATEWAY_PROCESSING_COST = 2.50;
-const TRUEQUE_PLATFORM_FEE = 0.005;
 const RETAILER_VOUCHER_FEE = 2.00; // Mock Retailer Fee
 
 // Card Specifics
@@ -241,7 +241,10 @@ export default function ReviewPage() {
     }
 
     const gatewayFee = GATEWAY_PROCESSING_COST;
-    const platformFee = principalSource * TRUEQUE_PLATFORM_FEE;
+
+    // 5. Symmetri Platform Fee (Tiered: 1.0% <= 500, 1.5% > 500)
+    const platformFeeRate = principalSource <= 500 ? 0.010 : 0.015;
+    const platformFee = principalSource * platformFeeRate;
 
     let outboundFee = 0;
     if (deliveryMethod === 'card_push') outboundFee = principalSource * 0.015;
@@ -346,8 +349,8 @@ export default function ReviewPage() {
     setLoading(true);
     try {
       const s = JSON.parse(localStorage.getItem('trueque_session') || '{}');
-      const name = s.firstName || s.email?.split('@')[0] || 'Joao';
-      const brandedId = `${name.toUpperCase()} TID`;
+      const name = s.firstName || s.email?.split('@')[0] || 'User';
+      const brandedId = `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
       const payload = {
         amount: breakdown.totalToPaySource,
@@ -364,10 +367,18 @@ export default function ReviewPage() {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Swap failed');
+      if (!res.ok) {
+        const err = await res.json();
+        if (res.status === 403 && err.error?.code === 'KYC_LIMIT_EXCEEDED') {
+          alert(`⚠️ Limit Exceeded!\n\nYou have reached your Tier limit of €${err.error.metadata.limit}.\nCurrent Volume: €${err.error.metadata.current}\n\nPlease Upgrade to Tier 2 for Unlimited Swaps.`);
+          return;
+        }
+        throw new Error(err.error?.message || 'Swap failed');
+      }
 
-      s.txCount = (s.txCount || 0) + 1;
-      localStorage.setItem('trueque_session', JSON.stringify(s));
+      const sessionData = JSON.parse(localStorage.getItem('trueque_session') || '{}');
+      sessionData.txCount = (sessionData.txCount || 0) + 1;
+      localStorage.setItem('trueque_session', JSON.stringify(sessionData));
 
       router.push({
         pathname: '/secure-swap',
@@ -384,9 +395,13 @@ export default function ReviewPage() {
           init: 'true'
         }
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('Transaction failed. Please try again.');
+      if (e.message !== 'Swap failed') { // Already handled alert
+        // checks if we didn't already alert
+      } else {
+        alert('Transaction failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -441,10 +456,10 @@ export default function ReviewPage() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', backgroundColor: '#fff', fontSize: '14px' };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: 'sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: brandConfig.theme.fontFamily }}>
       <Header />
-      <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 40px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) 1fr', gap: '40px', backgroundColor: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+      <main style={{ maxWidth: 1200, margin: '40px auto', padding: '0 20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(450px, 1.2fr) 1fr', gap: '40px', backgroundColor: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
 
           {/* LEFT: PAYMENT */}
           <div>
@@ -533,7 +548,7 @@ export default function ReviewPage() {
 
               {/* 5. Service / Platform */}
               <div style={rowStyle}>
-                <span>Platform Fee <Tooltip text="The cost for using the Trueque app to find the best market rate and organize your swap from start to finish" /></span>
+                <span>Platform Fee <Tooltip text="The cost for using the Symmetri app to find the best market rate and organize your swap from start to finish" /></span>
                 <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.platformFee)}</span>
               </div>
 
@@ -554,7 +569,7 @@ export default function ReviewPage() {
               {/* DYNAMIC COMPLIANCE TAXES */}
               {breakdown.appliedTaxes.map((tax, i) => (
                 <div key={i} style={rowStyle}>
-                  <span>{tax.label} <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Trueque does not receive or handle these funds" /></span>
+                  <span>{tax.label} <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Symmetri does not receive or handle these funds" /></span>
                   <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(tax.amountSource)}</span>
                 </div>
               ))}
@@ -565,6 +580,12 @@ export default function ReviewPage() {
               <div style={{ ...rowStyle, color: '#e67e22', fontWeight: 'bold', fontSize: '16px' }}>
                 <span>Total Additional Cost (Friction)</span>
                 <span>+ €{currencyFmt(breakdown.totalFeesSource)}</span>
+              </div>
+
+              {/* FRICTION PERCENTAGE - NEW */}
+              <div style={{ ...rowStyle, color: '#e67e22', fontWeight: 'bold', fontSize: '16px', marginTop: '-4px' }}>
+                <span>Total Additional Cost (%)</span>
+                <span>{(breakdown.principalSource > 0 ? (breakdown.totalFeesSource / breakdown.principalSource * 100).toFixed(2) : '0.00')}%</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
@@ -595,10 +616,10 @@ export default function ReviewPage() {
                 disabled={loading}
                 style={{
                   flex: 2, padding: '14px', borderRadius: '10px',
-                  border: 'none', backgroundColor: '#4A90E2', // Trueque Blue
+                  border: 'none', backgroundColor: brandConfig.theme.actionColor, // Symmetri Blue
                   color: 'white', fontWeight: 'bold', cursor: 'pointer',
                   opacity: loading ? 0.7 : 1, fontSize: '16px',
-                  boxShadow: loading ? 'none' : '0 4px 15px rgba(74, 144, 226, 0.3)'
+                  boxShadow: loading ? 'none' : `0 4px 15px ${brandConfig.theme.actionColor}4D`
                 }}
               >
                 {loading ? 'Processing...' : `Confirm & Swap €${currencyFmt(breakdown.totalToPaySource)}`}

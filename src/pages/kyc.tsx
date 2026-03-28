@@ -7,10 +7,11 @@ type DocumentType = 'passport' | 'drivers_license' | 'national_id';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { useAuth } from '../context/AuthContext'; // Integration
 import { generateTruequeID } from '@/lib/idGenerator';
+import brandConfig from '../config/brand_config.json';
 
 export default function KYCPage() {
   useRequireAuth(); // Auth Guard
-  const { user } = useAuth(); // Context Access
+  const { user, refreshSession } = useAuth(); // Context Access
   const router = useRouter();
   const { returnTo, offerId, userId, from, to, amountIntent, expectedReceive, newUser } = router.query;
 
@@ -33,19 +34,39 @@ export default function KYCPage() {
       } catch { }
     }
 
-    // 0. Joao Lockdown (If pre-filled data exists, we lock it for the test user to prevent tampering/drift)
-    // 0. Joao Lockdown
-    const name = (effectiveUser?.name || effectiveUser?.firstName || '').toLowerCase();
-    const email = (effectiveUser?.email || '').toLowerCase();
-    const isJoao = name.includes('joao') || email.includes('joao');
+    // 0. Placeholder Detection
+    const isPlaceholder = (val: string) => {
+      if (!val) return true;
+      const v = val.toLowerCase().trim();
+      return v === 'user' || v === 'test' || v === 'friend' || v === 'none';
+    };
 
-    // 1. Fully Locked States
+    // 1. Initial State (New User) - Unlock Everything
     const status = (effectiveUser?.kycStatus || effectiveUser?.kyc_status || '').toUpperCase();
+    if (status === 'NONE' || status === 'INCOMPLETE' || !status) return false;
 
-    // UNLOCK IF STATUS IS NONE (New User) enabled
-    if (status === 'NONE' || !status) return false;
+    // 2. Source Validated Lockdown (The "Signup Truth" Rule)
+    // If we have "Truth" data from signup/session, we lock the field to prevent drifting.
+    if (fieldName === 'dateOfBirth' && (effectiveUser?.dob || effectiveUser?.date_of_birth)) return true;
 
-    if (isJoao) return true;
+    // Lock Name if we have a structured first/last name (Strong Signal)
+    // Only lock if names are present and NOT placeholders
+    if (fieldName === 'fullLegalName') {
+      const fn = effectiveUser?.firstName || '';
+      const ln = effectiveUser?.lastName || '';
+      const name = effectiveUser?.name || '';
+      if ((fn && ln && !isPlaceholder(fn) && !isPlaceholder(ln)) || (name && !isPlaceholder(name))) return true;
+    }
+
+    // Address Locks (Strict Signup Integrity)
+    if (fieldName === 'street_address' && (effectiveUser?.street_address || effectiveUser?.address)) return true;
+    if (fieldName === 'city' && effectiveUser?.city) return true;
+    if (fieldName === 'state' && (effectiveUser?.state_province || effectiveUser?.state)) return true;
+    if (fieldName === 'postalCode' && (effectiveUser?.postal_code || effectiveUser?.postalCode)) return true;
+    if (fieldName === 'country' && (effectiveUser?.countryOfResidence || effectiveUser?.country_of_residence)) return true;
+    if (fieldName === 'documentIssuingCountry' && (effectiveUser?.countryOfResidence || effectiveUser?.country_of_residence)) return true;
+    if (fieldName === 'documentType' && (effectiveUser?.countryOfResidence || effectiveUser?.country_of_residence)) return true;
+
     if (status === 'PENDING' || status === 'VERIFIED' || status === 'APPROVED') {
       return true;
     }
@@ -68,14 +89,11 @@ export default function KYCPage() {
       } catch { }
     }
     const status = (effectiveUser?.kycStatus || effectiveUser?.kyc_status || '').toUpperCase();
-    const name = (effectiveUser?.name || effectiveUser?.firstName || '').toLowerCase();
-    const email = (effectiveUser?.email || '').toLowerCase();
-    const isJoao = name.includes('joao') || email.includes('joao');
 
-    // UNLOCK IF STATUS IS NONE
-    if (status === 'NONE' || !status) return false;
+    // UNLOCK IF STATUS IS NONE OR INCOMPLETE
+    if (status === 'NONE' || status === 'INCOMPLETE' || !status) return false;
 
-    return isJoao || status === 'PENDING' || status === 'VERIFIED' || status === 'APPROVED';
+    return status === 'PENDING' || status === 'VERIFIED' || status === 'APPROVED';
   })();
 
   // Helper for Remediation Mode
@@ -104,16 +122,15 @@ export default function KYCPage() {
     occupation: '',
 
     // Address Information
-    // Address Information
-    street_address: '',
-    apartment: '',
+    street_address: '', // Mapped from addressLine1
+    apartment: '', // Mapped from addressLine2
     city: '',
-    state: '', // Maps to state_province
+    state: '',
     postalCode: '',
-    country: '',
+    country: 'MX', // Default
 
     // Document Information
-    documentType: 'passport' as DocumentType,
+    documentType: 'national_id' as DocumentType,
     documentNumber: '',
     documentIssueDate: '',
     documentExpiryDate: '',
@@ -126,8 +143,48 @@ export default function KYCPage() {
 
     // Consent
     agreedToDataProcessing: false,
-    agreedToScreening: false
+    agreedToScreening: false,
+    phone: ''
   });
+
+  // --- PREPOPULATION LOGIC (Preserving Existing Logic) ---
+  useEffect(() => {
+    if (user && !loading) {
+      setKycData(prev => {
+        const newData = { ...prev };
+        let changed = false;
+
+        // Name Logic: Combine First + Last or use Name
+        if (!prev.fullLegalName) {
+          const fn = user.firstName || '';
+          const ln = user.lastName || '';
+          const combined = [fn, ln].filter(Boolean).join(' ');
+
+          if (combined && combined.toLowerCase() !== 'user') {
+            newData.fullLegalName = combined;
+            changed = true;
+          } else if (user.name && user.name.toLowerCase() !== 'user') {
+            newData.fullLegalName = user.name;
+            changed = true;
+          }
+        }
+
+        // DOB Logic
+        if (!prev.dateOfBirth && (user.dob || user.date_of_birth)) {
+          newData.dateOfBirth = user.dob || user.date_of_birth || '';
+          changed = true;
+        }
+
+        // Address Logic (If available in user profile)
+        if (!prev.country && (user.countryOfResidence || user.country)) {
+          newData.country = user.countryOfResidence || user.country;
+          changed = true;
+        }
+
+        return changed ? newData : prev;
+      });
+    }
+  }, [user, loading]);
 
   // File uploads
   const [documentFrontFile, setDocumentFrontFile] = useState<File | null>(null);
@@ -176,40 +233,39 @@ export default function KYCPage() {
         }
 
         // Base pre-fill from session (Data Anchor)
-        // Base pre-fill from session (Data Anchor)
         // PRIORITY: Context User -> Local Session -> Default
-        const source = user || session;
-        // JOAO PATCH: If it's the test user, inject correct data if missing
-        const isJoao = (source.name || source.firstName || '').includes('Joao');
+        const source = user || session || {};
         let prefill: any = {
           // STEP 1: Personal
-          fullLegalName: source.name || `${session.firstName} ${session.lastName}`,
-          country: senderCountry || source.countryOfResidence || session.countryOfResidence || (isJoao ? 'US' : ''),
-          nationality: (source as any).nationality || session.nationality || (isJoao ? 'PT' : senderCountry) || '',
-          dateOfBirth: (source as any).dateOfBirth || (source as any).dob || session.dateOfBirth || session.dob || (isJoao ? '1990-01-01' : ''),
-          occupation: (source as any).occupation || session.occupation || (isJoao ? 'Software Engineer' : ''),
+          fullLegalName: (source.firstName && source.lastName)
+            ? `${source.firstName} ${source.lastName}`
+            : (source.name && source.name.toLowerCase() !== 'user' ? source.name : ''),
+          country: senderCountry || source.countryOfResidence || session?.countryOfResidence || '',
+          nationality: (source as any).nationality || session?.nationality || senderCountry || '',
+          dateOfBirth: (source as any).dateOfBirth || (source as any).dob || session?.dateOfBirth || session?.dob || '',
+          occupation: (source as any).occupation || session?.occupation || '',
 
-          // STEP 2: Address (Joao Injection or Signup Sync)
-          // STEP 2: Address (Joao Injection or Signup Sync)
-          street_address: (source.street_address || session.street_address || source.address || session.address || (isJoao ? '123 Tech Boulevard' : '')),
-          apartment: (source.apartment || session.apartment || ''),
-          city: (source.city || session.city || (isJoao ? 'San Francisco' : '')),
-          state: (source.state_province || session.state_province || (isJoao ? 'CA' : '')),
-          postalCode: (source.postal_code || session.postal_code || (isJoao ? '94107' : '')),
+          // STEP 2: Address (Signup Sync)
+          street_address: (source.street_address || session?.street_address || source.address || session?.address || ''),
+          apartment: (source.apartment || session?.apartment || ''),
+          city: (source.city || session?.city || ''),
+          state: (source.state_province || session?.state_province || ''),
+          postalCode: (source.postal_code || session?.postal_code || ''),
 
-          // STEP 3: Documents (Joao Injection)
-          documentType: (isJoao ? 'passport' : 'passport'),
-          documentNumber: (isJoao ? 'P12345678' : ''),
-          documentIssueDate: (isJoao ? '2020-01-01' : ''),
-          documentExpiryDate: (isJoao ? '2030-01-01' : ''),
-          documentIssuingCountry: senderCountry || (isJoao ? 'PT' : ''),
+          // STEP 3: Documents
+          documentType: 'passport',
+          documentNumber: '',
+          documentIssueDate: '',
+          documentExpiryDate: '',
+          documentIssuingCountry: source.countryOfResidence || session?.countryOfResidence || senderCountry || '',
+          phone: source.phone || session?.phone || '',
 
-          // STEP 4: Additional Info (Joao Injection)
-          sourceOfFunds: (isJoao ? 'employment' : ''),
-          purposeOfTransaction: (isJoao ? 'Family support' : ''),
-          estimatedMonthlyVolume: (isJoao ? '1000-5000' : ''),
-          agreedToDataProcessing: (isJoao ? true : false),
-          agreedToScreening: (isJoao ? true : false)
+          // STEP 4: Additional Info
+          sourceOfFunds: '',
+          purposeOfTransaction: '',
+          estimatedMonthlyVolume: '',
+          agreedToDataProcessing: false,
+          agreedToScreening: false
         };
 
         // Enhanced pre-fill from Draft (if available)
@@ -303,35 +359,35 @@ export default function KYCPage() {
         };
       case 'MX':
         return {
-          street_address: 'Av. Reforma 123',
-          apartment: 'Col. Centro',
-          city: 'Ciudad de México',
-          state: 'CDMX',
-          postalCode: '01000'
+          street_address: 'e.g. Av. Reforma 123',
+          apartment: 'e.g. Col. Centro',
+          city: 'e.g. Ciudad de México',
+          state: 'e.g. CDMX',
+          postalCode: 'e.g. 01000'
         };
       case 'BR':
         return {
-          street_address: 'Rua Paulista 1000',
-          apartment: 'Apto 12',
-          city: 'São Paulo',
-          state: 'SP',
-          postalCode: '01310-100'
+          street_address: 'e.g. Rua Paulista 1000',
+          apartment: 'e.g. Apto 12',
+          city: 'e.g. São Paulo',
+          state: 'e.g. SP',
+          postalCode: 'e.g. 01310-100'
         };
       case 'ES':
         return {
-          street_address: 'Calle Gran Vía 45',
-          apartment: '3º A',
-          city: 'Madrid',
-          state: 'Madrid',
-          postalCode: '28013'
+          street_address: 'e.g. Calle Gran Vía 45',
+          apartment: 'e.g. 3º A',
+          city: 'e.g. Madrid',
+          state: 'e.g. Madrid',
+          postalCode: 'e.g. 28013'
         };
       default:
         return {
-          street_address: '123 Main Street',
-          apartment: 'Apt 4B',
-          city: 'New York',
-          state: 'NY',
-          postalCode: '10001'
+          street_address: 'Street Name & Number',
+          apartment: 'Apt, Unit, Suite',
+          city: 'City',
+          state: 'State or Province',
+          postalCode: 'Postal / ZIP Code'
         };
     }
   };
@@ -354,10 +410,20 @@ export default function KYCPage() {
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
-    if (!kycData.fullLegalName.trim()) newErrors.fullLegalName = 'Full legal name is required';
-    if (!kycData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (!kycData.fullLegalName.trim()) newErrors.fullLegalName = 'Full Name is required';
+    if (!kycData.dateOfBirth) newErrors.dateOfBirth = 'Date of Birth is required';
+    else {
+      const birthDate = new Date(kycData.dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const m = today.getMonth() - birthDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age < 18) newErrors.dateOfBirth = 'You must be at least 18 years old';
+    }
     if (!kycData.nationality) newErrors.nationality = 'Nationality is required';
-    if (!kycData.occupation) newErrors.occupation = 'Occupation is required';
+    if (!kycData.occupation.trim()) newErrors.occupation = 'Occupation is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -365,10 +431,10 @@ export default function KYCPage() {
 
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
-    if (!kycData.street_address.trim()) newErrors.street_address = 'Street address is required';
+    if (!kycData.street_address.trim()) newErrors.street_address = 'Street Address is required';
     if (!kycData.city.trim()) newErrors.city = 'City is required';
     if (!kycData.state.trim()) newErrors.state = 'State/Province is required';
-    if (!kycData.postalCode.trim()) newErrors.postalCode = 'Postal code is required';
+    if (!kycData.postalCode.trim()) newErrors.postalCode = 'Postal Code is required';
     if (!kycData.country.trim()) newErrors.country = 'Country is required';
 
     setErrors(newErrors);
@@ -377,16 +443,18 @@ export default function KYCPage() {
 
   const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
-    if (!kycData.documentNumber.trim()) newErrors.documentNumber = 'Document number is required';
-    if (!kycData.documentIssueDate) newErrors.documentIssueDate = 'Issue date is required';
-    if (!kycData.documentExpiryDate) newErrors.documentExpiryDate = 'Expiry date is required';
-    if (!kycData.documentIssuingCountry) newErrors.documentIssuingCountry = 'Issuing country is required';
-    // File uploads are optional for testing
-    // if (!documentFrontFile) newErrors.documentFront = 'Front of document is required';
-    // if (kycData.documentType === 'drivers_license' && !documentBackFile) {
-    //   newErrors.documentBack = 'Back of document is required';
-    // }
-    // if (!selfieFile) newErrors.selfie = 'Selfie photo is required';
+    if (!kycData.documentNumber.trim()) newErrors.documentNumber = 'Document Number is required';
+    if (!kycData.documentIssueDate) newErrors.documentIssueDate = 'Issue Date is required';
+    if (!kycData.documentExpiryDate) newErrors.documentExpiryDate = 'Expiry Date is required';
+
+    if (kycData.documentIssueDate && kycData.documentExpiryDate) {
+      if (new Date(kycData.documentExpiryDate) <= new Date(kycData.documentIssueDate)) {
+        newErrors.documentExpiryDate = 'Expiry date must be after issue date';
+      }
+    }
+
+    if (!kycData.documentIssuingCountry) newErrors.documentIssuingCountry = 'Issuing Country is required';
+    // ID Document is required for Tier 2+, but let's at least check fields for Tier 1 submission
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -410,21 +478,21 @@ export default function KYCPage() {
 
     switch (currentStep) {
       case 1:
-        isValid = validateStep1();
+        // Combine Step 1 & 2 Validation
+        const v1 = validateStep1();
+        const v2 = validateStep2();
+        isValid = v1 && v2;
         break;
       case 2:
-        isValid = validateStep2();
-        break;
-      case 3:
-        isValid = validateStep3();
-        break;
-      case 4:
-        isValid = validateStep4();
+        // Combine Step 3 & 4 Validation
+        const v3 = validateStep3();
+        const v4 = validateStep4();
+        isValid = v3 && v4;
         break;
     }
 
     if (isValid) {
-      if (currentStep < 4) {
+      if (currentStep < 2) {
         setCurrentStep(currentStep + 1);
       } else {
         handleSubmitKYC();
@@ -465,8 +533,11 @@ export default function KYCPage() {
       if (responseJson.ok && responseJson.tid) {
         setUserTruequeId(responseJson.tid);
 
-        // Update Session in LocalStorage with new TID
-        // Update Session in LocalStorage with new TID
+        // ACTIVATE LOGIN STATE: Refresh Session from Cookie now that Flow A is done.
+        // This ensures Dashboard access is valid.
+        await refreshSession().catch((e: any) => console.warn('KYC refresh session warning:', e));
+
+        // Update Session in LocalStorage with new TID (if session handles exist)
         const sessionStr = localStorage.getItem('trueque_session');
         if (sessionStr) {
           const session = JSON.parse(sessionStr);
@@ -526,777 +597,677 @@ export default function KYCPage() {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      <header style={{
-        background: 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-        padding: '30px 40px',
-        color: 'white',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-          <h1 style={{ fontSize: '32px', fontWeight: '600', margin: 0 }}>
-            Trueque
-          </h1>
-          <p style={{ margin: '8px 0 0 0', fontSize: '15px', opacity: 0.9 }}>
-            Complete your identity verification to continue
-          </p>
-        </div>
-      </header>
 
-      <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 40px' }}>
-        {/* Welcome Banner for New Users */}
-        {newUser === 'true' && (
-          <div style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#e8f4fd',
-            border: '2px solid #4A90E2',
-            borderRadius: '12px'
-          }}>
-            <h2 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '20px' }}>
-              🎉 Welcome to Trueque, {userName}!
-            </h2>
-            <p style={{ margin: 0, color: '#34495e', lineHeight: '1.6' }}>
-              Before you can make your first swap, we need to complete a quick verification process. This helps us keep Trueque safe and compliant. Don't worry - this is just a test environment, so you can use fake information!
-            </p>
-          </div>
-        )}
+    <div className="min-h-screen bg-gray-50 flex flex-col lg:grid lg:grid-cols-12 lg:h-screen lg:overflow-hidden">
 
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          padding: '40px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
-        }}>
-          {/* Progress Indicator */}
-          <div style={{ marginBottom: '40px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              {[1, 2, 3, 4].map(step => (
-                <div key={step} style={{ flex: 1, textAlign: 'center' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    margin: '0 auto',
-                    backgroundColor: currentStep >= step ? '#4A90E2' : '#e1e8ed',
-                    color: currentStep >= step ? 'white' : '#7f8c8d',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    transition: 'all 0.3s'
-                  }}>
-                    {step}
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: currentStep >= step ? '#2c3e50' : '#95a5a6',
-                    marginTop: '8px',
-                    fontWeight: '500'
-                  }}>
-                    {step === 1 ? 'Personal' : step === 2 ? 'Address' : step === 3 ? 'Documents' : 'Verification'}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{
-              height: '4px',
-              backgroundColor: '#e1e8ed',
-              borderRadius: '2px',
-              position: 'relative',
-              overflow: 'hidden'
+      {/* --- LEFT SIDEBAR (Desktop) --- */}
+      {currentStep < 5 && (
+        <aside className="hidden lg:flex lg:col-span-3 bg-white border-r border-gray-200 flex-col p-10 h-full overflow-y-auto relative z-10">
+          {/* Brand */}
+          <div className="mb-12">
+            <h1 style={{
+              fontSize: '32px',
+              fontWeight: brandConfig.theme.fontWeight,
+              margin: 0,
+              fontFamily: brandConfig.theme.fontFamily,
+              color: '#1A73E8'
             }}>
-              <div style={{
-                height: '100%',
-                backgroundColor: '#4A90E2',
-                width: `${(currentStep / 4) * 100}%`,
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-          </div>
-
-          {/* Regulatory Notice */}
-          <div style={{
-            marginBottom: '30px',
-            padding: '16px',
-            backgroundColor: '#e8f4fd',
-            border: '2px solid #4A90E2',
-            borderRadius: '10px'
-          }}>
-            <p style={{ margin: 0, fontSize: '14px', color: '#2c3e50', lineHeight: '1.6' }}>
-              <strong>Why KYC is Required:</strong> Regulatory compliance (AML/CFT) requires identity verification for transactions meeting certain thresholds. Your information is encrypted and securely stored.
+              {brandConfig.appName}
+            </h1>
+            <p className="text-gray-500 mt-2 text-sm">
+              Complete your identity verification to continue
             </p>
           </div>
 
-          {/* APPROVED STATE OVERRIDE */}
-          {((user as any)?.kycStatus || (user as any)?.kyc_status) === 'APPROVED' ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-              <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
-              <h1 style={{ color: '#27ae60', marginBottom: '15px' }}>Account Approved</h1>
-              <p style={{ color: '#7f8c8d', fontSize: '18px', lineHeight: '1.6', marginBottom: '30px' }}>
-                Your identity has been verified. You now have full access to global swaps with higher limits.
-              </p>
-              <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-                <button
-                  onClick={() => router.push('/dashboard')}
-                  style={{
-                    padding: '12px 24px', backgroundColor: '#4A90E2', color: 'white',
-                    border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'
-                  }}
+          {/* Vertical Stepper */}
+          <div className="space-y-8">
+            {[1, 2].map(step => (
+              <div key={step} className="flex items-center gap-4 group">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${currentStep >= step
+                    ? 'bg-[#1A73E8] text-white shadow-lg shadow-blue-200'
+                    : 'bg-gray-100 text-gray-400'
+                    }`}
                 >
-                  Go to Dashboard
-                </button>
+                  {currentStep > step ? '✓' : step}
+                </div>
+                <div className="flex flex-col">
+                  <span className={`font-bold text-base transition-colors ${currentStep >= step ? 'text-gray-900' : 'text-gray-400'}`}>
+                    {step === 1 ? 'Identity Information' : 'Verification & Consent'}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {step === 1 ? 'Personal details & Address' : 'ID Upload & Final Review'}
+                  </span>
+                </div>
               </div>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {/* --- MOBILE HEADER (Visible only on mobile) --- */}
+      {currentStep < 5 && (
+        <header className="lg:hidden bg-white p-6 border-b border-gray-200 text-center">
+          <h1 className="text-2xl font-bold text-gray-900">
+            {brandConfig.appName}
+          </h1>
+        </header>
+      )}
+
+      {/* --- RIGHT CONTENT AREA --- */}
+      <main className={`${currentStep === 5 ? 'lg:col-span-12' : 'lg:col-span-9'} h-full overflow-y-auto bg-gray-50/50 p-4 lg:p-8`}>
+        <div className="w-full">
+          {/* Welcome Banner for New Users */}
+          {hasMounted && newUser === 'true' && (
+            <div style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#e8f4fd',
+              border: '2px solid #1A73E8',
+              borderRadius: '12px'
+            }}>
+              <h2 style={{ margin: '0 0 10px 0', color: '#2c3e50', fontSize: '20px' }}>
+                🎉 Welcome to {brandConfig.appName}, {userName}!
+              </h2>
+              <p style={{ margin: 0, color: '#34495e', lineHeight: '1.6' }}>
+                Before you can make your first swap, we need to complete a quick verification process. This helps us keep {brandConfig.appName} safe and compliant. Don't worry - this is just a test environment, so you can use fake information!
+              </p>
             </div>
-          ) : (
-            <>
-              {/* Step 1: Personal Information */}
-              {currentStep === 1 && (
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '25px', color: '#2c3e50' }}>
-                    Personal Information
-                  </h2>
+          )}
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>Full Legal Name</label>
-                      <input
-                        type="text"
-                        value={kycData.fullLegalName}
-                        onChange={handleInputChange('fullLegalName')}
-                        placeholder="As shown on government ID"
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('fullLegalName') ? '#f3f4f6' : 'white', cursor: isFieldLocked('fullLegalName') ? 'not-allowed' : 'text', opacity: isFieldLocked('fullLegalName') ? 0.75 : 1 }}
-                        readOnly={isFieldLocked('fullLegalName')}
-                      />
-                      {errors.fullLegalName && <div style={errorStyle}>{errors.fullLegalName}</div>}
-                    </div>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '40px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+          }}>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      <div>
-                        <label style={labelStyle}>Date of Birth</label>
-                        <input
-                          type="date"
-                          value={kycData.dateOfBirth}
-                          onChange={handleInputChange('dateOfBirth')}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('dateOfBirth') ? '#f3f4f6' : 'white', cursor: isFieldLocked('dateOfBirth') ? 'not-allowed' : 'text', opacity: isFieldLocked('dateOfBirth') ? 0.75 : 1 }}
-                          readOnly={isFieldLocked('dateOfBirth')}
-                        />
-                        {errors.dateOfBirth && <div style={errorStyle}>{errors.dateOfBirth}</div>}
-                      </div>
-
-                      <div>
-                        <label style={labelStyle}>Nationality</label>
-                        <select
-                          value={kycData.nationality}
-                          onChange={handleInputChange('nationality')}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('nationality') ? '#f3f4f6' : 'white', cursor: isFieldLocked('nationality') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('nationality') ? 0.75 : 1 }}
-                          disabled={isFieldLocked('nationality')}
-                        >
-                          <option value="">Select Nationality</option>
-                          <option value="AR">Argentina</option>
-                          <option value="BO">Bolivia</option>
-                          <option value="BR">Brazil</option>
-                          <option value="CO">Colombia</option>
-                          <option value="SV">El Salvador</option>
-                          <option value="GT">Guatemala</option>
-                          <option value="MX">Mexico</option>
-                          <option value="PT">Portugal</option>
-                          <option value="ES">Spain</option>
-                          <option value="US">United States</option>
-                          <option value="VE">Venezuela</option>
-                          <option value="CA">Canada</option>
-                          <option value="GB">United Kingdom</option>
-                          <option value="FR">France</option>
-                          <option value="DE">Germany</option>
-                          <option value="IT">Italy</option>
-                          <option value="JP">Japan</option>
-                          <option value="CN">China</option>
-                        </select>
-                        {errors.nationality && <div style={errorStyle}>{errors.nationality}</div>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Occupation</label>
-                      <input
-                        type="text"
-                        value={kycData.occupation}
-                        onChange={handleInputChange('occupation')}
-                        placeholder="Your current occupation"
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('occupation') ? '#f3f4f6' : 'white', cursor: isFieldLocked('occupation') ? 'not-allowed' : 'text', opacity: isFieldLocked('occupation') ? 0.75 : 1 }}
-                        readOnly={isFieldLocked('occupation')}
-                      />
-                      {errors.occupation && <div style={errorStyle}>{errors.occupation}</div>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: Address Information */}
-              {currentStep === 2 && (
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '25px', color: '#2c3e50' }}>
-                    Residential Address
-                  </h2>
-
-                  {/* Street & Apt */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>Street Address</label>
-                      <input
-                        type="text"
-                        value={kycData.street_address}
-                        onChange={handleInputChange('street_address')}
-                        placeholder={addressPlaceholders.street_address}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('street_address') ? '#f3f4f6' : 'white', cursor: isFieldLocked('street_address') ? 'not-allowed' : 'text', color: '#2c3e50' }}
-                        readOnly={isFieldLocked('street_address')}
-                      />
-                      {errors.street_address && <div style={errorStyle}>{errors.street_address}</div>}
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Apt/Suite (Optional)</label>
-                      <input
-                        type="text"
-                        value={kycData.apartment}
-                        onChange={handleInputChange('apartment')}
-                        placeholder={addressPlaceholders.apartment}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('apartment') ? '#f3f4f6' : 'white', cursor: isFieldLocked('apartment') ? 'not-allowed' : 'text', color: '#2c3e50' }}
-                        readOnly={isFieldLocked('apartment')}
-                      />
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>City</label>
-                      <input
-                        type="text"
-                        value={kycData.city}
-                        onChange={handleInputChange('city')}
-                        placeholder={addressPlaceholders.city}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('city') ? '#f3f4f6' : 'white', cursor: isFieldLocked('city') ? 'not-allowed' : 'text', color: '#2c3e50' }}
-                        readOnly={isFieldLocked('city')}
-                      />
-                      {errors.city && <div style={errorStyle}>{errors.city}</div>}
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>State/Province</label>
-                      <input
-                        type="text"
-                        value={kycData.state}
-                        onChange={handleInputChange('state')}
-                        placeholder={addressPlaceholders.state}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('state') ? '#f3f4f6' : 'white', cursor: isFieldLocked('state') ? 'not-allowed' : 'text', opacity: isFieldLocked('state') ? 0.75 : 1 }}
-                        readOnly={isFieldLocked('state')}
-                      />
-                      {errors.state && <div style={errorStyle}>{errors.state}</div>}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>Postal Code</label>
-                      <input
-                        type="text"
-                        value={kycData.postalCode}
-                        onChange={handleInputChange('postalCode')}
-                        placeholder={addressPlaceholders.postalCode}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('postalCode') ? '#f3f4f6' : 'white', cursor: isFieldLocked('postalCode') ? 'not-allowed' : 'text', opacity: isFieldLocked('postalCode') ? 0.75 : 1 }}
-                        readOnly={isFieldLocked('postalCode')}
-                      />
-                      {errors.postalCode && <div style={errorStyle}>{errors.postalCode}</div>}
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Country</label>
-                      <select
-                        value={kycData.country}
-                        onChange={handleInputChange('country')}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('country') ? '#f3f4f6' : 'white', cursor: isFieldLocked('country') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('country') ? 0.75 : 1 }}
-                        disabled={isFieldLocked('country')}
-                      >
-                        <option value="">Select Country</option>
-                        <option value="AR">Argentina</option>
-                        <option value="BO">Bolivia</option>
-                        <option value="BR">Brazil</option>
-                        <option value="CO">Colombia</option>
-                        <option value="SV">El Salvador</option>
-                        <option value="GT">Guatemala</option>
-                        <option value="MX">Mexico</option>
-                        <option value="PT">Portugal</option>
-                        <option value="ES">Spain</option>
-                        <option value="US">United States</option>
-                        <option value="VE">Venezuela</option>
-                        <option value="CA">Canada</option>
-                        <option value="GB">United Kingdom</option>
-                      </select>
-                      {errors.country && <div style={errorStyle}>{errors.country}</div>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 3: Document Upload */}
-              {currentStep === 3 && (
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '25px', color: '#2c3e50' }}>
-                    Identity Documents
-                  </h2>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>Document Type</label>
-                      <select
-                        value={kycData.documentType}
-                        onChange={handleInputChange('documentType')}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('documentType') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentType') ? 'not-allowed' : 'pointer', color: '#2c3e50' }}
-                        disabled={isFieldLocked('documentType')}
-                      >
-                        <option value="passport">Passport</option>
-                        <option value="drivers_license">Driver's License</option>
-                        <option value="national_id">National ID Card</option>
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      <div>
-                        <label style={labelStyle}>
-                          {kycData.country === 'ES' || kycData.nationality === 'ES' ? 'DNI / NIE / Passport Number' : 'Document Number'}
-                        </label>
-                        <input
-                          type="text"
-                          value={kycData.documentNumber}
-                          onChange={handleInputChange('documentNumber')}
-                          placeholder={kycData.country === 'ES' ? 'e.g. 12345678Z' : 'Document number'}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('documentNumber') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentNumber') ? 'not-allowed' : 'text', opacity: isFieldLocked('documentNumber') ? 0.75 : 1 }}
-                          readOnly={isFieldLocked('documentNumber')}
-                        />
-                        {errors.documentNumber && <div style={errorStyle}>{errors.documentNumber}</div>}
-                      </div>
-
-                      <div>
-                        <label style={labelStyle}>Issuing Country</label>
-                        <select
-                          value={kycData.documentIssuingCountry}
-                          onChange={handleInputChange('documentIssuingCountry')}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('documentIssuingCountry') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentIssuingCountry') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('documentIssuingCountry') ? 0.75 : 1 }}
-                          disabled={isFieldLocked('documentIssuingCountry')}
-                        >
-                          <option value="">Select Country</option>
-                          <option value="AR">Argentina</option>
-                          <option value="BO">Bolivia</option>
-                          <option value="BR">Brazil</option>
-                          <option value="CO">Colombia</option>
-                          <option value="SV">El Salvador</option>
-                          <option value="GT">Guatemala</option>
-                          <option value="MX">Mexico</option>
-                          <option value="PT">Portugal</option>
-                          <option value="ES">Spain</option>
-                          <option value="US">United States</option>
-                          <option value="VE">Venezuela</option>
-                          <option value="CA">Canada</option>
-                          <option value="GB">United Kingdom</option>
-                        </select>
-                        {errors.documentIssuingCountry && <div style={errorStyle}>{errors.documentIssuingCountry}</div>}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                      <div>
-                        <label style={labelStyle}>Issue Date</label>
-                        <input
-                          type="date"
-                          value={kycData.documentIssueDate}
-                          onChange={handleInputChange('documentIssueDate')}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('documentIssueDate') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentIssueDate') ? 'not-allowed' : 'text', opacity: isFieldLocked('documentIssueDate') ? 0.75 : 1 }}
-                          readOnly={isFieldLocked('documentIssueDate')}
-                        />
-                        {errors.documentIssueDate && <div style={errorStyle}>{errors.documentIssueDate}</div>}
-                      </div>
-
-                      <div>
-                        <label style={labelStyle}>Expiry Date</label>
-                        <input
-                          type="date"
-                          value={kycData.documentExpiryDate}
-                          onChange={handleInputChange('documentExpiryDate')}
-                          style={{ ...inputStyle, backgroundColor: isFieldLocked('documentExpiryDate') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentExpiryDate') ? 'not-allowed' : 'text', opacity: isFieldLocked('documentExpiryDate') ? 0.75 : 1 }}
-                          readOnly={isFieldLocked('documentExpiryDate')}
-                        />
-                        {errors.documentExpiryDate && <div style={errorStyle}>{errors.documentExpiryDate}</div>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Upload Document (Front)</label>
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={handleFileChange(setDocumentFrontFile)}
-                        style={{ ...inputStyle, padding: '10px', backgroundColor: isFieldLocked('documentFront') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentFront') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('documentFront') ? 0.75 : 1 }}
-                        disabled={isFieldLocked('documentFront')}
-                      />
-                      {documentFrontFile && (
-                        <div style={{ fontSize: '13px', color: '#27ae60', marginTop: '6px' }}>
-                          ✓ {documentFrontFile.name}
-                        </div>
-                      )}
-                      {errors.documentFront && <div style={errorStyle}>{errors.documentFront}</div>}
-                    </div>
-
-                    {kycData.documentType === 'drivers_license' && (
-                      <div>
-                        <label style={labelStyle}>Upload Document (Back)</label>
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={handleFileChange(setDocumentBackFile)}
-                          style={{ ...inputStyle, padding: '10px', backgroundColor: isFieldLocked('documentBack') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentBack') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('documentBack') ? 0.75 : 1 }}
-                          disabled={isFieldLocked('documentBack')}
-                        />
-                        {documentBackFile && (
-                          <div style={{ fontSize: '13px', color: '#27ae60', marginTop: '6px' }}>
-                            ✓ {documentBackFile.name}
-                          </div>
-                        )}
-                        {errors.documentBack && <div style={errorStyle}>{errors.documentBack}</div>}
-                      </div>
-                    )}
-
-                    <div>
-                      <label style={labelStyle}>Selfie Photo</label>
-                      <p style={{ fontSize: '13px', color: '#7f8c8d', margin: '4px 0 8px 0' }}>
-                        Take a clear photo of yourself holding your ID document
-                      </p>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange(setSelfieFile)}
-                        style={{ ...inputStyle, padding: '10px', backgroundColor: isFieldLocked('selfie') ? '#f3f4f6' : 'white', cursor: isFieldLocked('selfie') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('selfie') ? 0.75 : 1 }}
-                        disabled={isFieldLocked('selfie')}
-                      />
-                      {selfieFile && (
-                        <div style={{ fontSize: '13px', color: '#27ae60', marginTop: '6px' }}>
-                          ✓ {selfieFile.name}
-                        </div>
-                      )}
-                      {errors.selfie && <div style={errorStyle}>{errors.selfie}</div>}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Additional Info & Consent */}
-              {currentStep === 4 && (
-                <div>
-                  <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '25px', color: '#2c3e50' }}>
-                    Additional Information
-                  </h2>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
-                    <div>
-                      <label style={labelStyle}>Source of Funds</label>
-                      <select
-                        value={kycData.sourceOfFunds}
-                        onChange={handleInputChange('sourceOfFunds')}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('sourceOfFunds') ? '#f3f4f6' : 'white', cursor: isFieldLocked('sourceOfFunds') ? 'not-allowed' : 'pointer', color: '#2c3e50' }}
-                        disabled={isFieldLocked('sourceOfFunds')}
-                      >
-                        <option value="">Select source</option>
-                        <option value="employment">Employment/Salary</option>
-                        <option value="business">Business Income</option>
-                        <option value="savings">Savings</option>
-                        <option value="investment">Investment Returns</option>
-                        <option value="family">Family Support</option>
-                        <option value="other">Other</option>
-                      </select>
-                      {errors.sourceOfFunds && <div style={errorStyle}>{errors.sourceOfFunds}</div>}
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Purpose of Transactions</label>
-                      <textarea
-                        value={kycData.purposeOfTransaction}
-                        onChange={handleInputChange('purposeOfTransaction')}
-                        placeholder="E.g., Family support, business expenses, personal remittances"
-                        rows={3}
-                        style={{ ...inputStyle, resize: 'vertical', backgroundColor: isFieldLocked('purposeOfTransaction') ? '#f3f4f6' : 'white', cursor: isFieldLocked('purposeOfTransaction') ? 'not-allowed' : 'text', color: '#2c3e50' }}
-                        readOnly={isFieldLocked('purposeOfTransaction')}
-                      />
-                      {errors.purposeOfTransaction && <div style={errorStyle}>{errors.purposeOfTransaction}</div>}
-                    </div>
-
-                    <div>
-                      <label style={labelStyle}>Estimated Monthly Transaction Volume</label>
-                      <select
-                        value={kycData.estimatedMonthlyVolume}
-                        onChange={handleInputChange('estimatedMonthlyVolume')}
-                        style={{ ...inputStyle, backgroundColor: isFieldLocked('estimatedMonthlyVolume') ? '#f3f4f6' : 'white', cursor: isFieldLocked('estimatedMonthlyVolume') ? 'not-allowed' : 'pointer', color: '#2c3e50' }}
-                        disabled={isFieldLocked('estimatedMonthlyVolume')}
-                      >
-                        <option value="">Select range</option>
-                        <option value="0-1000">$0 - $1,000</option>
-                        <option value="1000-5000">$1,000 - $5,000</option>
-                        <option value="5000-10000">$5,000 - $10,000</option>
-                        <option value="10000+">$10,000+</option>
-                      </select>
-                    </div>
-
-                    {/* Proof of Address - Hidden for testing */}
-                    {/* <div>
-                  <label style={labelStyle}>Proof of Address</label>
-                  <p style={{ fontSize: '13px', color: '#7f8c8d', margin: '4px 0 8px 0' }}>
-                    Upload a recent utility bill, bank statement, or government document (within last 3 months)
+            {/* APPROVED STATE OVERRIDE */}
+            {
+              ((user as any)?.kycStatus || (user as any)?.kyc_status) === 'APPROVED' ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <div style={{ fontSize: '64px', marginBottom: '20px' }}>✅</div>
+                  <h1 style={{ color: '#27ae60', marginBottom: '15px' }}>Account Approved</h1>
+                  <p style={{ color: '#7f8c8d', fontSize: '18px', lineHeight: '1.6', marginBottom: '30px' }}>
+                    Your identity has been verified. You now have full access to global swaps with higher limits.
                   </p>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={handleFileChange(setProofOfAddressFile)}
-                    style={{ ...inputStyle, padding: '10px' }}
-                  />
-                  {proofOfAddressFile && (
-                    <div style={{ fontSize: '13px', color: '#27ae60', marginTop: '6px' }}>
-                      ✓ {proofOfAddressFile.name}
-                    </div>
-                  )}
-                  {errors.proofOfAddress && <div style={errorStyle}>{errors.proofOfAddress}</div>}
-                </div> */}
-
-                    {/* Consent Checkboxes */}
-                    <div style={{
-                      marginTop: '20px',
-                      padding: '20px',
-                      backgroundColor: '#fff3cd',
-                      borderRadius: '10px',
-                      border: '2px solid #ffc107'
-                    }}>
-                      <div style={{ marginBottom: '15px', padding: '10px', backgroundColor: '#fff', borderRadius: '6px', border: '1px solid #ffc107' }}>
-                        <strong style={{ color: '#856404', fontSize: '15px' }}>🧪 TEST MODE</strong>
-                        <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: '#856404' }}>
-                          This is a testing environment. No data will be saved or sent to any server. All information entered is for UI testing purposes only.
-                        </p>
-                      </div>
-                      <div style={{ marginBottom: '15px' }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={kycData.agreedToDataProcessing}
-                            onChange={handleInputChange('agreedToDataProcessing')}
-                            style={{ width: '18px', height: '18px', marginTop: '2px', cursor: 'pointer', flexShrink: 0 }}
-                          />
-                          <span style={{ fontSize: '14px', color: '#2c3e50', lineHeight: '1.6' }}>
-                            I understand this is a TEST and confirm that all information provided is FAKE and for testing purposes only. No real data is being collected.
-                          </span>
-                        </label>
-                        {errors.agreedToDataProcessing && <div style={errorStyle}>{errors.agreedToDataProcessing}</div>}
-                      </div>
-
-                      <div>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={kycData.agreedToScreening}
-                            onChange={handleInputChange('agreedToScreening')}
-                            style={{ width: '18px', height: '18px', marginTop: '2px', cursor: 'pointer', flexShrink: 0 }}
-                          />
-                          <span style={{ fontSize: '14px', color: '#2c3e50', lineHeight: '1.6' }}>
-                            I acknowledge that this KYC form is a PROTOTYPE for testing the user interface flow only. No verification checks will be performed.
-                          </span>
-                        </label>
-                        {errors.agreedToScreening && <div style={errorStyle}>{errors.agreedToScreening}</div>}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Completion & TID */}
-              {currentStep === 5 && (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <div style={{ fontSize: '60px', marginBottom: '20px' }}>🎉</div>
-                  <h2 style={{ fontSize: '28px', color: '#2c3e50', marginBottom: '15px' }}>Verification Submitted!</h2>
-                  <p style={{ color: '#7f8c8d', fontSize: '16px', marginBottom: '30px' }}>
-                    Thank you, {userName}. Your information has been securely received.
-                  </p>
-
-                  <div style={{
-                    backgroundColor: '#f8f9fa',
-                    border: '2px dashed #bdc3c7',
-                    borderRadius: '12px',
-                    padding: '30px',
-                    marginBottom: '30px',
-                    maxWidth: '500px',
-                    margin: '0 auto 30px auto'
-                  }}>
-                    <div style={{ fontSize: '14px', color: '#95a5a6', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                      YOUR TRUEQUE ID
-                    </div>
-                    <div style={{
-                      fontSize: '28px',
-                      fontFamily: 'monospace',
-                      fontWeight: 'bold',
-                      color: '#2c3e50',
-                      letterSpacing: '2px',
-                      wordBreak: 'break-all'
-                    }}>
-                      {userTruequeId || generateTruequeID(kycData.country || 'ES')}
-                    </div>
-                    <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f6f3', borderRadius: '8px', borderLeft: '4px solid #27ae60' }}>
-                      <p style={{ margin: 0, fontSize: '14px', color: '#16a085', textAlign: 'left' }}>
-                        This is your Trueque ID. It is your permanent key for secure account recovery and ensures your privacy and safety during peer-to-peer swaps. Store it in a safe, offline location.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    textAlign: 'left',
-                    marginBottom: '20px',
-                    color: '#2c3e50',
-                    fontSize: '15px',
-                    maxWidth: '600px',
-                    margin: '0 auto 20px auto',
-                    lineHeight: '1.5',
-                    backgroundColor: '#e8f4fc',
-                    padding: '20px',
-                    borderRadius: '8px',
-                    borderLeft: '5px solid #3498db'
-                  }}>
-                    <strong>Verification in Progress:</strong> While your identity is being verified, you are allowed to perform a single swap of up to $200 USD or its equivalent in the currency you decide. We will notify you once your full limits are active.
-                  </div>
-
-                  <button
-                    onClick={() => router.push('/swap')}
-                    style={{
-                      padding: '16px 40px',
-                      fontSize: '18px',
-                      fontWeight: '600',
-                      color: 'white',
-                      background: 'linear-gradient(135deg, #2ecc71 0%, #27ae60 100%)',
-                      border: 'none',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(46, 204, 113, 0.3)'
-                    }}
-                  >
-                    Start Swapping →
-                  </button>
-                </div>
-              )}
-
-              {/* Navigation Buttons (Hide on Step 5) */}
-              {currentStep < 5 && (
-                <div style={{ display: 'flex', gap: '15px', marginTop: '40px' }}>
-                  {/* HYDRATION SHIELD: Server/Client Separation */}
-                  {!hasMounted ? (
-                    /* SERVER/INITIAL RENDER: Neutral State */
+                  <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
                     <button
-                      disabled={true} /* Disabled during hydration to prevent clicks */
+                      onClick={() => router.push('/dashboard')}
                       style={{
-                        flex: 1,
-                        padding: '16px',
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        color: '#95a5a6', /* Muted color */
-                        background: '#f8f9fa',
-                        border: '2px solid #e1e8ed',
-                        borderRadius: '12px',
-                        cursor: 'default'
+                        padding: '12px 24px', backgroundColor: '#1A73E8', color: 'white',
+                        border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'
                       }}
                     >
-                      ← Back
+                      Go to Dashboard
                     </button>
-                  ) : (
-                    <>
-                      {/* CLIENT RENDER: Dynamic State */}
-                      {/* Back Button */}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Step 1: Personal Information AND Address (Landscape Layout) */}
+                  {currentStep === 1 && (
+                    <div className="space-y-8">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                        {/* Personal Info Section */}
+                        <div className="bg-gray-50/30 p-6 rounded-xl border border-gray-100/50">
+                          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: '#2c3e50' }}>
+                            Personal Information
+                          </h2>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                            <div>
+                              <label style={labelStyle}>Full Legal Name *</label>
+                              <input
+                                type="text"
+                                value={kycData.fullLegalName}
+                                onChange={handleInputChange('fullLegalName')}
+                                placeholder="As shown on government ID"
+                                style={{ ...inputStyle, backgroundColor: isFieldLocked('fullLegalName') ? '#f3f4f6' : 'white', cursor: isFieldLocked('fullLegalName') ? 'not-allowed' : 'text', opacity: isFieldLocked('fullLegalName') ? 0.75 : 1 }}
+                                readOnly={isFieldLocked('fullLegalName')}
+                              />
+                              {errors.fullLegalName && <div style={errorStyle}>{errors.fullLegalName}</div>}
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div>
+                                <label style={labelStyle}>Date of Birth *</label>
+                                <input
+                                  type="date"
+                                  value={kycData.dateOfBirth}
+                                  onChange={handleInputChange('dateOfBirth')}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('dateOfBirth') ? '#f3f4f6' : 'white', cursor: isFieldLocked('dateOfBirth') ? 'not-allowed' : 'text', opacity: isFieldLocked('dateOfBirth') ? 0.75 : 1 }}
+                                  readOnly={isFieldLocked('dateOfBirth')}
+                                />
+                                {errors.dateOfBirth && <div style={errorStyle}>{errors.dateOfBirth}</div>}
+                              </div>
+
+                              <div>
+                                <label style={labelStyle}>Nationality *</label>
+                                <select
+                                  value={kycData.nationality}
+                                  onChange={handleInputChange('nationality')}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('nationality') ? '#f3f4f6' : 'white', cursor: isFieldLocked('nationality') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('nationality') ? 0.75 : 1 }}
+                                  disabled={isFieldLocked('nationality')}
+                                >
+                                  <option value="">Select Nationality</option>
+                                  <option value="AR">Argentina</option>
+                                  <option value="BO">Bolivia</option>
+                                  <option value="BR">Brazil</option>
+                                  <option value="CO">Colombia</option>
+                                  <option value="SV">El Salvador</option>
+                                  <option value="GT">Guatemala</option>
+                                  <option value="MX">Mexico</option>
+                                  <option value="PT">Portugal</option>
+                                  <option value="ES">Spain</option>
+                                  <option value="US">United States</option>
+                                  <option value="VE">Venezuela</option>
+                                  <option value="CA">Canada</option>
+                                  <option value="GB">United Kingdom</option>
+                                </select>
+                                {errors.nationality && <div style={errorStyle}>{errors.nationality}</div>}
+                              </div>
+                            </div>
+
+                            <div>
+                              <label style={labelStyle}>Occupation</label>
+                              <input
+                                type="text"
+                                value={kycData.occupation}
+                                onChange={handleInputChange('occupation')}
+                                placeholder="Your current occupation"
+                                style={{ ...inputStyle, backgroundColor: isFieldLocked('occupation') ? '#f3f4f6' : 'white', cursor: isFieldLocked('occupation') ? 'not-allowed' : 'text', opacity: isFieldLocked('occupation') ? 0.75 : 1 }}
+                                readOnly={isFieldLocked('occupation')}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Address Section */}
+                        <div className="bg-gray-50/30 p-6 rounded-xl border border-gray-100/50">
+                          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: '#2c3e50' }}>
+                            Residential Address
+                          </h2>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
+                              <div>
+                                <label style={labelStyle}>Street Address *</label>
+                                <input
+                                  type="text"
+                                  value={kycData.street_address}
+                                  onChange={handleInputChange('street_address')}
+                                  placeholder={addressPlaceholders.street_address}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('street_address') ? '#f3f4f6' : 'white', cursor: isFieldLocked('street_address') ? 'not-allowed' : 'text' }}
+                                  readOnly={isFieldLocked('street_address')}
+                                />
+                                {errors.street_address && <div style={errorStyle}>{errors.street_address}</div>}
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Apt/Suite</label>
+                                <input
+                                  type="text"
+                                  value={kycData.apartment}
+                                  onChange={handleInputChange('apartment')}
+                                  placeholder={addressPlaceholders.apartment}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('apartment') ? '#f3f4f6' : 'white', cursor: isFieldLocked('apartment') ? 'not-allowed' : 'text' }}
+                                  readOnly={isFieldLocked('apartment')}
+                                />
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div>
+                                <label style={labelStyle}>City *</label>
+                                <input
+                                  type="text"
+                                  value={kycData.city}
+                                  onChange={handleInputChange('city')}
+                                  placeholder={addressPlaceholders.city}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('city') ? '#f3f4f6' : 'white', cursor: isFieldLocked('city') ? 'not-allowed' : 'text' }}
+                                  readOnly={isFieldLocked('city')}
+                                />
+                                {errors.city && <div style={errorStyle}>{errors.city}</div>}
+                              </div>
+                              <div>
+                                <label style={labelStyle}>State/Province *</label>
+                                <input
+                                  type="text"
+                                  value={kycData.state}
+                                  onChange={handleInputChange('state')}
+                                  placeholder={addressPlaceholders.state}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('state') ? '#f3f4f6' : 'white', cursor: isFieldLocked('state') ? 'not-allowed' : 'text', opacity: isFieldLocked('state') ? 0.75 : 1 }}
+                                  readOnly={isFieldLocked('state')}
+                                />
+                                {errors.state && <div style={errorStyle}>{errors.state}</div>}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                              <div>
+                                <label style={labelStyle}>Postal Code *</label>
+                                <input
+                                  type="text"
+                                  value={kycData.postalCode}
+                                  onChange={handleInputChange('postalCode')}
+                                  placeholder={addressPlaceholders.postalCode}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('postalCode') ? '#f3f4f6' : 'white', cursor: isFieldLocked('postalCode') ? 'not-allowed' : 'text', opacity: isFieldLocked('postalCode') ? 0.75 : 1 }}
+                                  readOnly={isFieldLocked('postalCode')}
+                                />
+                                {errors.postalCode && <div style={errorStyle}>{errors.postalCode}</div>}
+                              </div>
+                              <div>
+                                <label style={labelStyle}>Country of Residence (Anchor) *</label>
+                                <select
+                                  value={kycData.country}
+                                  onChange={handleInputChange('country')}
+                                  style={{ ...inputStyle, backgroundColor: isFieldLocked('country') ? '#f3f4f6' : 'white', cursor: isFieldLocked('country') ? 'not-allowed' : 'pointer', opacity: isFieldLocked('country') ? 0.75 : 1 }}
+                                  disabled={isFieldLocked('country')}
+                                >
+                                  <option value="">Select Country</option>
+                                  <option value="AR">Argentina</option>
+                                  <option value="BO">Bolivia</option>
+                                  <option value="BR">Brazil</option>
+                                  <option value="CO">Colombia</option>
+                                  <option value="SV">El Salvador</option>
+                                  <option value="GT">Guatemala</option>
+                                  <option value="MX">Mexico</option>
+                                  <option value="PT">Portugal</option>
+                                  <option value="ES">Spain</option>
+                                  <option value="US">United States</option>
+                                  <option value="VE">Venezuela</option>
+                                  <option value="CA">Canada</option>
+                                  <option value="GB">United Kingdom</option>
+                                </select>
+                                {errors.country && <div style={errorStyle}>{errors.country}</div>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+
+                  {/* Step 2: Documents & Consent */}
+                  {currentStep === 2 && (
+                    <div className="space-y-8">
+                      {/* Document Section */}
+                      <div className="bg-gray-50/30 p-6 rounded-xl border border-gray-100/50">
+                        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: '#2c3e50' }}>
+                          Identity Documents
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label style={labelStyle}>Document Type *</label>
+                            <select
+                              value={kycData.documentType}
+                              onChange={handleInputChange('documentType')}
+                              style={{ ...inputStyle, backgroundColor: isFieldLocked('documentType') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentType') ? 'not-allowed' : 'pointer' }}
+                              disabled={isFieldLocked('documentType')}
+                            >
+                              <option value="national_id">{kycData.country === 'ES' ? 'DNI / NIE (National ID)' : 'National ID Card'}</option>
+                              <option value="passport">Passport</option>
+                              <option value="drivers_license">Driver's License</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Document Number *</label>
+                            <input
+                              type="text"
+                              value={kycData.documentNumber}
+                              onChange={handleInputChange('documentNumber')}
+                              placeholder={kycData.country === 'ES' ? 'e.g. 12345678Z' : 'Document Number'}
+                              style={{ ...inputStyle, backgroundColor: isFieldLocked('documentNumber') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentNumber') ? 'not-allowed' : 'text' }}
+                              readOnly={isFieldLocked('documentNumber')}
+                            />
+                            {errors.documentNumber && <div style={errorStyle}>{errors.documentNumber}</div>}
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Issuing Country *</label>
+                            <select
+                              value={kycData.documentIssuingCountry}
+                              onChange={handleInputChange('documentIssuingCountry')}
+                              style={{ ...inputStyle, backgroundColor: isFieldLocked('documentIssuingCountry') ? '#f3f4f6' : 'white', cursor: isFieldLocked('documentIssuingCountry') ? 'not-allowed' : 'pointer' }}
+                              disabled={isFieldLocked('documentIssuingCountry')}
+                            >
+                              <option value="">Select Country</option>
+                              <option value="AR">Argentina</option>
+                              <option value="BO">Bolivia</option>
+                              <option value="BR">Brazil</option>
+                              <option value="CO">Colombia</option>
+                              <option value="SV">El Salvador</option>
+                              <option value="GT">Guatemala</option>
+                              <option value="MX">Mexico</option>
+                              <option value="PT">Portugal</option>
+                              <option value="ES">Spain</option>
+                              <option value="US">United States</option>
+                              <option value="VE">Venezuela</option>
+                              <option value="CA">Canada</option>
+                              <option value="GB">United Kingdom</option>
+                            </select>
+                            {errors.documentIssuingCountry && <div style={errorStyle}>{errors.documentIssuingCountry}</div>}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label style={labelStyle}>Issue Date *</label>
+                              <input
+                                type="date"
+                                value={kycData.documentIssueDate}
+                                onChange={handleInputChange('documentIssueDate')}
+                                style={inputStyle}
+                              />
+                              {errors.documentIssueDate && <div style={errorStyle}>{errors.documentIssueDate}</div>}
+                            </div>
+                            <div>
+                              <label style={labelStyle}>Expiry Date *</label>
+                              <input
+                                type="date"
+                                value={kycData.documentExpiryDate}
+                                onChange={handleInputChange('documentExpiryDate')}
+                                style={inputStyle}
+                              />
+                              {errors.documentExpiryDate && <div style={errorStyle}>{errors.documentExpiryDate}</div>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <label style={labelStyle}>Document Front *</label>
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={handleFileChange(setDocumentFrontFile)}
+                              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                            {documentFrontFile && <p className="mt-1 text-xs text-green-600">✓ {documentFrontFile.name}</p>}
+                            {errors.documentFront && <div style={errorStyle}>{errors.documentFront}</div>}
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Selfie with ID *</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileChange(setSelfieFile)}
+                              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                            {selfieFile && <p className="mt-1 text-xs text-green-600">✓ {selfieFile.name}</p>}
+                            {errors.selfie && <div style={errorStyle}>{errors.selfie}</div>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Additional Info Section */}
+                      <div className="bg-gray-50/30 p-6 rounded-xl border border-gray-100/50">
+                        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '20px', color: '#2c3e50' }}>
+                          Additional Information
+                        </h2>
+
+                        <div className="space-y-6">
+                          <div>
+                            <label style={labelStyle}>Source of Funds *</label>
+                            <select
+                              value={kycData.sourceOfFunds}
+                              onChange={handleInputChange('sourceOfFunds')}
+                              style={inputStyle}
+                            >
+                              <option value="">Select source</option>
+                              <option value="employment">Employment / Salary</option>
+                              <option value="business">Business Income</option>
+                              <option value="savings">Savings</option>
+                              <option value="investment">Investment Returns</option>
+                              <option value="other">Other</option>
+                            </select>
+                            {errors.sourceOfFunds && <div style={errorStyle}>{errors.sourceOfFunds}</div>}
+                          </div>
+
+                          <div>
+                            <label style={labelStyle}>Purpose of Transactions *</label>
+                            <textarea
+                              value={kycData.purposeOfTransaction}
+                              onChange={handleInputChange('purposeOfTransaction')}
+                              placeholder="e.g., Family support, business expenses"
+                              rows={2}
+                              style={{ ...inputStyle, resize: 'none' }}
+                            />
+                            {errors.purposeOfTransaction && <div style={errorStyle}>{errors.purposeOfTransaction}</div>}
+                          </div>
+
+                          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={kycData.agreedToDataProcessing}
+                                onChange={handleInputChange('agreedToDataProcessing')}
+                                className="mt-1 h-4 w-4"
+                                id="consent1"
+                              />
+                              <label htmlFor="consent1" className="text-sm text-yellow-800 leading-tight cursor-pointer">
+                                I confirm that all information provided is for testing purposes only. No real personal data is being shared.
+                              </label>
+                            </div>
+                            <div className="flex items-start gap-3 mt-4">
+                              <input
+                                type="checkbox"
+                                checked={kycData.agreedToScreening}
+                                onChange={handleInputChange('agreedToScreening')}
+                                className="mt-1 h-4 w-4"
+                                id="consent2"
+                              />
+                              <label htmlFor="consent2" className="text-sm text-yellow-800 leading-tight cursor-pointer">
+                                I acknowledge that this is a UI prototype and no actual verification will be conducted.
+                              </label>
+                            </div>
+                            {(errors.agreedToDataProcessing || errors.agreedToScreening) && (
+                              <div className="mt-2 text-xs text-red-600">Please accept all consents to proceed.</div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 5: Completion & TID */}
+                  {currentStep === 5 && (
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <div style={{ fontSize: '60px', marginBottom: '20px' }}>🎉</div>
+                      <h2 style={{ fontSize: '28px', color: '#2c3e50', marginBottom: '15px' }}>Verification Submitted!</h2>
+                      <p style={{ color: '#7f8c8d', fontSize: '16px', marginBottom: '30px' }}>
+                        Thank you, {userName}. Your information has been securely received.
+                      </p>
+
+                      <div style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '2px dashed #bdc3c7',
+                        borderRadius: '12px',
+                        padding: '30px',
+                        marginBottom: '30px',
+                        maxWidth: '500px',
+                        margin: '0 auto 30px auto'
+                      }}>
+                        <div style={{ fontSize: '14px', color: '#95a5a6', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                          YOUR SYMMETRI ID
+                        </div>
+                        <div style={{
+                          fontSize: '28px',
+                          fontFamily: 'monospace',
+                          fontWeight: 'bold',
+                          color: '#2c3e50',
+                          letterSpacing: '2px',
+                          wordBreak: 'break-all'
+                        }}>
+                          {userTruequeId || generateTruequeID(kycData.country || 'ES')}
+                        </div>
+                        <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f6f3', borderRadius: '8px', borderLeft: '4px solid #27ae60' }}>
+                          <p style={{ margin: 0, fontSize: '14px', color: '#16a085', textAlign: 'left' }}>
+                            This is your Symmetri ID. It is your permanent key for secure account recovery and ensures your privacy and safety during peer-to-peer swaps. Store it in a safe, offline location.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{
+                        textAlign: 'left',
+                        marginBottom: '20px',
+                        color: '#2c3e50',
+                        fontSize: '15px',
+                        maxWidth: '600px',
+                        margin: '0 auto 20px auto',
+                        lineHeight: '1.5',
+                        backgroundColor: '#e8f4fc',
+                        padding: '20px',
+                        borderRadius: '8px',
+                        borderLeft: '5px solid #3498db'
+                      }}>
+                        <strong>Verification in Progress:</strong> While your identity is being verified, you are allowed to perform a single swap of up to $200 USD or its equivalent in the currency you decide. We will notify you once your full limits are active.
+                      </div>
+
                       <button
                         onClick={() => {
-                          if (currentStep === 1) {
-                            // DYNAMIC NAVIGATION
-                            const hasSession = user || localStorage.getItem('trueque_session');
-                            if (hasSession) {
-                              router.push('/dashboard');
-                            } else {
-                              router.push('/signup');
-                            }
-                          } else {
-                            setCurrentStep(currentStep - 1);
-                          }
+                          sessionStorage.removeItem('trueque_kyc_step');
+                          router.push('/dashboard');
                         }}
-                        disabled={loading}
                         style={{
-                          flex: 1,
-                          padding: '16px',
-                          fontSize: '16px',
-                          fontWeight: '600',
-                          color: '#7f8c8d',
-                          background: 'white',
-                          border: '2px solid #e1e8ed',
+                          padding: '16px 40px',
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          color: 'white',
+                          background: 'linear-gradient(135deg, #1A73E8 0%, #357ABD 100%)',
+                          border: 'none',
                           borderRadius: '12px',
-                          cursor: loading ? 'not-allowed' : 'pointer'
+                          cursor: 'pointer',
+                          boxShadow: '0 4px 15px rgba(26, 115, 232, 0.3)',
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        {/* Dynamic Label based on Context */}
-                        {(currentStep === 1)
-                          ? ((user || localStorage.getItem('trueque_session')) ? '← Back to Dashboard' : '← Back to Sign Up')
-                          : '← Previous'}
+                        Go to Dashboard →
                       </button>
+                    </div>
+                  )}
 
-                      {/* Next / Submit Button */}
-                      {isGlobalReadOnly && currentStep === 4 ? (
+                  {/* Navigation Buttons (Hide on Step 5) */}
+                  {currentStep < 5 && (
+                    <div style={{ display: 'flex', gap: '15px', marginTop: '40px' }}>
+                      {/* HYDRATION SHIELD: Server/Client Separation */}
+                      {!hasMounted ? (
+                        /* SERVER/INITIAL RENDER: Neutral State */
                         <button
-                          disabled
+                          disabled={true}
                           style={{
                             flex: 1,
                             padding: '16px',
                             fontSize: '16px',
                             fontWeight: '600',
-                            color: '#2980b9',
-                            background: '#ecf0f1',
-                            border: '2px solid #bdc3c7',
+                            color: '#95a5a6',
+                            background: '#f8f9fa',
+                            border: '2px solid #e1e8ed',
                             borderRadius: '12px',
-                            cursor: 'default',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px'
+                            cursor: 'default'
                           }}
                         >
-                          <span>🔒</span> Verification in Progress
+                          ← Back
                         </button>
                       ) : (
-                        <button
-                          onClick={handleNextStep}
-                          disabled={loading}
-                          style={{
-                            flex: 1,
-                            padding: '16px',
-                            fontSize: '18px',
-                            fontWeight: '600',
-                            color: 'white',
-                            background: loading ? '#bdc3c7' : 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            cursor: (kycData.agreedToScreening === false && currentStep === 4) || loading ? 'not-allowed' : 'pointer',
-                            opacity: (kycData.agreedToScreening === false && currentStep === 4) ? 0.7 : 1,
-                            boxShadow: loading ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.3)'
-                          }}
-                        >
-                          {loading ? 'Submitting...' : currentStep === 4 ? 'Submit KYC' : 'Next →'}
-                        </button>
+                        <>
+                          {/* CLIENT RENDER: Dynamic State */}
+                          <button
+                            onClick={() => {
+                              if (currentStep === 1) {
+                                const hasSession = user || localStorage.getItem('trueque_session');
+                                if (hasSession) {
+                                  router.push('/dashboard');
+                                } else {
+                                  router.push('/signup');
+                                }
+                              } else {
+                                setCurrentStep(currentStep - 1);
+                              }
+                            }}
+                            disabled={loading}
+                            style={{
+                              flex: 1,
+                              padding: '16px',
+                              fontSize: '16px',
+                              fontWeight: '600',
+                              color: '#7f8c8d',
+                              background: 'white',
+                              border: '2px solid #e1e8ed',
+                              borderRadius: '12px',
+                              cursor: loading ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            {(currentStep === 1)
+                              ? ((user || (typeof window !== 'undefined' && localStorage.getItem('trueque_session'))) ? '← Back to Dashboard' : '← Back to Sign Up')
+                              : '← Previous'}
+                          </button>
+
+                          {isGlobalReadOnly && currentStep === 2 ? (
+                            <button
+                              disabled
+                              style={{
+                                flex: 1,
+                                padding: '16px',
+                                fontSize: '16px',
+                                fontWeight: '600',
+                                color: '#2980b9',
+                                background: '#ecf0f1',
+                                border: '2px solid #bdc3c7',
+                                borderRadius: '12px',
+                                cursor: 'default',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px'
+                              }}
+                            >
+                              <span>🔒</span> Verification in Progress
+                            </button>
+                          ) : (
+                            <button
+                              onClick={handleNextStep}
+                              disabled={loading}
+                              style={{
+                                flex: 1,
+                                padding: '16px',
+                                fontSize: '18px',
+                                fontWeight: '600',
+                                background: loading ? '#bdc3c7' : 'linear-gradient(135deg, #1A73E8 0%, #357ABD 100%)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '12px',
+                                cursor: (kycData.agreedToScreening === false && currentStep === 2) || loading ? 'not-allowed' : 'pointer',
+                                opacity: (kycData.agreedToScreening === false && currentStep === 2) ? 0.7 : 1,
+                                boxShadow: loading ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.3)'
+                              }}
+                            >
+                              {loading ? 'Submitting...' : currentStep === 2 ? 'Submit KYC' : 'Next →'}
+                            </button>
+                          )}
+                        </>
                       )}
-                    </>
+                    </div>
                   )}
-                </div>
-              )}
-            </>
-          )}
+
+                  {/* Regulatory Notice (Fixed Visibility: Below Buttons) */}
+                  {currentStep < 5 && (
+                    <div className="mt-12 mb-20 p-8 bg-blue-50/70 border-2 border-[#1A73E8]/20 rounded-3xl text-[15px] text-gray-700 leading-relaxed text-left shadow-md max-w-5xl mx-auto">
+                      <p>
+                        <strong className="text-[#1A73E8] text-lg block mb-2 font-bold">Regulatory Compliance & Transparency</strong>
+                        To comply with local and international regulations, Symmetri requires you to verify your identity. Access to full platform features will be limited until verification is complete.
+                        <br /><br />
+                        <span className="font-semibold text-gray-800">Note: </span>
+                        Upon submitting your information, you may be eligible for a provisional one-time swap of up to $200 while full limits are activated.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )
+            }
+          </div>
         </div>
       </main>
     </div>

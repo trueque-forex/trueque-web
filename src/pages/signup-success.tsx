@@ -50,7 +50,7 @@ export default function SignupSuccessPage() {
                     color: 'white'
                 }}>
                     <div style={{ fontSize: '60px', marginBottom: '20px' }}>🎉</div>
-                    <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>Welcome to Trueque!</h1>
+                    <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700' }}>Welcome to Symmetri!</h1>
                     <p style={{ margin: '10px 0 0', opacity: 0.9, fontSize: '16px' }}>
                         Your account has been successfully created.
                     </p>
@@ -58,7 +58,7 @@ export default function SignupSuccessPage() {
 
                 <div style={{ padding: '40px 30px' }}>
                     <p style={{ color: '#7f8c8d', fontSize: '16px', marginBottom: '30px', lineHeight: '1.5' }}>
-                        Hello <strong>{userName}</strong>! Here is your unique Trueque ID.
+                        Hello <strong>{userName}</strong>! Here is your unique Symmetri ID.
                         Share this ID with others so they can send money to you.
                     </p>
 
@@ -70,7 +70,7 @@ export default function SignupSuccessPage() {
                         marginBottom: '30px'
                     }}>
                         <div style={{ fontSize: '12px', textTransform: 'uppercase', color: '#7f8c8d', letterSpacing: '1px', marginBottom: '5px' }}>
-                            Your Trueque ID
+                            Your Symmetri ID
                         </div>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: '#2c3e50', fontFamily: 'monospace' }}>
                             {truequeId || 'Loading...'}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import brandConfig from '../config/brand_config.json';
 
 export default function Dashboard() {
     const { user, loading, refreshSession } = useAuth();
@@ -14,88 +15,81 @@ export default function Dashboard() {
     }, []);
 
     // Default Fallbacks if context empty (shouldn't happen if guarded, but safe for dev)
-    const userName = user?.name || 'Joao Teste';
+    const userName = user?.name || 'User';
     const kycStatus = user?.kycStatus || 'PENDING';
     const userType = user?.userType || 'PEER'; // Default to PEER if undefined
     const rejectionReason = 'Identity document expired'; // Dynamic if we add to context later
 
     const [recentSwaps, setRecentSwaps] = useState<any[]>([]);
     const [savedBeneficiaries, setSavedBeneficiaries] = useState<any[]>([]);
+    const [drafts, setDrafts] = useState<any[]>([]);
 
     useEffect(() => {
         // Redirect if not logged in (Client-side Guard)
         if (!loading && !user) {
             console.warn('Dashboard: User missing. Loop prevention active (No Redirect).');
+            return;
         }
 
-        // 3. Mock Recent Activity (Initialize first so we can extract beneficiaries)
-        // SYNC: Pulling history associated with TiD TDEV000111
-        const mockHistory = [
-            {
-                id: 1,
-                date: '2026-01-01',
-                amount: '143.07 EUR',
-                valueDelivered: '160,000.00 ARS',
-                marketRate: '1,200.00 ARS/EUR',
-                to: 'ARS',
-                status: 'Delivered',
-                recipient: 'Joao Teste',
-                fees: { inbound: '2.30 EUR', liquidity: '0.67 EUR', service: '0.67 EUR', gateway: '2.50 EUR', premium: '2.00 EUR', tax: '1.60 EUR' }
-            },
-            {
-                id: 2,
-                date: '2025-12-30',
-                amount: '150.00 EUR',
-                valueDelivered: '$3,150.00 MXN',
-                marketRate: '21.00 MXN/EUR',
-                to: 'MXN',
-                status: 'Delivered',
-                recipient: 'Maria Silva',
-                fees: { inbound: '2.55 EUR', liquidity: '0.75 EUR', service: '0.75 EUR', gateway: '2.50 EUR', premium: '2.25 EUR', tax: 'N/A' }
-            },
-        ];
-        setRecentSwaps(mockHistory);
-
-        // 2. Load Saved Beneficiaries + EXTRACT NEW ONES FROM HISTORY
-        const savedBensRaw = localStorage.getItem('trueque_saved_beneficiaries');
-        let currentBens: any[] = [];
-        if (savedBensRaw) {
+        async function fetchHistory() {
             try {
-                currentBens = JSON.parse(savedBensRaw);
-            } catch { }
+                // Fetch Transactions
+                const res = await fetch('/api/transactions');
+                if (res.ok) {
+                    const data = await res.json();
+                    setRecentSwaps(data.transactions || []);
+
+                    // (Beneficiary Extraction Logic preserved...)
+                    const historyBens = (data.transactions || [])
+                        .filter((s: any) => s.status === 'Delivered' || s.status === 'COMPLETED')
+                        .map((s: any) => ({
+                            personal: {
+                                firstName: s.recipient.split(' ')[0],
+                                lastName: s.recipient.split(' ').slice(1).join(' ') || ''
+                            },
+                            banking: {
+                                bankName: 'Saved from History',
+                                accountNumber: '****' // No real account number in summary yet
+                            }
+                        }));
+
+                    // Load Saved
+                    const savedBensRaw = localStorage.getItem('trueque_saved_beneficiaries');
+                    let currentBens: any[] = [];
+                    if (savedBensRaw) {
+                        try { currentBens = JSON.parse(savedBensRaw); } catch { }
+                    }
+
+                    // Merge Unique
+                    const merged = [...currentBens];
+                    historyBens.forEach((hb: any) => {
+                        const exists = merged.find(b =>
+                            b.personal.firstName === hb.personal.firstName &&
+                            b.personal.lastName === hb.personal.lastName
+                        );
+                        if (!exists) merged.push(hb);
+                    });
+
+                    setSavedBeneficiaries(merged);
+                    localStorage.setItem('trueque_saved_beneficiaries', JSON.stringify(merged));
+                }
+
+                // Fetch Drafts
+                const draftRes = await fetch('/api/drafts');
+                if (draftRes.ok) {
+                    const draftData = await draftRes.json();
+                    setDrafts(draftData);
+                }
+
+            } catch (err) {
+                console.error('Failed to load dashboard data', err);
+            }
         }
 
-        // Logic: Add 'Delivered' recipients from history if not already saved
-        const historyBens = mockHistory
-            .filter(s => s.status === 'Delivered')
-            .map(s => ({
-                personal: {
-                    firstName: s.recipient.split(' ')[0],
-                    lastName: s.recipient.split(' ').slice(1).join(' ')
-                },
-                banking: {
-                    bankName: 'Verified Local Rail', // Mock
-                    accountNumber: '****' + (Math.floor(Math.random() * 9000) + 1000)
-                }
-            }));
-
-        // Merge Unique (by Full Name)
-        const merged = [...currentBens];
-        historyBens.forEach(hb => {
-            const exists = merged.find(b =>
-                b.personal.firstName === hb.personal.firstName &&
-                b.personal.lastName === hb.personal.lastName
-            );
-            if (!exists) {
-                merged.push(hb);
-            }
-        });
-
-        // Update State & Persistence
-        setSavedBeneficiaries(merged);
-        localStorage.setItem('trueque_saved_beneficiaries', JSON.stringify(merged));
+        fetchHistory();
 
     }, [user, loading, router]);
+
 
     if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading Dashboard...</div>;
 
@@ -109,93 +103,84 @@ export default function Dashboard() {
                         <h1 style={{ color: '#2c3e50', margin: 0 }}>Business Portal: {userName}</h1>
                         <p style={{ color: '#7f8c8d' }}>Manage settlements and view voucher activity.</p>
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '30px' }}>
-                        {/* WALLET CARD */}
-                        <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                            <h3 style={{ margin: '0 0 10px 0', color: '#7f8c8d', fontSize: '14px', textTransform: 'uppercase' }}>Internal Wallet Balance</h3>
-                            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#27ae60' }}>
-                                $ 15,430.50 <span style={{ fontSize: '16px', color: '#95a5a6' }}>MXN</span>
-                            </div>
-                            <div style={{ marginTop: '20px', fontSize: '13px', color: '#95a5a6' }}>
-                                Next automatic settlement: Today, 17:00 CST
-                            </div>
-                            <button style={{
-                                width: '100%', padding: '12px', marginTop: '20px',
-                                backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer'
-                            }}>
-                                Request Early Settlement
-                            </button>
-                        </div>
-
-                        {/* RECENT SETTLEMENTS */}
-                        <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '30px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                            <h3 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>Voucher Activity</h3>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid #f0f2f5', textAlign: 'left', color: '#95a5a6', fontSize: '13px' }}>
-                                        <th style={{ padding: '10px' }}>Time</th>
-                                        <th style={{ padding: '10px' }}>Voucher ID</th>
-                                        <th style={{ padding: '10px' }}>Type</th>
-                                        <th style={{ padding: '10px', textAlign: 'right' }}>Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                                        <td style={{ padding: '15px 10px' }}>10:42 AM</td>
-                                        <td style={{ padding: '15px 10px', fontFamily: 'monospace' }}>V-9982-X</td>
-                                        <td style={{ padding: '15px 10px' }}>Redemption</td>
-                                        <td style={{ padding: '15px 10px', textAlign: 'right', fontWeight: 'bold' }}>+ $500.00</td>
-                                    </tr>
-                                    <tr style={{ borderBottom: '1px solid #f0f2f5' }}>
-                                        <td style={{ padding: '15px 10px' }}>09:15 AM</td>
-                                        <td style={{ padding: '15px 10px', fontFamily: 'monospace' }}>V-2211-A</td>
-                                        <td style={{ padding: '15px 10px' }}>Redemption</td>
-                                        <td style={{ padding: '15px 10px', textAlign: 'right', fontWeight: 'bold' }}>+ $1,200.00</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </main>
             </div>
         );
     }
     // --- MERCHANT VIEW END ---
 
-    const handleStartSwap = () => {
-        // Ensure fresh start
+    const handleStartSwap = async () => {
+        // --- 1. THE SECURITY GATE (Priority 1: The "Empty Profile Block") ---
+        // Rule: If kycStatus is missing or 'NONE', the user hasn't started/submitted profile.
+        // We verify this immediately before any draft/limit logic.
+
+        // Ensure user is loaded
+        if (!user) return;
+
+        const currentKycStatus = (user.kycStatus || user.kyc_status || 'NONE').toUpperCase();
+        const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+
+        // Strict Block for Empty/None/Incomplete logic (Prompt Requirement)
+        if (restrictedStatuses.includes(currentKycStatus)) {
+            console.log(`[Security Gate] Restricted Status (${currentKycStatus}) detected. Redirecting to /kyc.`);
+            router.push('/kyc');
+            return;
+        }
+
+        // Cleanup Stale State
         sessionStorage.removeItem('trueque_swap_state');
-        router.push('/amount-selection');
+        sessionStorage.removeItem('smart_intent');
+
+        // --- 2. DRAFT LOGIC (Priority 2: Intent Tracking) ---
+        // "Once the user passes the Empty Profile Block..."
+
+        try {
+            // A. Check Active Draft
+            const res = await fetch('/api/drafts');
+            const data = await res.json();
+
+            // Handle array response from proximal API
+            const drafts = Array.isArray(data) ? data : (data.drafts || []);
+            const activeDraft = drafts.find((d: any) => d.status === 'DRAFT');
+
+            if (activeDraft) {
+                // RESUME
+                console.log('[Draft Logic] Resuming active draft:', activeDraft.id);
+                // Redirect to wizard with draft ID
+                router.push({
+                    pathname: '/amount-selection',
+                    query: { draftId: activeDraft.id }
+                });
+            } else {
+                // NEW DRAFT
+                console.log('[Draft Logic] Creating new draft');
+                const createRes = await fetch('/api/drafts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+
+                if (createRes.ok) {
+                    const createData = await createRes.json();
+                    router.push({
+                        pathname: '/amount-selection',
+                        query: { draftId: createData.id || createData.draft_id }
+                    });
+                } else {
+                    console.error('Failed to create draft');
+                    alert("System Error: Could not initialization transaction. Please contact support.");
+                }
+            }
+        } catch (e) {
+            console.error('[Draft Logic] Check failed', e);
+            alert("Network Error. Please try again.");
+        }
     };
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
             <Header />
             <main style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-
-                {/* WELCOME HEADER */}
-                <div style={{ marginBottom: '30px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <h1 style={{ color: '#2c3e50', margin: 0 }}>Hello, {userName} 👋</h1>
-                        {kycStatus === 'APPROVED' && (
-                            <span style={{
-                                backgroundColor: '#e8f8f5',
-                                color: '#27ae60',
-                                padding: '4px 8px',
-                                borderRadius: '12px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                                border: '1px solid #27ae60'
-                            }}>
-                                Verified
-                            </span>
-                        )}
-                    </div>
-                    <p style={{ color: '#7f8c8d', fontSize: '16px', marginTop: '5px' }}>Welcome back to your dashboard.</p>
-                </div>
-
-
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
 
@@ -210,7 +195,7 @@ export default function Dashboard() {
                             boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
                             textAlign: 'center'
                         }}>
-                            <h2 style={{ color: '#2c3e50', marginTop: 0 }}>Swap your Money Locally</h2>
+                            <h2 style={{ color: '#2c3e50', marginTop: 0 }}>Swap your Money with Symmetri</h2>
                             <p style={{ color: '#7f8c8d', marginBottom: '25px' }}>
                                 Fast, secure, and at the real market rate.
                             </p>
@@ -220,14 +205,14 @@ export default function Dashboard() {
                                 style={{
                                     width: '100%',
                                     padding: '16px',
-                                    backgroundColor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? '#bdc3c7' : '#4A90E2',
+                                    backgroundColor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? '#bdc3c7' : brandConfig.theme.actionColor,
                                     color: 'white',
                                     fontSize: '18px',
                                     fontWeight: 'bold',
                                     border: 'none',
                                     borderRadius: '12px',
                                     cursor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'not-allowed' : 'pointer',
-                                    boxShadow: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.3)',
+                                    boxShadow: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'none' : `0 4px 12px ${brandConfig.theme.actionColor}4D`,
                                     transition: 'transform 0.2s',
                                     opacity: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 0.7 : 1
                                 }}
@@ -236,8 +221,48 @@ export default function Dashboard() {
                             </button>
                         </div>
 
+                        {/* SAVED DRAFTS */}
+                        {drafts.length > 0 && (
+                            <section style={{ marginBottom: '30px' }}>
+                                <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Your Drafts</h3>
+                                <div style={{ display: 'grid', gap: '15px' }}>
+                                    {drafts.map((draft) => (
+                                        <div key={draft.id} style={{
+                                            backgroundColor: '#fff8e1',
+                                            padding: '15px',
+                                            borderRadius: '10px',
+                                            cursor: 'pointer',
+                                            border: '1px solid #fce8b2',
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                        }} onClick={() => {
+                                            // Resume Draft Logic
+                                            // We push to the step saved in draft
+                                            // For now, assume it's "amount_selection" or route to /amount-selection with flags
+                                            router.push({
+                                                pathname: '/amount-selection',
+                                                query: {
+                                                    amount: draft.data.amount,
+                                                    recipient: draft.data.recipient,
+                                                    draftId: draft.id
+                                                }
+                                            });
+                                        }}>
+                                            <div>
+                                                <div style={{ fontWeight: '600', color: '#d35400' }}>Incomplete Swap</div>
+                                                <div style={{ fontSize: '13px', color: '#e67e22' }}>
+                                                    {draft.data.amount} {draft.data.corridor || 'EUR'} to {draft.data.recipient || 'Unknown'}
+                                                </div>
+                                            </div>
+                                            <span style={{ fontSize: '20px', color: '#f39c12' }}>→</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
                         {/* SAVED BENEFICIARIES */}
                         <section>
+
                             <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Saved Beneficiaries</h3>
                             {savedBeneficiaries.length > 0 ? (
                                 <div style={{ display: 'grid', gap: '15px' }}>
@@ -337,7 +362,18 @@ export default function Dashboard() {
                                             <span style={{ color: '#2c3e50', fontWeight: '500' }}>{swap.valueDelivered}</span>
                                         </div>
                                         <div>
-                                            <span style={{ color: '#95a5a6' }}>Market Exchange Rate: </span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                <span style={{ color: '#95a5a6' }}>Market Exchange Rate: </span>
+                                                <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer', marginLeft: '5px' }} title="View Market Rate Policy">
+                                                    <a href="/compliance/terms" target="_blank" rel="noopener noreferrer">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                            <circle cx="12" cy="12" r="10"></circle>
+                                                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                                                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                                        </svg>
+                                                    </a>
+                                                </div>
+                                            </div>
                                             <span style={{ color: '#2c3e50', fontWeight: '500' }}>{swap.marketRate}</span>
                                         </div>
                                     </div>

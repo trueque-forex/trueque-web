@@ -16,8 +16,25 @@ const PATTERNS = {
   CUIT: /^\d{11}$/,        // Argentina CUIT: 11 digits
   CLABE: /^\d{18}$/,       // Mexico CLABE: 18 digits 
   IBAN: /^[A-Z]{2}\d{2}[A-Z\d]{4,30}$/, // Basic IBAN check
-  BIC: /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/ // SWIFT/BIC
+  BIC: /^[A-Z]{6}[A-Z0-9]{1,3}$/, // SWIFT/BIC
+  ABA: /^\d{9}$/,          // USA Routing
+  CCI: /^\d{20}$/,         // Peru CCI
+  VE_BANK: /^\d{20}$/,     // Venezuela 20-digit account
+  CEDULA: /^[VEGJPveijp]-?\d{6,9}$/, // generic LatAm ID format (adjust as needed)
 };
+
+const VE_BANKS = [
+  { id: '0102', name: '0102 - Venezuela' },
+  { id: '0105', name: '0105 - Mercantil' },
+  { id: '0108', name: '0108 - Provincial' },
+  { id: '0114', name: '0114 - Bancaribe' },
+  { id: '0128', name: '0128 - BNC' },
+  { id: '0134', name: '0134 - Banesco' },
+  { id: '0151', name: '0151 - BFC' },
+  { id: '0163', name: '0163 - Tesoro' },
+  { id: '0172', name: '0172 - Bancamiga' },
+  { id: '0175', name: '0175 - Bicentenario' },
+];
 
 // UI Components
 const InputGroup = ({ label, error, children }: { label: string, error?: string, children: React.ReactNode }) => (
@@ -49,6 +66,10 @@ export default function BeneficiaryPage() {
   // Phone State (Harmonized with Signup)
   const [phoneCode, setPhoneCode] = useState('+54'); // Default to AR/Source
   const [phoneNumber, setPhoneNumber] = useState('');
+
+  // Symmetri 1.0: Payment Method Logic
+  type PayoutMethod = 'bank' | 'card' | 'wallet' | 'pago_movil';
+  const [payoutMethod, setPayoutMethod] = useState<PayoutMethod>('bank');
 
   // 3. Sandbox Logic - DISABLED here to allow flow to proceed to Review
   // We will enforce the limit at the "Confirm" step in ReviewPage.
@@ -93,12 +114,16 @@ export default function BeneficiaryPage() {
 
   // 4. User & Country Context
   const getDestinationCountry = () => {
-    const to = swapIntent?.currencyTo || 'ARS';
+    const to = (swapIntent?.currencyTo || router.query.to || 'ARS').toString().toUpperCase();
     if (to === 'ARS') return 'AR';
     if (to === 'EUR') return 'EU';
     if (to === 'MXN') return 'MX';
     if (to === 'BRL') return 'BR';
     if (to === 'USD') return 'US';
+    if (to === 'VES') return 'VE';
+    if (to === 'DOP') return 'DO';
+    if (to === 'PEN') return 'PE';
+    if (to === 'COP') return 'CO';
     return 'US'; // Default
   };
   const destCountry = getDestinationCountry();
@@ -111,12 +136,18 @@ export default function BeneficiaryPage() {
       .then(res => res.json())
       .then(data => {
         if (destCountry && data[destCountry]) {
-          const fees = data[destCountry].outbound_fees;
-          const opts = Object.keys(fees).map(key => ({
-            id: key,
-            label: fees[key].display_name || key.replace('_', ' ').toUpperCase()
-          }));
-          setCorridorOptions(opts);
+          const fees = data[destCountry].outbound_rails;
+          // Guard against missing fees config (prevents crash)
+          if (fees) {
+            const opts = Object.keys(fees).map(key => ({
+              id: key,
+              label: fees[key].label || fees[key].display_name || key.replace('_', ' ').toUpperCase()
+            }));
+            setCorridorOptions(opts);
+          } else {
+            console.warn(`[Beneficiary] No outbound_rails found for ${destCountry}`);
+            setCorridorOptions([]);
+          }
         }
       })
       .catch(err => console.error("Failed to load corridor options", err));
@@ -157,11 +188,61 @@ export default function BeneficiaryPage() {
     }
   };
 
+  // Symmetri 1.0: Clear hidden fields to prevent ghost data
+  const clearHiddenFields = (prevBanking: typeof contextForm.banking, selectedMethod: PayoutMethod) => {
+    const banking = { ...prevBanking };
+    // Always keep bankName and deliveryMethod
+    const toKeep = ['bankName', 'deliveryMethod'];
+
+    // Logic to determine which fields to clear based on method and country
+    // This is called before updating the method
+    const allFields = [
+      'cbu', 'alias', 'accountType', 'cardNumber', 'cardExpiry', 'cvv',
+      'walletProvider', 'walletId', 'iban', 'accountNumber', 'clabe',
+      'routingNumber', 'pixKey', 'taxId', 'mobileNumber', 'idNumber', 'cci', 'beneficiaryName'
+    ];
+
+    allFields.forEach(f => {
+      // @ts-ignore
+      banking[f] = '';
+    });
+
+    return banking;
+  };
+
   const handleBankingChange = (field: keyof typeof contextForm.banking, value: string) => {
-    setBeneficiary(prev => ({
-      ...prev,
-      banking: { ...prev.banking, [field]: value }
-    }));
+    setBeneficiary(prev => {
+      let newBanking = { ...prev.banking, [field]: value };
+
+      // If switching payoutMethod (standardized), clear other fields
+      if (field === 'deliveryMethod') {
+        // Map standardized UI choice back to rail IDs if needed, 
+        // but here we use the rails directly or adapt them.
+        // For simplicity, we'll let the UI handle the mapping to rail IDs.
+      }
+
+      // AUTO-HYDRATION: If switching method, check if we have data in saved_methods
+      if (field === 'deliveryMethod' && prev.saved_methods && prev.saved_methods[value]) {
+        // Map identifiers back to banking fields (Heuristic match)
+        const saved = prev.saved_methods[value];
+        const identifiers = saved.identifiers || saved;
+
+        Object.assign(newBanking, {
+          bankName: identifiers.bank_name || newBanking.bankName,
+          accountNumber: identifiers.account_number || newBanking.accountNumber,
+          cbu: identifiers.cbu || newBanking.cbu,
+          alias: identifiers.alias || newBanking.alias,
+          iban: identifiers.iban || newBanking.iban,
+          clabe: identifiers.clabe || newBanking.clabe,
+          cardNumber: identifiers.card_number || newBanking.cardNumber,
+          walletProvider: identifiers.wallet_provider || newBanking.walletProvider,
+          walletId: identifiers.wallet_id || newBanking.walletId
+        });
+      }
+
+      return { ...prev, banking: newBanking };
+    });
+
     if (errors[field]) {
       setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     }
@@ -226,56 +307,91 @@ export default function BeneficiaryPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  // Luhn Check for Card Number
+  const luhnCheck = (num: string) => {
+    let arr = (num + '').split('').reverse().map(x => parseInt(x));
+    let lastDigit = arr.shift();
+    let sum = arr.reduce((acc, val, i) => (i % 2 !== 0 ? acc + val : acc + ((val * 2 > 9) ? val * 2 - 9 : val * 2)), 0);
+    return (sum + lastDigit!) % 10 === 0;
+  };
+
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
-    const { deliveryMethod, bankName, cbu, iban, clabe, accountNumber, cardNumber, cardExpiry, walletProvider, walletId } = contextForm.banking;
+    const {
+      deliveryMethod, bankName, cbu, iban, clabe, accountNumber,
+      cardNumber, cardExpiry, routingNumber, pixKey, taxId,
+      mobileNumber, idNumber, cci, beneficiaryName
+    } = contextForm.banking;
 
-    if (isVoucher) {
-      // For Vouchers, we only need the Phone Number from Step 1.
-      // We can add a specific check here if we want to validte checking "Whatsapp enabled" checkbox or similar.
-      // For now, rely on Step 1 phone validation.
-      return true;
+    if (isVoucher) return true;
+
+    // 💳 CARD VALIDATION
+    if (deliveryMethod === 'card_push') {
+      const cleanCard = cardNumber.replace(/\D/g, '');
+      if (!cleanCard || cleanCard.length < 15) newErrors.cardNumber = 'Valid Card Number required';
+      else if (!luhnCheck(cleanCard)) newErrors.cardNumber = 'Invalid Card Number (Luhn check failed)';
+
+      if (!cardExpiry || !/^\d{2}\/\d{2}$/.test(cardExpiry)) newErrors.cardExpiry = 'Expiry MM/YY required';
+      if (!beneficiaryName) newErrors.beneficiaryName = 'Cardholder name is required';
     }
 
+    // 🏦 BANK DEPOSIT VALIDATION
     if (deliveryMethod === 'bank_rtp') {
-      if (!bankName) newErrors.bankName = 'Bank Name is required';
-      if (destCountry === 'AR') {
+      if (destCountry === 'US') {
+        if (!PATTERNS.ABA.test(routingNumber || '')) newErrors.routingNumber = 'Routing Number must be 9 digits';
+        if (!accountNumber) newErrors.accountNumber = 'Account Number required';
+      } else if (destCountry === 'AR') {
         const cleanCBU = cbu.replace(/\D/g, '');
         if (!PATTERNS.CBU.test(cleanCBU)) newErrors.cbu = 'CBU must be exactly 22 digits';
       } else if (destCountry === 'EU') {
-        const cleanIBAN = (iban || '').replace(/\s/g, '').toUpperCase();
-        if (!PATTERNS.IBAN.test(cleanIBAN)) newErrors.iban = 'Invalid IBAN format';
+        if (!iban || !PATTERNS.IBAN.test(iban.replace(/\s/g, '').toUpperCase())) newErrors.iban = 'Invalid IBAN format';
+        if (!beneficiaryName) newErrors.beneficiaryName = 'Beneficiary name required';
       } else if (destCountry === 'MX') {
-        const cleanCLABE = (clabe || '').replace(/\D/g, '');
-        if (!PATTERNS.CLABE.test(cleanCLABE)) newErrors.clabe = 'CLABE must be exactly 18 digits';
+        if (!clabe || !PATTERNS.CLABE.test(clabe.replace(/\D/g, ''))) newErrors.clabe = 'CLABE must be 18 digits';
+        if (!beneficiaryName) newErrors.beneficiaryName = 'Beneficiary name required';
+      } else if (destCountry === 'BR') {
+        if (!pixKey) newErrors.pixKey = 'PIX Key required';
+        if (!taxId) newErrors.taxId = 'Tax ID (CPF) required';
+      } else if (destCountry === 'CO') {
+        if (!mobileNumber) newErrors.mobileNumber = 'Mobile number required';
+        if (!idNumber) newErrors.idNumber = 'ID Number (Cédula) required';
+      } else if (destCountry === 'VE') {
+        if (!bankName) newErrors.bankName = 'Select a bank';
+        if (!PATTERNS.VE_BANK.test(accountNumber || '')) newErrors.accountNumber = 'Account must be 20 digits';
+        if (!idNumber) newErrors.idNumber = 'ID Number (Cédula) required';
+      } else if (destCountry === 'DO') {
+        if (!accountNumber) newErrors.accountNumber = 'Account number required';
+        if (!idNumber) newErrors.idNumber = 'Cédula/RNC required';
+      } else if (destCountry === 'PE') {
+        if (!PATTERNS.CCI.test(cci || '')) newErrors.cci = 'CCI must be 20 digits';
+        if (!beneficiaryName) newErrors.beneficiaryName = 'Beneficiary name required';
       } else {
         if (!accountNumber) newErrors.accountNumber = 'Account Number required';
       }
     }
 
-    if (deliveryMethod === 'card_push') {
-      if (!cardNumber || cardNumber.replace(/\D/g, '').length < 16)
-        newErrors.cardNumber = 'Valid 16-digit Card Number required';
-      if (!cardExpiry) newErrors.cardExpiry = 'Expiry required';
-    }
-
-    if (deliveryMethod === 'wallet') {
-      if (!walletProvider) newErrors.walletProvider = 'Select a provider';
-      if (!walletId) newErrors.walletId = 'ID required';
+    // ⚡ PAGO MOVIL VALIDATION
+    if (deliveryMethod === 'pago_movil') {
+      if (!bankName) newErrors.bankName = 'Select a bank';
+      if (!mobileNumber || mobileNumber.length < 10) newErrors.mobileNumber = 'Valid mobile number required';
+      if (!idNumber) newErrors.idNumber = 'ID Number (Cédula) required';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
-    if (step === 1) {
-      if (validateStep1()) setStep(2);
+  // Unified Submit Handler
+  const handleUnifiedSubmit = () => {
+    // Run both validations
+    const v1 = validateStep1();
+    const v2 = validateStep2();
+
+    if (v1 && v2) {
+      handleSubmit();
     } else {
-      // Final Submit
-      if (validateStep2()) {
-        handleSubmit();
-      }
+      // Scroll to top or first error?
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -285,29 +401,62 @@ export default function BeneficiaryPage() {
     try {
       const { personal, banking } = contextForm;
 
-      // Determine Account Number based on country/method
-      let finalAccountNumber = banking.accountNumber;
-      if (destCountry === 'AR') finalAccountNumber = banking.cbu;
-      else if (destCountry === 'EU') finalAccountNumber = banking.iban;
-      else if (destCountry === 'MX') finalAccountNumber = banking.clabe;
-      else if (banking.deliveryMethod === 'card_push') finalAccountNumber = banking.cardNumber;
+      // Symmetri 1.0: Map identifiers based on country & method
+      const identifiers: Record<string, any> = {
+        email: personal.email,
+        phone_number: personal.phone,
+        bank_name: banking.bankName,
+        account_type: banking.accountType,
+        country: destCountry
+      };
+
+      if (banking.deliveryMethod === 'card_push') {
+        identifiers.card_number = banking.cardNumber;
+        identifiers.card_expiry = banking.cardExpiry;
+        identifiers.beneficiary_name = banking.beneficiaryName;
+      } else if (banking.deliveryMethod === 'pago_movil') {
+        identifiers.mobile_number = banking.mobileNumber;
+        identifiers.id_number = banking.idNumber;
+      } else {
+        // Bank Transfer Logic
+        if (destCountry === 'US') {
+          identifiers.routing_number = banking.routingNumber;
+          identifiers.account_number = banking.accountNumber;
+        } else if (destCountry === 'AR') {
+          identifiers.cbu = banking.cbu;
+          identifiers.alias = banking.alias;
+        } else if (destCountry === 'EU') {
+          identifiers.iban = banking.iban;
+          identifiers.beneficiary_name = banking.beneficiaryName;
+        } else if (destCountry === 'MX') {
+          identifiers.clabe = banking.clabe;
+          identifiers.beneficiary_name = banking.beneficiaryName;
+        } else if (destCountry === 'BR') {
+          identifiers.pix_key = banking.pixKey;
+          identifiers.tax_id = banking.taxId;
+        } else if (destCountry === 'CO') {
+          identifiers.mobile_number = banking.mobileNumber;
+          identifiers.id_number = banking.idNumber;
+        } else if (destCountry === 'VE') {
+          identifiers.account_number = banking.accountNumber;
+          identifiers.id_number = banking.idNumber;
+        } else if (destCountry === 'DO') {
+          identifiers.account_number = banking.accountNumber;
+          identifiers.id_number = banking.idNumber;
+        } else if (destCountry === 'PE') {
+          identifiers.cci = banking.cci;
+          identifiers.beneficiary_name = banking.beneficiaryName;
+        } else {
+          identifiers.account_number = banking.accountNumber;
+        }
+      }
 
       const payload = {
         name: `${personal.firstName} ${personal.lastName}`.trim(),
         method: banking.deliveryMethod,
-        identifiers: {
-          email: personal.email,
-          phone_number: personal.phone, // "identifiers.phone_number"
-          bank_name: banking.bankName,
-          account_type: banking.accountType,
-          account_number: finalAccountNumber,
-          cbu: banking.cbu, // Pass explicitly for redundancy
-          alias: banking.alias,
-          wallet_provider: banking.walletProvider,
-          country: destCountry // Helpful for backend context
-        },
-        country: destCountry, // Top-level for API indexing
-        id: targetBeneficiaryId // Include if updating
+        identifiers,
+        country: destCountry,
+        id: targetBeneficiaryId
       };
 
       // Determine Method: POST (Create) or PUT (Update/Add Method)
@@ -320,7 +469,10 @@ export default function BeneficiaryPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Failed to save beneficiary');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || errData.message || 'Failed to save beneficiary');
+      }
 
       // CAPTURE ID & HANDOVER TO REVIEW
       const savedData = await res.json();
@@ -343,9 +495,9 @@ export default function BeneficiaryPage() {
 
       // Success -> Step 5 (Review)
       router.push('/review');
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Error saving beneficiary. Please try again.');
+      alert(`Error: ${err.message || 'Error saving beneficiary. Please try again.'}`);
     } finally {
       setLoading(false);
     }
@@ -368,7 +520,7 @@ export default function BeneficiaryPage() {
     if (s) {
       try {
         const sess = JSON.parse(s);
-        setUserName(sess.firstName || 'Friend');
+        setUserName(sess.firstName || 'User');
       } catch { }
     }
   }, []);
@@ -377,7 +529,7 @@ export default function BeneficiaryPage() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: 'sans-serif' }}>
       <Header />
 
-      <main style={{ maxWidth: 600, margin: '40px auto', padding: '0 20px' }}>
+      <main style={{ maxWidth: 1200, margin: '40px auto', padding: '0 20px' }}>
 
         {/* SELECTION SCREEN */}
         {viewMode === 'selection' && (
@@ -531,15 +683,25 @@ export default function BeneficiaryPage() {
 
                               } else {
                                 // ADD NEW RAIL (IN-PLACE)
-                                // Pre-fill Personal from Group
+                                // Pre-fill Personal from Group & Preserve existing Banking if switching
+                                const existingBanking = group.full?.banking || {};
                                 setBeneficiary({
-                                  ...group.full || { personal: group.personal, banking: {} }, // Fallback
+                                  ...group.full || { personal: group.personal, banking: {} },
                                   personal: group.personal,
                                   banking: {
+                                    ...existingBanking,
                                     deliveryMethod: rail,
-                                    bankName: '', cbu: '', iban: '', clabe: '',
-                                    accountNumber: '', accountType: 'checking',
-                                    cardNumber: '', cardExpiry: '', walletProvider: '', walletId: ''
+                                    // Only reset fields if not already present in the "carrier" row
+                                    bankName: existingBanking.bankName || '',
+                                    cbu: existingBanking.cbu || '',
+                                    iban: existingBanking.iban || '',
+                                    clabe: existingBanking.clabe || '',
+                                    accountNumber: existingBanking.accountNumber || '',
+                                    accountType: existingBanking.accountType || 'checking',
+                                    cardNumber: existingBanking.cardNumber || '',
+                                    cardExpiry: existingBanking.cardExpiry || '',
+                                    walletProvider: existingBanking.walletProvider || '',
+                                    walletId: existingBanking.walletId || ''
                                   }
                                 });
 
@@ -663,17 +825,7 @@ export default function BeneficiaryPage() {
               </button>
             </div>
 
-            {/* Progress Stepper */}
-            <div style={{ display: 'flex', marginBottom: '30px', justifyContent: 'center', gap: '10px' }}>
-              <div style={{
-                width: '120px', height: '4px', borderRadius: '2px',
-                backgroundColor: step >= 1 ? '#4A90E2' : '#e1e8ed'
-              }} />
-              <div style={{
-                width: '120px', height: '4px', borderRadius: '2px',
-                backgroundColor: step >= 2 ? '#4A90E2' : '#e1e8ed'
-              }} />
-            </div>
+            {/* Progress Stepper REMOVED - Single View */}
 
             <div style={{
               backgroundColor: 'white',
@@ -682,18 +834,15 @@ export default function BeneficiaryPage() {
               boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
             }}>
               {userName && (
-                <h3 style={{ margin: '0 0 15px 0', color: '#4A90E2', fontSize: '18px' }}>
-                  Hello, {userName} 👋
-                </h3>
-              )}
-              <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>
-                {step === 1 ? 'Beneficiary Details' : 'Banking Information'}
-              </h2>
-
-              {/* Context Summary */}
-              {swapIntent && (
-                <div style={{ marginBottom: '25px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', fontSize: '14px', color: '#7f8c8d' }}>
-                  Swapping {swapIntent.amount} {swapIntent.currencyFrom} for {swapIntent.currencyTo}
+                <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, color: '#4A90E2', fontSize: '18px' }}>
+                    Hello, {userName} 👋
+                  </h3>
+                  {swapIntent && (
+                    <div style={{ fontSize: '14px', color: '#7f8c8d', backgroundColor: '#f8f9fa', padding: '8px 12px', borderRadius: '20px' }}>
+                      Swapping <b>{swapIntent.amount} {swapIntent.currencyFrom}</b> for <b>{swapIntent.currencyTo}</b>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -732,9 +881,17 @@ export default function BeneficiaryPage() {
                 </div>
               )}
 
-              {/* STEP 1: PERSONAL */}
-              {step === 1 && (
-                <>
+              {/* LANDSCAPE GRID LAYOUT */}
+              <div className="grid lg:grid-cols-2 gap-10">
+
+                {/* --- COLUMN 1: PERSONAL DETAILS --- */}
+                <div>
+                  <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px' }}>
+                    1. Beneficiary Details
+                  </h2>
+
+
+
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                     <InputGroup label="First Name" error={errors.firstName}>
                       <input
@@ -787,11 +944,14 @@ export default function BeneficiaryPage() {
                       placeholder="maria@example.com"
                     />
                   </InputGroup>
-                </>
-              )}
+                </div>
 
-              {step === 2 && (
-                <>
+                {/* --- COLUMN 2: BANKING DETAILS --- */}
+                <div>
+                  <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', borderBottom: '2px solid #f0f2f5', paddingBottom: '10px' }}>
+                    2. Banking Information
+                  </h2>
+                  {/* Step 2 Content Rendered Unconditionally */}
                   {isVoucher ? (
                     <div style={{ textAlign: 'center', padding: '20px' }}>
                       <h3 style={{ color: '#27ae60' }}>
@@ -806,46 +966,220 @@ export default function BeneficiaryPage() {
                     </div>
                   ) : (
                     <>
-                      {/* Delivery Method Toggle */}
+                      {/* Symmetri 1.0: Standardized Method Selector */}
                       <div style={{ marginBottom: '25px' }}>
                         <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#34495e', fontSize: '14px' }}>
-                          Delivery Method
+                          Payment Method
                         </label>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {displayOptions.map(opt => {
-                            const method = opt.id;
-                            const isSelected = contextForm.banking.deliveryMethod === method;
+                          <button
+                            onClick={() => {
+                              const cleared = clearHiddenFields(contextForm.banking, 'bank');
+                              setBeneficiary(prev => ({ ...prev, banking: { ...cleared, deliveryMethod: 'bank_rtp' } }));
+                            }}
+                            style={{
+                              flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
+                              borderColor: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#4A90E2' : '#e1e8ed',
+                              backgroundColor: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#eef6fc' : 'white',
+                              color: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#4A90E2' : '#7f8c8d',
+                              fontWeight: '600', cursor: 'pointer', fontSize: '13px'
+                            }}>
+                            {contextForm.banking.deliveryMethod === 'bank_rtp' && <span>🏦 </span>} Bank Deposit
+                          </button>
 
-                            return (
-                              <button
-                                key={method}
-                                onClick={() => handleBankingChange('deliveryMethod', method)}
-                                style={{
-                                  flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
-                                  borderColor: isSelected ? '#4A90E2' : '#e1e8ed',
-                                  backgroundColor: isSelected ? '#eef6fc' : 'white',
-                                  color: isSelected ? '#4A90E2' : '#7f8c8d',
-                                  fontWeight: '600', cursor: 'pointer', fontSize: '13px'
-                                }}>
-                                {isSelected && <span>✓</span>} {opt.label}
-                              </button>
-                            );
-                          })}
+                          {destCountry === 'VE' && (
+                            <button
+                              onClick={() => {
+                                const cleared = clearHiddenFields(contextForm.banking, 'pago_movil');
+                                setBeneficiary(prev => ({ ...prev, banking: { ...cleared, deliveryMethod: 'pago_movil' } }));
+                              }}
+                              style={{
+                                flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
+                                borderColor: contextForm.banking.deliveryMethod === 'pago_movil' ? '#f39c12' : '#e1e8ed',
+                                backgroundColor: contextForm.banking.deliveryMethod === 'pago_movil' ? '#fef5e7' : 'white',
+                                color: contextForm.banking.deliveryMethod === 'pago_movil' ? '#f39c12' : '#7f8c8d',
+                                fontWeight: '600', cursor: 'pointer', fontSize: '13px'
+                              }}>
+                              {contextForm.banking.deliveryMethod === 'pago_movil' && <span>⚡ </span>} Pago Móvil
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              const cleared = clearHiddenFields(contextForm.banking, 'card');
+                              setBeneficiary(prev => ({ ...prev, banking: { ...cleared, deliveryMethod: 'card_push' } }));
+                            }}
+                            style={{
+                              flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
+                              borderColor: contextForm.banking.deliveryMethod === 'card_push' ? '#4A90E2' : '#e1e8ed',
+                              backgroundColor: contextForm.banking.deliveryMethod === 'card_push' ? '#eef6fc' : 'white',
+                              color: contextForm.banking.deliveryMethod === 'card_push' ? '#4A90E2' : '#7f8c8d',
+                              fontWeight: '600', cursor: 'pointer', fontSize: '13px'
+                            }}>
+                            {contextForm.banking.deliveryMethod === 'card_push' && <span>💳 </span>} Debit Card
+                          </button>
                         </div>
                       </div>
 
-                      {/* === BANK RTP Inputs === */}
-                      {contextForm.banking.deliveryMethod === 'bank_rtp' && (
+                      {/* === Payout-Specific Dynamic Fields === */}
+
+                      {/* 💳 GLOBAL CARD METHOD */}
+                      {contextForm.banking.deliveryMethod === 'card_push' && (
                         <>
-                          <InputGroup label="Bank Name" error={errors.bankName}>
+                          <InputGroup label="Card Number" error={errors.cardNumber}>
                             <input
                               style={inputStyle}
-                              value={contextForm.banking.bankName}
-                              onChange={(e) => handleBankingChange('bankName', e.target.value)}
-                              placeholder={destCountry === 'AR' ? 'e.g. Banco Galicia' : 'Bank Name'}
+                              value={contextForm.banking.cardNumber}
+                              onChange={(e) => handleBankingChange('cardNumber', e.target.value.replace(/\D/g, ''))}
+                              maxLength={16}
+                              placeholder="0000 0000 0000 0000"
                             />
                           </InputGroup>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                            <InputGroup label="Expiry (MM/YY)" error={errors.cardExpiry}>
+                              <input
+                                style={inputStyle}
+                                value={contextForm.banking.cardExpiry}
+                                onChange={(e) => handleBankingChange('cardExpiry', e.target.value)}
+                                maxLength={5}
+                                placeholder="MM/YY"
+                              />
+                            </InputGroup>
+                            <InputGroup label="Cardholder Name" error={errors.beneficiaryName}>
+                              <input
+                                style={inputStyle}
+                                value={contextForm.banking.beneficiaryName || ''}
+                                onChange={(e) => handleBankingChange('beneficiaryName', e.target.value)}
+                                placeholder="FullName"
+                              />
+                            </InputGroup>
+                          </div>
+                        </>
+                      )}
 
+                      {/* 🏦 BANK DEPOSIT METHOD */}
+                      {contextForm.banking.deliveryMethod === 'bank_rtp' && (
+                        <>
+                          {/* USA */}
+                          {destCountry === 'US' && (
+                            <>
+                              <InputGroup label="Routing Number (ABA)" error={errors.routingNumber}>
+                                <input style={inputStyle} value={contextForm.banking.routingNumber || ''} onChange={(e) => handleBankingChange('routingNumber', e.target.value)} maxLength={9} placeholder="9 digits" />
+                              </InputGroup>
+                              <InputGroup label="Account Number" error={errors.accountNumber}>
+                                <input style={inputStyle} value={contextForm.banking.accountNumber || ''} onChange={(e) => handleBankingChange('accountNumber', e.target.value)} placeholder="Account Number" />
+                              </InputGroup>
+                              <InputGroup label="Account Type">
+                                <select style={inputStyle} value={contextForm.banking.accountType} onChange={(e) => handleBankingChange('accountType', e.target.value)}>
+                                  <option value="checking">Checking</option>
+                                  <option value="savings">Savings</option>
+                                </select>
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* EUROZONE */}
+                          {destCountry === 'EU' && (
+                            <>
+                              <InputGroup label="IBAN" error={errors.iban}>
+                                <input style={inputStyle} value={contextForm.banking.iban || ''} onChange={(e) => handleBankingChange('iban', e.target.value.toUpperCase())} placeholder="ES12..." />
+                              </InputGroup>
+                              <InputGroup label="Beneficiary Full Name" error={errors.beneficiaryName}>
+                                <input style={inputStyle} value={contextForm.banking.beneficiaryName || ''} onChange={(e) => handleBankingChange('beneficiaryName', e.target.value)} placeholder="Full Name" />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* MEXICO */}
+                          {destCountry === 'MX' && (
+                            <>
+                              <InputGroup label="CLABE (18 digits)" error={errors.clabe}>
+                                <input style={inputStyle} value={contextForm.banking.clabe || ''} onChange={(e) => handleBankingChange('clabe', e.target.value)} maxLength={18} placeholder="18 digits" />
+                              </InputGroup>
+                              <InputGroup label="Beneficiary Full Name" error={errors.beneficiaryName}>
+                                <input style={inputStyle} value={contextForm.banking.beneficiaryName || ''} onChange={(e) => handleBankingChange('beneficiaryName', e.target.value)} placeholder="Full Name" />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* BRAZIL */}
+                          {destCountry === 'BR' && (
+                            <>
+                              <InputGroup label="PIX Key" error={errors.pixKey}>
+                                <input style={inputStyle} value={contextForm.banking.pixKey || ''} onChange={(e) => handleBankingChange('pixKey', e.target.value)} placeholder="CPF, Email, Phone, or EVP" />
+                              </InputGroup>
+                              <InputGroup label="Tax ID (CPF)" error={errors.taxId}>
+                                <input style={inputStyle} value={contextForm.banking.taxId || ''} onChange={(e) => handleBankingChange('taxId', e.target.value)} placeholder="000.000.000-00" />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* COLOMBIA */}
+                          {destCountry === 'CO' && (
+                            <>
+                              <InputGroup label="Mobile Number (Transfiya)" error={errors.mobileNumber}>
+                                <input style={inputStyle} value={contextForm.banking.mobileNumber || ''} onChange={(e) => handleBankingChange('mobileNumber', e.target.value)} placeholder="300 000 0000" />
+                              </InputGroup>
+                              <InputGroup label="ID Number (Cédula)" error={errors.idNumber}>
+                                <input style={inputStyle} value={contextForm.banking.idNumber || ''} onChange={(e) => handleBankingChange('idNumber', e.target.value)} placeholder="Cédula Number" />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* VENEZUELA BANK */}
+                          {destCountry === 'VE' && (
+                            <>
+                              <InputGroup label="Cédula (V/E)" error={errors.idNumber}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.idNumber || ''}
+                                  onChange={(e) => handleBankingChange('idNumber', e.target.value)}
+                                  placeholder="V-12345678"
+                                />
+                              </InputGroup>
+                              <InputGroup label="Account Number (20 Digits)" error={errors.accountNumber}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.accountNumber || ''}
+                                  onChange={(e) => handleBankingChange('accountNumber', e.target.value)}
+                                  maxLength={20}
+                                  placeholder="0102..."
+                                />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* DOMINICAN REPUBLIC */}
+                          {destCountry === 'DO' && (
+                            <>
+                              <InputGroup label="Account Number" error={errors.accountNumber}>
+                                <input style={inputStyle} value={contextForm.banking.accountNumber || ''} onChange={(e) => handleBankingChange('accountNumber', e.target.value)} placeholder="Account Number" />
+                              </InputGroup>
+                              <InputGroup label="ID Number (Cédula/RNC)" error={errors.idNumber}>
+                                <input style={inputStyle} value={contextForm.banking.idNumber || ''} onChange={(e) => handleBankingChange('idNumber', e.target.value)} placeholder="001-0000000-0" />
+                              </InputGroup>
+                              <InputGroup label="Account Type">
+                                <select style={inputStyle} value={contextForm.banking.accountType} onChange={(e) => handleBankingChange('accountType', e.target.value)}>
+                                  <option value="savings">Savings</option>
+                                  <option value="checking">Checking</option>
+                                </select>
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* PERU */}
+                          {destCountry === 'PE' && (
+                            <>
+                              <InputGroup label="CCI (20 Digits)" error={errors.cci}>
+                                <input style={inputStyle} value={contextForm.banking.cci || ''} onChange={(e) => handleBankingChange('cci', e.target.value)} maxLength={20} placeholder="Interbank Account Code" />
+                              </InputGroup>
+                              <InputGroup label="Beneficiary Full Name" error={errors.beneficiaryName}>
+                                <input style={inputStyle} value={contextForm.banking.beneficiaryName || ''} onChange={(e) => handleBankingChange('beneficiaryName', e.target.value)} placeholder="Full Name" />
+                              </InputGroup>
+                            </>
+                          )}
+
+                          {/* ARGENTINA (Preserved/Refined) */}
                           {destCountry === 'AR' && (
                             <>
                               <div style={{ marginBottom: '15px' }}>
@@ -890,89 +1224,47 @@ export default function BeneficiaryPage() {
                               </InputGroup>
                             </>
                           )}
-                          {destCountry === 'EU' && (
-                            <InputGroup label="IBAN" error={errors.iban}>
-                              <input
-                                style={inputStyle}
-                                value={contextForm.banking.iban || ''}
-                                onChange={(e) => handleBankingChange('iban', e.target.value)}
-                                placeholder="ES12..."
-                              />
-                            </InputGroup>
-                          )}
-                          {destCountry === 'MX' && (
-                            <InputGroup label="CLABE (18 digits)" error={errors.clabe}>
-                              <input
-                                style={inputStyle}
-                                value={contextForm.banking.clabe || ''}
-                                onChange={(e) => handleBankingChange('clabe', e.target.value)}
-                                placeholder="000000000000000000"
-                                maxLength={18}
-                              />
-                            </InputGroup>
-                          )}
-                          {(!['AR', 'EU', 'MX'].includes(destCountry)) && (
-                            <InputGroup label="Account Number" error={errors.accountNumber}>
-                              <input style={inputStyle} value={contextForm.banking.accountNumber} onChange={(e) => handleBankingChange('accountNumber', e.target.value)} />
-                            </InputGroup>
-                          )}
-                        </>
-                      )}
-                      {/* === CARD Inputs === */}
-                      {contextForm.banking.deliveryMethod === 'card_push' && (
-                        <>
-                          <InputGroup label="Card Number" error={errors.cardNumber}>
-                            <input style={inputStyle} value={contextForm.banking.cardNumber} onChange={(e) => handleBankingChange('cardNumber', e.target.value)} maxLength={19} placeholder="Card Number" />
-                          </InputGroup>
-                          <InputGroup label="Expiry (MM/YY)" error={errors.cardExpiry}>
-                            <input style={inputStyle} value={contextForm.banking.cardExpiry} onChange={(e) => handleBankingChange('cardExpiry', e.target.value)} maxLength={5} placeholder="MM/YY" />
-                          </InputGroup>
                         </>
                       )}
 
-                      {/* === WALLET Inputs === */}
-                      {contextForm.banking.deliveryMethod === 'wallet' && (
+                      {/* ⚡ PAGO MOVIL VENEZUELA */}
+                      {contextForm.banking.deliveryMethod === 'pago_movil' && (
                         <>
-                          <InputGroup label="Wallet Provider" error={errors.walletProvider}>
-                            <select style={inputStyle} value={contextForm.banking.walletProvider} onChange={e => handleBankingChange('walletProvider', e.target.value)}>
-                              <option value="">Select Provider</option>
-                              <option value="paypal">PayPal</option>
-                              <option value="mercadopago">Mercado Pago</option>
+                          <InputGroup label="Cédula (V/E)" error={errors.idNumber}>
+                            <input
+                              style={inputStyle}
+                              value={contextForm.banking.idNumber || ''}
+                              onChange={(e) => handleBankingChange('idNumber', e.target.value)}
+                              placeholder="V-12345678"
+                            />
+                          </InputGroup>
+                          <InputGroup label="Bank" error={errors.bankName}>
+                            <select style={inputStyle} value={contextForm.banking.bankName} onChange={(e) => handleBankingChange('bankName', e.target.value)}>
+                              <option value="">Select Bank</option>
+                              {VE_BANKS.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                             </select>
                           </InputGroup>
-                          <InputGroup label="Wallet ID" error={errors.walletId}>
-                            <input style={inputStyle} value={contextForm.banking.walletId} onChange={(e) => handleBankingChange('walletId', e.target.value)} />
+                          <InputGroup label="Mobile Number" error={errors.mobileNumber}>
+                            <input
+                              style={inputStyle}
+                              value={contextForm.banking.mobileNumber || ''}
+                              onChange={(e) => handleBankingChange('mobileNumber', e.target.value)}
+                              placeholder="0414 123 4567"
+                            />
                           </InputGroup>
                         </>
                       )}
 
                     </>
                   )}
+                </div> {/* End of Column 2 */}
 
+              </div> {/* End of Grid */}
 
-                </>
-              )}
-
-              {/* Footer Actions - NOW VISIBLE FOR ALL STEPS */}
-              <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
-                {savedBeneficiaries.length > 0 && viewMode === 'form' && step === 1 && (
-                  <button
-                    onClick={() => setViewMode('selection')}
-                    style={{
-                      padding: '14px', borderRadius: '10px',
-                      border: '2px solid #3498db', backgroundColor: 'transparent',
-                      color: '#3498db', fontWeight: 'bold', cursor: 'pointer',
-                      transition: 'all 0.2s', whiteSpace: 'nowrap'
-                    }}
-                  >
-                    View Saved
-                  </button>
-                )}
+              {/* Footer Actions */}
+              <div style={{ display: 'flex', gap: '15px', marginTop: '30px', borderTop: '1px solid #e1e8ed', paddingTop: '20px' }}>
                 <button
-                  onClick={() => {
-                    if (step === 2) setStep(1);
-                    else router.back();
-                  }}
+                  onClick={() => router.back()}
                   style={{
                     flex: 1, padding: '14px', borderRadius: '10px',
                     border: '2px solid #e1e8ed', backgroundColor: 'transparent',
@@ -980,7 +1272,7 @@ export default function BeneficiaryPage() {
                     transition: 'all 0.2s'
                   }}
                 >
-                  Back
+                  Cancel
                 </button>
 
                 {/* UPDATE CHECKBOX (Only if editing a saved entry) */}
@@ -991,27 +1283,29 @@ export default function BeneficiaryPage() {
                       id="updateSaved"
                       defaultChecked={true}
                       onChange={(e) => {
-                        if (!e.target.checked) setEditingIndex(null); // Opt-out triggers "Create New" path
+                        if (!e.target.checked) setEditingIndex(999); // 999 = Create New
+                        else setEditingIndex(editingIndex);
                       }}
                     />
                     <label htmlFor="updateSaved" style={{ fontSize: '12px', color: '#7f8c8d', cursor: 'pointer' }}>
-                      Update saved details?
+                      Update details?
                     </label>
                   </div>
                 )}
 
                 <button
-                  onClick={handleNext}
+                  onClick={handleUnifiedSubmit}
                   className="action-button"
                   disabled={loading}
                   style={{
                     flex: 2, padding: '14px', borderRadius: '10px',
                     border: 'none', backgroundColor: '#4A90E2',
                     color: 'white', fontWeight: 'bold', cursor: 'pointer',
-                    opacity: loading ? 0.7 : 1
+                    opacity: loading ? 0.7 : 1,
+                    boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)'
                   }}
                 >
-                  {step === 1 ? 'Next Step' : 'Review & Confirm'}
+                  {loading ? 'Processing...' : 'Review & Confirm'}
                 </button>
               </div>
 

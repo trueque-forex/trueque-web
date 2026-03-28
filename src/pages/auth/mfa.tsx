@@ -62,16 +62,8 @@ export default function MFAPage() {
                 localStorage.setItem('trueque_session', JSON.stringify(json.session));
                 // SYNCHRONOUS HANDSHAKE
                 localStorage.setItem('is_logged_in', 'true');
-                // WAIT FOR COOKIE RACE
-                setTimeout(() => {
-                    if (router.query.returnTo) {
-                        router.push(router.query.returnTo as string);
-                    } else {
-                        // Start fresh session (Clear leftovers)
-                        sessionStorage.removeItem('trueque_swap_state');
-                        router.push('/dashboard');
-                    }
-                }, 2000);
+                // Force fresh session load to break loops
+                window.location.href = '/dashboard';
             } else {
                 setError(json.error || 'Invalid code. Please try again.');
             }
@@ -167,18 +159,19 @@ export default function MFAPage() {
 
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading} // FRONTEND SHIELD: Prevents double-click race conditions
                         style={{
                             width: '100%',
                             padding: '14px',
                             borderRadius: '8px',
                             border: 'none',
-                            backgroundColor: '#2c3e50',
+                            backgroundColor: loading ? '#95a5a6' : '#2c3e50', // Visually indicate disabled state
                             color: 'white',
                             fontWeight: 'bold',
                             fontSize: '16px',
                             cursor: loading ? 'not-allowed' : 'pointer',
-                            opacity: loading ? 0.7 : 1
+                            opacity: loading ? 0.7 : 1,
+                            transition: 'background-color 0.2s'
                         }}
                     >
                         {loading ? 'Verifying...' : 'Verify Identity'}

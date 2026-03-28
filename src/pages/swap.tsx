@@ -53,12 +53,7 @@ export default function Swap() {
     if (s) {
       try {
         const sess = JSON.parse(s);
-        // HEALING: Fix Stale Name for Test User
-        if (sess.email === 'joao.teste@trueque.dev' && sess.firstName !== 'Joao') {
-          sess.firstName = 'Joao';
-          sess.full_name = 'Joao Teste';
-          localStorage.setItem('trueque_session', JSON.stringify(sess));
-        }
+
         setUserName(sess.firstName || 'Friend');
         setKycStatus(sess.kycStatus || sess.kyc_status || '');
         setTxCount(sess.txCount || 0);
@@ -168,29 +163,32 @@ export default function Swap() {
 
     const status = (kycStatus || '').toUpperCase();
 
-    // 1. APPROVED: No Limits (Bypass)
+    // 1. INCOMPLETE: Block Swap
+    if (status === 'INCOMPLETE') {
+      setLimitError('Account Incomplete: Please complete your identity profile to start swapping.');
+      return;
+    }
+
+    // 2. APPROVED: No Tier Limits
     if (status === 'APPROVED') {
       setLimitError(null);
       return;
     }
 
+    // 3. PENDING (Level 1 / Tier 1): Good Faith Limit
     const isPending = status === 'PENDING' || !status;
     const storedTier = typeof window !== 'undefined' ? localStorage.getItem('kyc_tier') : null;
     const isTier1 = storedTier === '1' || isPending;
 
     if (isTier1) {
-      // Check Normalized Value
       const approximateUSD = getApproximateUSDValue(val, currencyFrom);
-
-      // Allow ~10% buffer or strict 200? The user said 160,000 ARS (approx $105) should NOT trigger.
-      // 160000 * 0.0012 = 192. So it fits.
       if (approximateUSD > 200) {
         setLimitError(`Tier 1 Limit: The amount (~$${approximateUSD.toFixed(0)}) exceeds the $200 limit. Please complete full KYC.`);
         return;
       }
     }
 
-    // Default Guardrail
+    // Default Guardrail (Internal Business Rules)
     const check = validateSwapLimit(val);
     if (!check.allowed) {
       setLimitError(check.reason || 'Limit exceeded');
@@ -440,8 +438,39 @@ export default function Swap() {
             </div>
           </div>
 
+          {/* Incomplete / Tier 0 Alert */}
+          {(kycStatus || '').toUpperCase() === 'INCOMPLETE' && (
+            <div style={{
+              backgroundColor: '#f8d7da',
+              border: '1px solid #f5c6cb',
+              borderRadius: '10px',
+              padding: '20px',
+              marginBottom: '30px',
+              textAlign: 'center'
+            }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#721c24' }}>Profile Incomplete</h4>
+              <p style={{ margin: '0 0 15px 0', color: '#721c24', fontSize: '14px' }}>
+                You must complete your identity verification before you can start swapping.
+              </p>
+              <button
+                onClick={() => router.push('/kyc')}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#721c24',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Complete Identity Profile
+              </button>
+            </div>
+          )}
+
           {/* Pending Block Alert UI */}
-          {kycStatus === 'PENDING' && txCount > 0 && (
+          {(kycStatus || '').toUpperCase() === 'PENDING' && txCount > 0 && (
             <div style={{
               backgroundColor: '#fff3cd',
               border: '1px solid #ffeeba',
@@ -450,9 +479,9 @@ export default function Swap() {
               marginBottom: '30px',
               textAlign: 'center'
             }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#856404' }}>Account Verification Pending</h4>
+              <h4 style={{ margin: '0 0 10px 0', color: '#856404' }}>Verification in Progress</h4>
               <p style={{ margin: '0 0 15px 0', color: '#856404', fontSize: '14px' }}>
-                Please wait for full KYC approval before proceeding.
+                Your identity is being verified. You have a one-time "Good Faith" swap limit of $200.
               </p>
               <button
                 onClick={() => router.push('/kyc')}
@@ -466,7 +495,7 @@ export default function Swap() {
                   fontWeight: '600'
                 }}
               >
-                Check KYC Status
+                View Verification Status
               </button>
             </div>
           )}

@@ -2,7 +2,7 @@ import React from 'react'
 
 type Offer = {
   offerAmount: number
-  userId: string
+  id: string
   fee?: number
 }
 
@@ -36,7 +36,7 @@ export default function FeeBreakdown({ offers, marketRate, debug = false }: Prop
   return (
     <div className="mt-6 border rounded p-4 bg-gray-50">
       <h3 className="text-sm font-semibold text-gray-700 mb-2">Fee Breakdown</h3>
-      <p><strong>Best Offer:</strong> {bestOffer.offerAmount} from {bestOffer.userId}</p>
+      <p><strong>Best Offer:</strong> {bestOffer.offerAmount} from {bestOffer.id}</p>
       <p><strong>Fee:</strong> {bestOffer.fee ?? 'N/A'}%</p>
       <p><strong>Effective Rate:</strong> {effectiveRate.toFixed(2)}</p>
       <p><strong>Total Cost:</strong> {totalCost.toFixed(2)}</p>

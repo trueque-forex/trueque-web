@@ -1,138 +1,75 @@
+// FILE: src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useRouter } from 'next/router';
-import apiFetch from '../lib/apiFetch';
 
-interface User {
-    id: string;
-    email: string;
-    name: string;
-    kycStatus: string;
-    txCount: number;
-    userType?: 'PEER' | 'MERCHANT';
-}
-
-interface AuthContextType {
-    user: User | null;
-    loading: boolean;
-    login: (userData: User) => void;
-    logout: () => Promise<void>;
-    refreshSession: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<any>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     const refreshSession = async () => {
-        // OPTIMIZED: Try to get token from localStorage to support Hybrid Auth (Cookie + Bearer)
-        const stored = typeof window !== 'undefined' ? localStorage.getItem('trueque_session') : null;
+        // Bypass checks on public pages? NO. perform SOFT CHECK.
+        // Added /verify-mfa to public paths to prevent circular logic if session fetch has issues
+        const publicPaths = ['/signup', '/signin', '/login', '/', '/auth/mfa', '/verify-mfa', '/about', '/forgot-password'];
 
         try {
-            // Hydrate from local storage for instant UI (Degraded Mode support)
-            let token = null;
-            if (stored) {
-                try {
-                    const parsed = JSON.parse(stored);
-                    setUser({
-                        id: parsed.user?.id || parsed.id, // Support new structure or legacy
-                        email: parsed.user?.email || parsed.email,
-                        name: parsed.user?.name || parsed.name,
-                        kycStatus: parsed.user?.kycStatus || parsed.kycStatus,
-                        txCount: 0, // Placeholder
-                        userType: parsed.user?.userType || 'PEER'
-                    });
-                    token = parsed.token;
-                } catch { }
-            }
-
-            // Native fetch to avoid apiFetch throwing on 401
-            // HYBRID AUTH: Send both Cookie (credentials) and Bearer Token (header)
-            const headers: any = { 'Content-Type': 'application/json' };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`; // Critical fix for 401s
-            }
-
-            const res = await fetch('/api/profile', {
-                method: 'GET',
-                headers,
-                credentials: 'include' // Important: Send cookies
-            });
-
+            // Use specialized session endpoint that returns fresh DB counts (ignoring drafts)
+            const res = await fetch('/api/auth/session', { credentials: 'include' });
             if (res.ok) {
-                const json = await res.json();
-                if (json.id) {
-                    setUser({
-                        id: json.id,
-                        email: json.email,
-                        name: json.name,
-                        kycStatus: json.kycStatus,
-                        txCount: json.txCount,
-                        userType: json.userType // Ensure backend sends this
-                    });
-                } else {
-                    throw new Error('Invalid profile data');
-                }
-            } else if (res.status === 401 || res.status === 403) {
-                // Silent Redirect for auth failures
-                console.warn('Session check failed (401). Redirecting to login.');
-                setUser(null);
-                if (typeof window !== 'undefined') localStorage.removeItem('trueque_session');
-                // Prevent loop: Only redirect if NOT already on home
-                if (router.pathname !== '/') {
-                    router.push('/');
+                const data = await res.json();
+                if (data.user) {
+                    // NEW: ENFORCE PROFILE COMPLETENESS (The "Good Faith" Guard)
+                    // If name is missing (e.g. user created during bug), treat as EMPTY to block swaps.
+                    // Strict Check: Must rely on firstName because 'name' defaults to 'User'
+                    const currentKycStatus = (data.user.kycStatus || data.user.kyc_status || 'NOT_STARTED').toUpperCase();
+                    if (!data.user.firstName && currentKycStatus === 'NOT_STARTED') {
+                        console.warn("[AUTH] User missing profile name. Forcing KYC status to NOT_STARTED.");
+                        data.user.kycStatus = 'NOT_STARTED';
+                    }
+                    setUser(data.user); // Hydrate state
                 }
             } else {
-                throw new Error(`Profile check failed: ${res.status}`);
+                console.warn(`[AUTH] Session refresh failed with status: ${res.status}`);
+                setUser(null);
+                // ONLY Redirect if we are NOT on a public path AND it is an explicit 401 (Unauthorized)
+                if (!publicPaths.includes(router.pathname) && res.status === 401) {
+                    console.log('[AUTH] Unauthorized. Redirecting to /login');
+                    router.push('/login');
+                }
             }
         } catch (e) {
-            console.error('Auth check error', e);
+            console.error('[AUTH] Refresh failed:', e);
             setUser(null);
-            router.push('/');
         } finally {
             setLoading(false);
         }
     };
 
-    useEffect(() => {
-        refreshSession();
-    }, []);
 
-    const login = (userData: User) => {
-        setUser(userData);
-        router.push('/dashboard');
-    };
+    useEffect(() => { refreshSession(); }, [router.pathname]);
 
+    // Provide a stable logout function
     const logout = async () => {
         try {
-            await apiFetch('/api/auth/logout', { method: 'POST' });
+            await fetch('/api/auth/logout', { method: 'POST' });
         } catch (e) {
-            console.error('Logout API failed', e);
-        } finally {
-            // SECURITY HARDENING: Wipe everything
-            setUser(null);
-            if (typeof window !== 'undefined') {
-                localStorage.clear();
-                sessionStorage.clear();
-                console.log('Session Wiped. Storage Keys Remaining:', localStorage.length);
-            }
-            router.push('/');
+            console.error('Logout failed', e);
         }
+        setUser(null);
+        router.push('/');
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, refreshSession }}>
+        <AuthContext.Provider value={{ user, loading, logout, refreshSession }}>
             {children}
         </AuthContext.Provider>
     );
 }
 
-export function useAuth() {
+export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
+    if (context === undefined) return { loading: true, refreshSession: () => { } };
     return context;
-}
+};

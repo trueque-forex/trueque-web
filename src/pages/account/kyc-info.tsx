@@ -3,6 +3,17 @@ import { useRouter } from 'next/router';
 
 export default function KYCInfoPage() {
     const router = useRouter();
+    const [userName, setUserName] = React.useState('User');
+
+    React.useEffect(() => {
+        const sessionData = localStorage.getItem('trueque_session');
+        if (sessionData) {
+            try {
+                const session = JSON.parse(sessionData);
+                setUserName(session.name || (session.firstName ? `${session.firstName} ${session.lastName || ''}`.trim() : 'User'));
+            } catch (e) { }
+        }
+    }, []);
 
     const handleLogout = () => {
         localStorage.removeItem('trueque_session');
@@ -146,7 +157,7 @@ export default function KYCInfoPage() {
                         <div style={{ display: 'grid', gap: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e1e8ed', paddingBottom: '15px' }}>
                                 <span style={{ color: '#7f8c8d' }}>Full Name</span>
-                                <span style={{ fontWeight: '600', color: '#2c3e50' }}>Juan Tester</span>
+                                <span style={{ fontWeight: '600', color: '#2c3e50' }}>{userName}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e1e8ed', paddingBottom: '15px' }}>
                                 <span style={{ color: '#7f8c8d' }}>Document Type</span>

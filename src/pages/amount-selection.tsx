@@ -8,6 +8,7 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import { formatNumber } from '../lib/formatNumber';
 
 import { useAuth } from '../context/AuthContext'; // Import useAuth directly
+import brandConfig from '../config/brand_config.json';
 
 // Currency mappings
 const CURRENCIES = [
@@ -38,11 +39,40 @@ export default function AmountSelectionPage() {
     const [loading, setLoading] = useState(false);
     const [rateError, setRateError] = useState<string | null>(null);
     const [limitError, setLimitError] = useState<string | null>(null);
+    const [isRedirecting, setIsRedirecting] = useState(false);
 
     // Derived State from Context (Reactive)
     const userName = user?.name || 'Friend';
     const kycStatus = (user?.kycStatus || '').toUpperCase();
     const txCount = user?.txCount || 0;
+
+    // STRICT ROUTE GUARD: Enforce KYC Rules
+    useEffect(() => {
+        if (!user && !loading) return; // Wait for auth
+        if (loading) return;
+
+        // Check Conditions
+        const currentStatus = (kycStatus || user.kyc_status || 'NOT_STARTED').toUpperCase();
+        const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+
+        const isApproved = currentStatus === 'APPROVED' || currentStatus === 'VERIFIED';
+        const isPending = currentStatus === 'PENDING';
+        const isTrialEligible = isPending && txCount < 1;
+
+        if ((restrictedStatuses.includes(currentStatus) || (!isApproved && !isTrialEligible)) && user) {
+            console.warn(`[RouteGuard] Blocking Access: Status=${currentStatus}, TxCount=${txCount}`);
+            setIsRedirecting(true);
+
+            // Redirect with explanation
+            router.push({
+                pathname: '/kyc',
+                query: { reason: currentStatus === 'INCOMPLETE' ? 'profile_incomplete' : 'trial_exhausted' }
+            });
+        }
+    }, [user, kycStatus, txCount, router, loading]);
+
+    // BLOCK RENDER CHECK MOVED TO BOTTOM TO FIX HOOKS
+    const status = (user?.kycStatus || '').toUpperCase();
 
     const getCurrencyCode = (val: string) => {
         if (!val) return '';
@@ -87,7 +117,7 @@ export default function AmountSelectionPage() {
         sessionStorage.setItem('trueque_swap_state', JSON.stringify(state));
     }, [currencyFrom, currencyTo, amountFrom, isHydrated]);
 
-    // Fetch Rate
+    // Fetch Rate & Draft Hydration
     useEffect(() => {
         const updateRate = async () => {
             if (!currencyFrom || !currencyTo) return;
@@ -108,6 +138,51 @@ export default function AmountSelectionPage() {
         };
         if (currencyFrom && currencyTo) updateRate();
     }, [currencyFrom, currencyTo]);
+
+    // DRAFT HYDRATION
+    useEffect(() => {
+        if (router.query.draftId) {
+            // Note: Our list endpoint is /api/drafts, but maybe we need a get-by-id?
+            // The drafts.py has DELETE /{id} and GET /{user_id} (list).
+            // It lacks GET /{draft_id}.
+            // I should add GET /{draft_id} to backend if I want to fetch specific draft data here.
+            // OR I can iterate the list.
+            // Let's assume I'll add GET /{draft_id} to the proxy or use the list.
+            // For now, let's use the list and find it client-side as a quick fix, 
+            // OR better: use the data passed via router.query if I passed it?
+            // Dashboard passes: amount, recipient, draftId.
+            // It does NOT pass currencyFrom/To.
+            // So fetching is better.
+
+            // Let's use the list endpoint and filter for now (inefficient but safe).
+            fetch('/api/drafts')
+                .then(res => res.json())
+                .then((drafts: any[]) => {
+                    if (!Array.isArray(drafts)) {
+                        console.error("Drafts API returned non-array:", drafts);
+                        return;
+                    }
+                    const draft = drafts.find(d => d.id === router.query.draftId);
+                    if (draft && draft.data) {
+                        const d = draft.data;
+                        if (d.currency_from) setCurrencyFrom(d.currency_from); // values stored as "from"
+                        if (d.currency_to) setCurrencyTo(d.currency_to); // values stored as "to"
+                        // Handle "Country-Code" format if needed? 
+                        // The saved data from SendForm was { amount, recipient, corridor }.
+                        // SendForm saved 'corridor'.
+                        // AmountSelection expects 'Country-Code' format for dropdowns.
+                        // We need to map 'corridor' (e.g. 'EUR') to 'Spain-EUR' or similar?
+                        // Let's check what SendForm saves. 
+                        // SendForm saves: { amount, recipient, corridor }. 
+                        // We need more data in AmountSelection.
+
+                        if (d.amount) setAmountFrom(d.amount);
+                    }
+                })
+                .catch(err => console.error("Failed to hydrate draft", err));
+        }
+
+    }, [router.query.draftId]);
 
     const amountTo = (amountFrom && marketRate) ? (parseFloat(amountFrom) * marketRate).toFixed(2) : '';
 
@@ -162,10 +237,36 @@ export default function AmountSelectionPage() {
 
     }, [amountFrom, currencyFrom, validateSwapLimit, kycStatus, txCount]); // Removed limitError
 
-    const handleContinue = () => {
+    const handleContinue = async () => {
         if (limitError) return; // Prevent continue if error exists
         const amt = parseFloat(amountFrom);
         if (!amt || !marketRate) return;
+
+        // SAVE DRAFT (If Draft ID exists)
+        if (router.query.draftId) {
+            try {
+                // Update Draft
+                await fetch(`/api/drafts`, { // Post new one or update? Backend saves new "Draft" entry on POST.
+                    // My backend save_draft creates a NEW draft. It doesn't update.
+                    // I should probably add an update endpoint or just create a new one for the next step?
+                    // "Draft" model has "step". 
+                    // If moving to next step, maybe we save a new draft or update status?
+                    // For now, let's just log it or strict save.
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        step: 'offers', // Next step
+                        data: {
+                            amount: amt,
+                            currency_from: currencyFrom, // Full "Country-Code" string
+                            currency_to: currencyTo
+                        }
+                    })
+                });
+            } catch (e) {
+                console.error("Failed to update draft", e);
+            }
+        }
 
         // 1. Update Global Context
         setSwapIntent({
@@ -183,10 +284,21 @@ export default function AmountSelectionPage() {
                 amountIntent: amt,
                 rate: marketRate,
                 from: getCurrencyCode(currencyFrom || ''),
-                to: getCurrencyCode(currencyTo || '')
+                to: getCurrencyCode(currencyTo || ''),
+                draftId: router.query.draftId // Pass it along!
             }
         });
     };
+
+    if (loading || !user || isRedirecting) {
+        return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Loading secure environment...</div>;
+    }
+
+    const currentStatus = (kycStatus || user.kyc_status || 'NOT_STARTED').toUpperCase();
+    const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+    if (restrictedStatuses.includes(currentStatus)) {
+        return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Redirecting to security profile...</div>;
+    }
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5', fontFamily: 'sans-serif' }}>
@@ -205,30 +317,13 @@ export default function AmountSelectionPage() {
                         >
                             ← Back to Dashboard
                         </button>
-
-                        <button
-                            onClick={() => {
-                                sessionStorage.removeItem('trueque_swap_state');
-                                router.push('/dashboard');
-                            }}
-                            style={{
-                                background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
-                                fontWeight: '600', cursor: 'pointer'
-                            }}
-                        >
-                            Cancel ✕
-                        </button>
                     </div>
 
                     <h2 style={{ fontSize: '24px', fontWeight: '600', color: '#333333', margin: '0 0 30px 0' }}>
                         Amount and Currency to Swap
                     </h2>
 
-                    {userName && (
-                        <h3 style={{ margin: '0 0 25px 0', color: '#4A90E2', fontSize: '20px' }}>
-                            Hello, {userName} 👋
-                        </h3>
-                    )}
+
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '30px' }}>
                         {/* Left Column */}
@@ -249,7 +344,7 @@ export default function AmountSelectionPage() {
                                 >
                                     <option value="" disabled>Select Currency</option>
                                     {CURRENCIES.map(curr => (
-                                        <option key={`from-${curr.code}-${curr.country}`} value={`${curr.country}-${curr.code}`}>
+                                        <option key={`from-${curr.code}-${curr.country}`} value={`${curr.country}-${curr.code}`} style={{ color: '#333333' }}>
                                             {curr.flag} {curr.country} ({curr.code})
                                         </option>
                                     ))}
@@ -319,7 +414,7 @@ export default function AmountSelectionPage() {
                                 >
                                     <option value="" disabled>Select Currency</option>
                                     {CURRENCIES.map(curr => (
-                                        <option key={`to-${curr.code}-${curr.country}`} value={`${curr.country}-${curr.code}`}>
+                                        <option key={`to-${curr.code}-${curr.country}`} value={`${curr.country}-${curr.code}`} style={{ color: '#333333' }}>
                                             {curr.flag} {curr.country} ({curr.code})
                                         </option>
                                     ))}
@@ -362,11 +457,11 @@ export default function AmountSelectionPage() {
                         <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '15px', fontWeight: 'bold', color: '#333333', marginBottom: '5px' }}>
                             Current Market Rate
                             <span style={{ fontSize: '18px', fontWeight: '700', color: loading ? '#95a5a6' : '#27ae60' }}>
-                                {loading ? 'Loading...' : (marketRate ? marketRate.toFixed(4) : '---')}
+                                {loading ? 'Loading...' : (marketRate ? Number(marketRate).toFixed(4) : '---')}
                             </span>
                         </label>
                         <div style={{ fontSize: '13px', color: '#555555' }}>
-                            1 {getCurrencyCode(currencyFrom || '')} = {marketRate ? marketRate.toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}
+                            1 {getCurrencyCode(currencyFrom || '')} = {marketRate ? Number(marketRate).toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}
                         </div>
                     </div>
 
@@ -394,21 +489,54 @@ export default function AmountSelectionPage() {
                         </div>
                     )}
 
-                    <button
-                        onClick={handleContinue}
-                        disabled={(!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0)}
-                        style={{
-                            width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600', color: 'white',
-                            background: ((!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0))
-                                ? '#bdc3c7'
-                                : 'linear-gradient(135deg, #4A90E2 0%, #357ABD 100%)',
-                            border: 'none', borderRadius: '12px',
-                            cursor: ((!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0)) ? 'not-allowed' : 'pointer',
-                            transition: 'all 0.3s ease', boxShadow: '0 4px 12px rgba(74, 144, 226, 0.3)'
-                        }}
-                    >
-                        {(kycStatus === 'PENDING' && txCount > 0) ? 'Locked - Verification Pending' : 'Ready to Swap'}
-                    </button>
+                    {/* Action Buttons Container */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px', marginTop: '20px' }}>
+                        {/* Cancel Button */}
+                        <button
+                            onClick={() => {
+                                sessionStorage.removeItem('trueque_swap_state');
+                                router.push('/dashboard');
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '18px',
+                                background: 'white',
+                                border: `2px solid ${brandConfig.theme.errorColor}`,
+                                borderRadius: '12px',
+                                color: brandConfig.theme.errorColor,
+                                fontSize: '18px',
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            Cancel
+                        </button>
+
+                        {/* Ready to Swap Button (Bigger) */}
+                        <button
+                            onClick={handleContinue}
+                            disabled={(!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0)}
+                            style={{
+                                width: '100%',
+                                padding: '18px',
+                                background: ((!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0))
+                                    ? '#bdc3c7'
+                                    : brandConfig.theme.actionColor,
+                                border: 'none',
+                                borderRadius: '12px',
+                                color: 'white',
+                                fontSize: '22px', // Bigger font
+                                fontWeight: '800', // Bolder
+                                cursor: ((!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0)) ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.3s ease',
+                                boxShadow: ((!amountFrom || parseFloat(amountFrom) <= 0 || !marketRate || loading || !!limitError) || (kycStatus === 'PENDING' && txCount > 0)) ? 'none' : `0 6px 20px ${brandConfig.theme.actionColor}66` // Stronger shadow
+                            }}
+                        >
+                            {(kycStatus === 'PENDING' && txCount > 0) ? 'Locked' : 'Ready to Swap →'}
+                        </button>
+                    </div>
                 </div>
             </main>
         </div>

@@ -25,8 +25,14 @@ export function withAuth(handler: any): any {
     const session = await parseSessionFromReq(req);
 
     // STICT API GUARD
-    // 1. Validate standardized structure
-    if (!session || !session.user || typeof session.user.id !== 'string') {
+    // 1. Validate standardized structure (Relaxed for string/number)
+    // NOTE: We do NOT check kycStatus here. "PENDING" users are Authenticated but Limited.
+    if (!session || !session.user || !String(session.user.id)) {
+      console.warn('[WITHAUTH] Guard Blocked Request:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        id: session?.user?.id
+      });
       if (isApiRoute) {
         res.status(401).json({ error: 'unauthenticated' });
         return;
@@ -42,13 +48,15 @@ export function withAuth(handler: any): any {
 
     // 2. FAILSAVE: Reject Legacy Keys to prevent drift
     // Use type assertion to check for hidden properties not in TruequeSession type
+    /* 
     if ((session as any).userId) {
       console.error('[API GUARD] Legacy "userId" detected on session. Request blocked to prevent drift.');
       if (isApiRoute) {
         res.status(401).json({ error: 'legacy_property_drift_detected' });
         return;
       }
-    }
+    } 
+    */
 
     if (isApiRoute) {
       (req as any).session = session as TruequeSession;

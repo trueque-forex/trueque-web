@@ -1,22 +1,29 @@
 import { TruequeSession } from '../types/auth';
-import { createSession } from './session';
+import { createSession, setSessionCookie } from './session';
 
-import { NextApiResponse } from 'next'
+import { NextApiRequest, NextApiResponse } from 'next'
 
-export async function respondWithSession(res: NextApiResponse, user: any) {
+export async function respondWithSession(req: NextApiRequest, res: NextApiResponse, user: any) {
   const now = new Date();
-  const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
+  const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days (Internal expiry only)
 
   const payload: TruequeSession = {
     user: {
-      id: user.userId || user.id,
+      id: String(user.id), // STRICT: No fallback
       email: user.email,
-      kycStatus: (user.kyc_status || user.kycStatus || 'none').toUpperCase(),
+      kycStatus: (user.kyc_status || user.kycStatus || 'pending').toLowerCase(),
+      userType: user.userType || 'PEER',
+      tid: user.tid,
+      firstName: user.first_name || user.firstName,
+      lastName: user.last_name || user.lastName,
+      name: user.name || [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(' '),
+      txCount: user.tx_count || user.txCount || 0
     },
-    expires
+    expires // Kept for logic internal logic, but cookie is session-only
   };
 
-  await createSession(res, payload);
+  const sessionToken = await createSession(payload.user);
+  setSessionCookie(res, sessionToken);
   console.log('[AUTH-RESPONSE] Session created for user:', user.email);
 
   // Create Stateless JWT for Hybrid Auth (Robustness)
@@ -27,16 +34,25 @@ export async function respondWithSession(res: NextApiResponse, user: any) {
   return res.status(200).json({
     ok: true,
     // Strict Response - No Backward Compatibility
-    id: payload.user.id,
-    email: payload.user.email,
-    firstName: user.first_name || user.firstName || (user.full_name ? user.full_name.split(' ')[0] : 'User'),
-    lastName: user.last_name || user.lastName || (user.full_name ? user.full_name.split(' ').slice(1).join(' ') : ''),
-    tid: user.tid,
-    kycStatus: payload.user.kycStatus,
-    txCount: user.txCount || 0,
-    needsKyc: false,
-    token,
     // Return session object for client-side storage (localStorage) matching strict type
-    session: { ...payload, token }
+    session: {
+      user: {
+        id: payload.user.id,
+        email: payload.user.email,
+        kycStatus: payload.user.kycStatus,
+        userType: payload.user.userType,
+        tid: payload.user.tid,
+        firstName: user.first_name || user.firstName,
+        lastName: user.last_name || user.lastName,
+        phone: payload.user.phone,
+        country: payload.user.country,
+        street_address: payload.user.street_address,
+        city: payload.user.city,
+        state: payload.user.state,
+        postalCode: payload.user.postalCode
+      },
+      expires: payload.expires,
+      token
+    }
   });
 }

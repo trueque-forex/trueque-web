@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // On success, respond with session (reuse respondWithSession)
-    return await respondWithSession(res, { ...user, tid: entry.tid });
+    return await respondWithSession(req, res, { ...user, tid: entry.tid });
   } catch (err: any) {
     console.error('mfa challenge error', err);
     return res.status(500).json({ error: 'internal_error' });

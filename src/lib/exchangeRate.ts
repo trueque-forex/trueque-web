@@ -7,10 +7,8 @@
  */
 export async function fetchExchangeRate(from: string, to: string): Promise<number> {
   try {
-    // Using ExchangeRate-API (free tier, no API key needed for basic usage)
-    const response = await fetch(
-      `https://api.exchangerate-api.com/v4/latest/${from}`
-    );
+    // USE INTERNAL API for consistency with Landing Page
+    const response = await fetch(`/api/rate/${from}/${to}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch exchange rate');
@@ -18,13 +16,14 @@ export async function fetchExchangeRate(from: string, to: string): Promise<numbe
 
     const data = await response.json();
 
-    if (!data.rates || !data.rates[to]) {
+    if (!data.rate) {
       throw new Error(`Exchange rate not available for ${from} to ${to}`);
     }
 
-    return data.rates[to];
+    return parseFloat(data.rate);
   } catch (error: any) {
     console.error('Exchange rate fetch error:', error);
+    // Fallback? No, strict consistency requested.
     throw new Error(error.message || 'Unable to fetch exchange rate');
   }
 }

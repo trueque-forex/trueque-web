@@ -1,207 +1,271 @@
-// src/pages/index.tsx
-import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import apiFetch from '../lib/apiFetch';
-import { useAuth } from '../context/AuthContext';
+import { useState, useMemo } from 'react';
 
-// Mock Rates Data (In real app, fetch from API)
-const MOCK_RATES = [
-  { pair: 'USD → ARS', rate: 1150.50, trend: 'up' },
-  { pair: 'USD → MXN', rate: 17.45, trend: 'down' },
-  { pair: 'EUR → BRL', rate: 5.42, trend: 'stable' },
-  { pair: 'EUR → COP', rate: 4350.20, trend: 'up' },
-  { pair: 'NGN → GHS', rate: 0.015, trend: 'stable' }, // Africa Corridor
-];
-export default function IndexPage() {
-  const router = useRouter();
-  const { user, loading } = useAuth();
+// --- HELPER: FINANCIAL MATH ---
+function calculateBreakdown(amountSent: number, amountReceived: number, totalFee: number) {
+    const absoluteCost = totalFee;
+    const rawRate = amountReceived / amountSent;
+    
+    // Effective Rate = Amount Received / (Amount Swapped + Fees)
+    const totalInput = amountSent + totalFee;
+    const effectiveRate = amountReceived / totalInput;
 
-  useEffect(() => {
-    // 1. Check Session (Redirect if logged in, UNLESS explicit logout)
-    const isExplicitLogout = window.location.search.includes('logged_out=true');
+    const costIncreasePct = ((rawRate - effectiveRate) / rawRate) * 100;
 
-    if (!loading && user && !isExplicitLogout) {
-      router.replace('/dashboard');
+    return { absoluteCost, rawRate, effectiveRate, costIncreasePct };
+}
+
+export default function Home() {
+  const [status, setStatus] = useState<'IDLE' | 'LOADING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [responseLog, setResponseLog] = useState<string>('');
+  const [lastOfferId, setLastOfferId] = useState<string>('');
+  const [mySwaps, setMySwaps] = useState<any[]>([]);
+  const [currentViewUser, setCurrentViewUser] = useState<string>('');
+
+  // CONFIG: Your Real User IDs
+  const SWAPPER_A_ID = '6979be29-1878-462e-a8db-652db70bc7a2'; 
+  const SWAPPER_B_ID = '014a429d-db7a-475a-9a3f-e816dfc73185'; 
+
+  // --- LIVE QUOTE DATA WITH DETAILED FEES ---
+  const quoteData = {
+    swap: 1000.00,
+    currencySwap: 'USD',
+    receive: 920.00,
+    currencyReceive: 'EUR',
+    fees: {
+        inbound: 0.50,
+        gateway: 0.50,
+        liquidity: 1.00,
+        network: 1.00, 
+        outbound: 0.50,
+        symmetri: 1.50
     }
-  }, [user, loading, router]);
+  };
 
-  const [geoCountry, setGeoCountry] = useState<string>('US'); // Default US
-  // const [loading, setLoading] = useState(true); // Removed local loading, use context
+  const totalFee = Object.values(quoteData.fees).reduce((a, b) => a + b, 0);
 
-  useEffect(() => {
-    // 2. Mock Geolocation (Simulate IP check)
-    // ... only geo logic here ...
+  const stats = useMemo(() => 
+    calculateBreakdown(quoteData.swap, quoteData.receive, totalFee), 
+  [quoteData, totalFee]);
 
-    // 2. Mock Geolocation (Simulate IP check)
-    // In production, use req.headers['x-forwarded-for'] or a service
-    const detectGeo = async () => {
-      let detected = 'US'; // Default
-      try {
-        // Fetch from our backend wrapper which handles headers/service
-        const res = await fetch('/api/geo');
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.country) detected = data.country;
-        }
-      } catch (e) {
-        // Silent fail to default 'US'
-        console.warn('Geo detect failed, using default', e);
+  // --- ACTION 1: CREATE SWAP ---
+  async function handleCreateTestOffer() {
+    setStatus('LOADING');
+    setResponseLog('Creating Swap Proposal...');
+    try {
+      const res = await fetch('/api/offers/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: SWAPPER_A_ID,
+          swap_type: 'SWAP_USD',       
+          amount_offered: quoteData.swap,     
+          currency_offered: quoteData.currencySwap,
+          amount_wanted: quoteData.receive,       
+          currency_wanted: quoteData.currencyReceive,
+          exchange_rate: stats.rawRate,
+          fee_total: totalFee,
+          fee_details: quoteData.fees 
+        }),
+      });
+      const data = await res.json();
+      setResponseLog(JSON.stringify(data, null, 2));
+      if (res.ok) {
+        setStatus('SUCCESS');
+        setLastOfferId(data.offer.id); 
+        handleListSwaps(SWAPPER_A_ID);
+      } else {
+        setStatus('ERROR');
       }
+    } catch (error: any) {
+      setStatus('ERROR');
+      setResponseLog(error.toString());
+    }
+  }
 
-      setGeoCountry(detected);
-      sessionStorage.setItem('user_geo', detected);
-    };
+  // --- ACTION 2: ACCEPT SWAP ---
+  async function handleAcceptOffer() {
+    if (!lastOfferId) return alert('Please create a swap proposal first.');
+    setStatus('LOADING');
+    setResponseLog(`Attempting to Match Swap ${lastOfferId}...`);
+    try {
+      const res = await fetch('/api/matches/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offer_id: lastOfferId, taker_id: SWAPPER_B_ID }),
+      });
+      const data = await res.json();
+      setResponseLog(JSON.stringify(data, null, 2));
+      if (res.ok) {
+        setStatus('SUCCESS');
+        handleListSwaps(SWAPPER_B_ID); 
+      } else {
+        setStatus('ERROR');
+      }
+    } catch (error: any) {
+      setStatus('ERROR');
+      setResponseLog(error.toString());
+    }
+  }
 
-    detectGeo();
-  }, []); // Run once on mount
-
-  if (loading) return null; // Or a spinner
+  // --- HELPER: LIST SWAPS ---
+  async function handleListSwaps(userId: string) {
+    setCurrentViewUser(userId);
+    try {
+      const res = await fetch(`/api/matches/list?user_id=${userId}`);
+      const data = await res.json();
+      if (data.success) setMySwaps(data.swaps);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f5f7fa',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-    }}>
-      {/* Hero Section */}
-      <header style={{
-        background: 'linear-gradient(135deg, #2c3e50 0%, #3498db 100%)',
-        color: 'white',
-        padding: '60px 40px',
-        textAlign: 'center'
-      }}>
-        <div style={{ maxWidth: 800, margin: '0 auto' }}>
-          <h1 style={{ fontSize: '48px', fontWeight: '800', marginBottom: '20px', letterSpacing: '-1px' }}>
-            Welcome to Trueque
-          </h1>
-          <p style={{ fontSize: '20px', opacity: 0.9, lineHeight: '1.6', maxWidth: '700px', margin: '0 auto 40px auto' }}>
-            The global P2P remittance network. We lower costs by eliminating cross-border transactions through our domestic mirror network.
-          </p>
+    <div style={{ padding: '2rem', fontFamily: 'sans-serif', maxWidth: '900px', margin: '0 auto' }}>
+      <h1>Symmetri Developer Console</h1>
+      <p>Test the full lifecycle: Proposal &rarr; Handshake &rarr; Secure Trade Room.</p>
+      <hr style={{ margin: '2rem 0' }} />
 
-          <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
-            <button
-              onClick={() => router.push('/signin')}
-              style={{
-                padding: '16px 40px',
-                fontSize: '18px',
-                fontWeight: '700',
-                color: '#2c3e50',
-                backgroundColor: '#fad390', // Warm accent
-                border: 'none',
-                borderRadius: '50px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-                transition: 'transform 0.2s',
-              }}
-              onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-              onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            >
-              Get Started
-            </button>
-            <button
-              onClick={() => router.push('/how-it-works')}
-              style={{
-                padding: '16px 40px',
-                fontSize: '18px',
-                fontWeight: '600',
-                color: 'white',
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: '50px',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-              }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.2)'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-            >
-              How it Works
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Live Rates Ticker */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '20px 0',
-        borderBottom: '1px solid #e1e8ed',
-        overflow: 'hidden',
-        whiteSpace: 'nowrap'
-      }}>
-        <style jsx>{`
-          @keyframes marquee {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-50%); }
-          }
-        `}</style>
-        <div style={{
-          display: 'flex',
-          gap: '40px',
-          animation: 'marquee 30s linear infinite',
-          width: 'max-content',
-          paddingLeft: '40px'
-        }}>
-          {[...MOCK_RATES, ...MOCK_RATES, ...MOCK_RATES].sort((a, b) => { // Tripled for smoothness
-            return 0;
-          }).map((r, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontWeight: '600', color: '#7f8c8d' }}>{r.pair}</span>
-              <span style={{ fontWeight: '700', color: '#2c3e50', fontSize: '18px' }}>{r.rate.toFixed(3)}</span>
-              <span style={{
-                color: r.trend === 'up' ? '#27ae60' : r.trend === 'down' ? '#e74c3c' : '#f39c12',
-                fontSize: '14px'
-              }}>
-                {r.trend === 'up' ? '▲' : r.trend === 'down' ? '▼' : '▬'}
-              </span>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '2rem' }}>
+        
+        {/* SWAPPER A CARD */}
+        <div style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '8px' }}>
+            <h3>1. Swapper A (The Proposal)</h3>
+            <div style={{ background: '#fff', padding: '15px', borderRadius: '6px', border: '1px solid #ddd', marginBottom: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <span style={{ color: '#666' }}>You Swap:</span>
+                    <strong>{quoteData.swap} {quoteData.currencySwap}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                    <span style={{ color: '#666' }}>Beneficiary Receives:</span>
+                    <strong>{quoteData.receive} {quoteData.currencyReceive}</strong>
+                </div>
+                <div style={{ borderTop: '1px dashed #ccc', margin: '10px 0' }}></div>
+                <div style={{ fontSize: '0.85em', color: '#666' }}>
+                    <FeeRow label="Inbound Fee" amount={quoteData.fees.inbound} />
+                    <FeeRow label="Gateway Fee" amount={quoteData.fees.gateway} />
+                    <FeeRow label="Liquidity Fee" amount={quoteData.fees.liquidity} />
+                    <FeeRow label="VisaDirect/MCSend" amount={quoteData.fees.network} />
+                    <FeeRow label="Outbound Fee" amount={quoteData.fees.outbound} />
+                    <FeeRow label="Symmetri Fee" amount={quoteData.fees.symmetri} />
+                    <div style={{ borderTop: '1px solid #eee', margin: '5px 0' }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', color: '#d32f2f' }}>
+                        <span>Total Fees:</span>
+                        <span>${totalFee.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div style={{ borderTop: '1px dashed #ccc', margin: '10px 0' }}></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9em' }}>
+                    <span>Mid-Market Rate:</span>
+                    <span>{stats.rawRate.toFixed(4)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.9em', fontWeight: 'bold', marginTop: '5px' }}>
+                    <span>Effective Rate:</span>
+                    <span style={{ color: '#2e7d32' }}>{stats.effectiveRate.toFixed(4)}</span>
+                </div>
             </div>
-          ))}
+            <button onClick={handleCreateTestOffer} style={buttonStyle}>Confirm & Create</button>
+        </div>
+
+        {/* SWAPPER B CARD */}
+        <div style={{ background: '#e6f7ff', padding: '1rem', borderRadius: '8px', border: '1px solid #91d5ff' }}>
+            <h3>2. Swapper B (The Handshake)</h3>
+            <p style={{fontSize: '0.9rem'}}>Review the breakdown before accepting.</p>
+            <input 
+                type="text" value={lastOfferId} onChange={(e) => setLastOfferId(e.target.value)}
+                placeholder="Proposal ID..." style={{ width: '100%', marginBottom: '10px', padding: '5px' }}
+            />
+            <button onClick={handleAcceptOffer} style={{ ...buttonStyle, background: '#0050b3' }}>Accept Swap</button>
         </div>
       </div>
 
-      {/* Features Grid */}
-      <main style={{ maxWidth: 1200, margin: '60px auto 60px', padding: '0 40px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '30px' }}>
-        <FeatureCard
-          icon="⚡"
-          title="Instant Settlement"
-          desc="Funds arrive in minutes via local rails (RTP, Pix, SPEI)."
-        />
-        <FeatureCard
-          icon="🛡️"
-          title="Bank-Grade Security"
-          desc="Fully compliant KYC/AML checks and secure data encryption."
-        />
-        <FeatureCard
-          icon="💸"
-          title="Real Market Rates"
-          desc="Exchange made at Market Rate with transparent and low fees."
-        />
-        <FeatureCard
-          icon="✈️"
-          title="Traveler Ready"
-          desc="Swap currencies for local spending, in the travel destination, without a domestic bank account. Directly to your wallet or card."
-        />
-      </main>
+      {/* DASHBOARD */}
+      <div style={{ marginTop: '2rem' }}>
+        <h3>3. Symmetrical Dashboard</h3>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '1rem' }}>
+          <button onClick={() => handleListSwaps(SWAPPER_A_ID)} style={currentViewUser === SWAPPER_A_ID ? activeBtn : secondaryBtn}>
+            View as Swapper A
+          </button>
+          <button onClick={() => handleListSwaps(SWAPPER_B_ID)} style={currentViewUser === SWAPPER_B_ID ? activeBtn : secondaryBtn}>
+            View as Swapper B
+          </button>
+        </div>
 
-      {/* Footer */}
-      <footer style={{ textAlign: 'center', padding: '40px', color: '#95a5a6', fontSize: '14px' }}>
-        © 2024 Trueque Inc. All rights reserved.
-      </footer>
+        {mySwaps.length > 0 ? (
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', border: '1px solid #ddd' }}>
+            <thead style={{ background: '#f9f9f9' }}>
+              <tr>
+                <th style={thStyle}>Swap ID</th>
+                <th style={thStyle}>You Swapped</th>
+                <th style={thStyle}>&harr;</th>
+                <th style={thStyle}>Beneficiary Receives</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mySwaps.map((swap) => (
+                <tr key={swap.id} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={tdStyle}>{swap.id.slice(0, 8)}...</td>
+                  <td style={{ ...tdStyle, color: '#d32f2f', fontWeight: 'bold' }}>-{swap.sent_amount} {swap.sent_currency}</td>
+                  <td style={tdStyle}>&harr;</td>
+                  <td style={{ ...tdStyle, color: '#2e7d32', fontWeight: 'bold' }}>+{swap.received_amount} {swap.received_currency}</td>
+                  <td style={tdStyle}><StatusBadge status={swap.status} /></td>
+                  <td style={tdStyle}>
+                    {/* THIS IS THE CHANGE: LINK TO THE ROOM */}
+                    <a 
+                        href={`/trade/${swap.id}?viewer=${currentViewUser}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={roomLinkBtn}
+                    >
+                        {swap.status === 'COMPLETED' ? 'View Receipt' : 'Enter Room →'}
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', color: '#888' }}>
+            Click a "View as" button to load data.
+          </div>
+        )}
+      </div>
+
+      {status !== 'IDLE' && (
+        <div style={{ marginTop: '2rem', background: '#1a1a1a', color: '#52c41a', padding: '1rem', borderRadius: '8px', overflowX: 'auto' }}>
+            <pre>{responseLog}</pre>
+        </div>
+      )}
     </div>
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: string, title: string, desc: string }) {
-  return (
-    <div style={{
-      backgroundColor: 'white',
-      padding: '30px',
-      borderRadius: '16px',
-      border: '1px solid #e1e8ed',
-      textAlign: 'center'
-    }}>
-      <div style={{ fontSize: '40px', marginBottom: '20px' }}>{icon}</div>
-      <h3 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '10px', color: '#2c3e50' }}>{title}</h3>
-      <p style={{ color: '#7f8c8d', lineHeight: '1.5' }}>{desc}</p>
-    </div>
-  );
+function FeeRow({ label, amount }: { label: string, amount: number }) {
+    return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+            <span>{label}:</span>
+            <span>${amount.toFixed(2)}</span>
+        </div>
+    );
 }
+
+function StatusBadge({ status }: { status: string }) {
+    const isDone = status === 'COMPLETED';
+    return (
+        <span style={{ 
+            padding: '4px 8px', borderRadius: '12px', fontSize: '0.85em', fontWeight: 'bold',
+            background: isDone ? '#e6fffa' : '#fff7e6',
+            color: isDone ? '#006d75' : '#d46b08',
+        }}>
+            {status}
+        </span>
+    );
+}
+
+const thStyle = { padding: '12px', borderBottom: '2px solid #ddd' };
+const tdStyle = { padding: '12px' };
+const buttonStyle = { padding: '10px 20px', fontSize: '16px', background: '#0070f3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', width: '100%' };
+const roomLinkBtn = { display: 'inline-block', padding: '6px 12px', fontSize: '14px', background: '#101d2d', color: 'white', textDecoration: 'none', borderRadius: '4px', fontWeight: 'bold' };
+const secondaryBtn = { padding: '8px 16px', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', color: '#333' };
+const activeBtn = { ...secondaryBtn, background: '#e6f7ff', borderColor: '#1890ff', color: '#1890ff', fontWeight: 'bold' };

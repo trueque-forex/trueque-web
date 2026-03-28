@@ -198,8 +198,8 @@ export default function SwapSummaryPage() {
         setLoading(true);
         try {
             const s = JSON.parse(localStorage.getItem('trueque_session') || '{}');
-            const name = s.firstName || s.email?.split('@')[0] || 'Joao';
-            const brandedId = `${name.toUpperCase()} TID`;
+            const name = s.firstName || s.email?.split('@')[0] || 'User';
+            const brandedId = `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
 
             const payload = {
                 amount: breakdown.totalToPaySource,

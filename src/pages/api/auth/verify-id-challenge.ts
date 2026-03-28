@@ -72,16 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             // Success!
             // Issue session with special permission
-            return await respondWithSession(res, {
+            return await respondWithSession(req, res, {
                 ...user,
                 mfaResetAllowed: true, // State Transition
                 recoveryTrustLevel: tidMatch ? 'HIGH' : 'STANDARD',
-                tid: user.tid || 'FRESH_RECOVERY'
-            });
-            // Issue session with special permission
-            return await respondWithSession(res, {
-                ...user,
-                mfaResetAllowed: true, // State Transition
                 tid: user.tid || 'FRESH_RECOVERY'
             });
         } else {

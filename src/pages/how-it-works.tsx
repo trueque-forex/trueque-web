@@ -1,5 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
+import brandConfig from '../config/brand_config.json';
 
 export default function HowItWorksPage() {
     const router = useRouter();
@@ -18,16 +19,16 @@ export default function HowItWorksPage() {
                     ← Back to Home
                 </button>
 
-                <h1 style={{ fontSize: '36px', fontWeight: '800', color: '#2c3e50', marginBottom: '30px' }}>How Trueque Works</h1>
+                <h1 style={{ fontSize: '36px', fontWeight: '800', color: '#2c3e50', marginBottom: '30px' }}>How {brandConfig.appName} Works</h1>
 
                 <div style={{ backgroundColor: 'white', padding: '40px', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
                     <div style={{ marginBottom: '40px' }}>
                         <h2 style={{ fontSize: '24px', color: '#2c3e50', marginBottom: '15px' }}>The P2P Mirror Network</h2>
                         <p style={{ fontSize: '18px', color: '#34495e', lineHeight: '1.8' }}>
-                            Trueque eliminates cross-border fees by matching users locally.
+                            {brandConfig.appName} eliminates cross-border fees by matching users locally.
                         </p>
                         <p style={{ fontSize: '16px', color: '#7f8c8d', lineHeight: '1.8', marginTop: '10px' }}>
-                            In Trueque, a <strong>User A</strong> in one country (e.g. USA) wants to send 100 USD to Mexico.
+                            In {brandConfig.appName}, a <strong>User A</strong> in one country (e.g. USA) wants to send 100 USD to Mexico.
                             Simultaneously, a <strong>User B</strong> in Mexico wants to send the equivalent amount to the USA.
                         </p>
                     </div>

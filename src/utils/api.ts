@@ -18,12 +18,12 @@ type FetchAuditLogsResponse = {
 
 export const fetchAuditLogs = async (
   corridor: string,
-  userId: string
+  id: string
 ): Promise<FetchAuditLogsResponse> => {
   const res = await fetch(`${BASE_URL}/audit?corridor=${encodeURIComponent(corridor)}`, {
     method: 'GET',
     headers: {
-      'x-user-id': userId,
+      'x-user-id': id,
       'x-user-location': DEFAULT_LOCATION,
     },
   });
@@ -44,14 +44,14 @@ type AcknowledgeFallbackResponse = {
 
 export const acknowledgeFallback = async (
   reason: string,
-  userId: string,
+  id: string,
   corridor?: string
 ): Promise<AcknowledgeFallbackResponse> => {
   const res = await fetch(`${BASE_URL}/fallback`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-user-id': userId,
+      'x-user-id': id,
       'x-user-location': DEFAULT_LOCATION,
     },
     body: JSON.stringify({ reason, corridor } as AcknowledgeFallbackRequest),

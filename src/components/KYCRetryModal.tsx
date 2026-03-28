@@ -5,21 +5,21 @@ type RetryResult = { verified: boolean; failureReason?: string | null };
 
 type Props =
   | {
-      // legacy form-based retry (no userId)
-      userId?: undefined;
-      onClose: () => void;
-      onRetryComplete: (result: RetryResult) => void;
-    }
+    // legacy form-based retry (no id)
+    id?: undefined;
+    onClose: () => void;
+    onRetryComplete: (result: RetryResult) => void;
+  }
   | {
-      // simple retry by userId (newer flow)
-      userId: string;
-      onClose: () => void;
-      onRetryComplete: (result: RetryResult) => void;
-    };
+    // simple retry by id (newer flow)
+    id: string;
+    onClose: () => void;
+    onRetryComplete: (result: RetryResult) => void;
+  };
 
 export default function KYCRetryModal(props: Props) {
   const { onClose, onRetryComplete } = props as { onClose: () => void; onRetryComplete: (r: RetryResult) => void };
-  const userId = (props as any).userId as string | undefined;
+  const id = (props as any).id as string | undefined;
 
   // form state (for legacy form-based flow)
   const [fullName, setFullName] = useState('');
@@ -63,18 +63,18 @@ export default function KYCRetryModal(props: Props) {
     }
   }
 
-  // simple retry by userId (newer)
+  // simple retry by id (newer)
   async function runRetry() {
     setLoading(true);
     setError(null);
     try {
       // Minimal stub for retry action: replace with real API call later
-      // If userId is provided call a minimal retry endpoint
-      if (userId) {
+      // If id is provided call a minimal retry endpoint
+      if (id) {
         const res = await fetch('/api/kyc/retry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ id }),
         });
         if (!res.ok) {
           const payload = await res.json().catch(() => ({ message: 'Retry failed' }));
@@ -97,13 +97,13 @@ export default function KYCRetryModal(props: Props) {
     }
   }
 
-  // Render: if userId present show compact retry UI, otherwise show full form
-  return userId ? (
+  // Render: if id present show compact retry UI, otherwise show full form
+  return id ? (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded shadow p-4 w-96">
         <h3 className="font-semibold mb-2">Retry KYC</h3>
         <p className="text-sm mb-3">
-          Retry KYC for user <strong>{userId}</strong>.
+          Retry KYC for user <strong>{id}</strong>.
         </p>
 
         {error && <div className="text-red-600 mb-2">{error}</div>}

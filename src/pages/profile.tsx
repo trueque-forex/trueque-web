@@ -32,7 +32,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     const user = {
         userId: session.userId || session.truequeId || 'UNKNOWN_ID',
         email: session.email || 'unknown@example.com',
-        name: session.name || session.firstName || 'Trueque User',
+        name: session.name || session.firstName || 'Symmetri User',
         kycStatus: (session.kycStatus || 'PENDING').toUpperCase(),
         // Mock Trust Score/Level if not in session, as standard
         trustScore: session.trustScore || 85,
@@ -108,7 +108,7 @@ export default function ProfilePage({ user }: ProfileProps) {
                             </div>
                         </div>
                         <div style={{ fontSize: '14px', color: '#95a5a6', fontFamily: 'monospace' }}>
-                            Trueque ID: {user.userId}
+                            Symmetri ID: {user.userId}
                         </div>
                     </div>
 

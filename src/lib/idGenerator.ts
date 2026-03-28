@@ -20,7 +20,7 @@ export const generateTruequeID = (countryCode: string = 'XX'): string => {
     const sequence = '0001';
 
     // Generate Checksum (Simple Modulo 36 logic for demo)
-    const base = `T${dateStr}${cleanCountry}${sequence}`;
+    const base = `S${dateStr}${cleanCountry}${sequence}`;
     const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     let sum = 0;
     for (let i = 0; i < base.length; i++) {

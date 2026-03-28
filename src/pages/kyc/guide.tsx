@@ -14,7 +14,7 @@ export default function KycGuide({ session, baseUrl }: Props) {
   return (
     <main style={{ padding: 20 }}>
       <h1>What you need for KYC</h1>
-      {session?.userId && <p className="text-sm text-gray-500 mb-4">Signed in as: {session.userId}</p>}
+      {session?.user?.id && <p className="text-sm text-gray-500 mb-4">Signed in as: {session.user.id}</p>}
 
       <p>Typical documents:</p>
       <ul>

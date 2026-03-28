@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import getPool from '../../../lib/db';
 import { generateTruequeId } from '../../../lib/truequeId';
+import { getUtcDate } from '../../../lib/time';
 
 type ApiError = { error: string; message?: string };
 type ApiSuccess = { token: string; user: any };
@@ -20,7 +21,7 @@ function generateToken(user: any): string {
         {
             userId: user.id,
             email: user.email,
-            truequeId: user.trueque_id
+            tid: user.tid
         },
         secret,
         { expiresIn: '7d' }
@@ -77,17 +78,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const now = getUtcDate();
         const truequeId = typeof generateTruequeId === 'function'
             ? generateTruequeId(now, country || 'CO', Math.floor(Math.random() * 10000))
-            : `TRQ-${Date.now()}`;
+            : `SYM-${Date.now()}`;
 
         // Insert new user
         // Insert new user
         const insertQuery = `
       INSERT INTO users (
         email, email_canonical, password_hash, first_name, last_name,
-        country_of_residence, tid, created_at
+        country, tid, created_at, phone_number, kyc_status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-      RETURNING id, email, first_name, last_name, country_of_residence, tid, created_at
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, 'INCOMPLETE')
+      RETURNING id, email, first_name, last_name, country, tid, created_at
     `;
 
         const result = await pool.query(insertQuery, [
@@ -97,7 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             firstName,
             lastName,
             country || 'CO',
-            truequeId
+            truequeId,
+            phone
         ]);
 
         const newUser = result.rows[0];
@@ -106,18 +108,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const token = generateToken({
             id: newUser.id,
             email: newUser.email,
-            trueque_id: newUser.tid
+            tid: newUser.tid
         });
 
         // Format user object for mobile app
         const userResponse = {
             id: String(newUser.id),
-            trueque_id: newUser.tid,
+            tid: newUser.tid,
+            symmetriId: newUser.tid,
             email: newUser.email,
-            country: newUser.country_of_residence,
+            country: newUser.country,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            phone: null, // Not in DB yet
+            phone: newUser.phone_number,
             kyc_status: 'not_started', // Not in DB yet
             created_at: newUser.created_at,
             is_admin: false // Not in DB yet

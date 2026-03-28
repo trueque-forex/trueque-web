@@ -163,7 +163,7 @@ export default function ReceiptPage() {
                                         // 1. Core Fees
                                         fees.push({ label: 'Inbound', amount: principal * 0.015 + 0.30 });
                                         fees.push({ label: 'Card Liquidity', amount: principal * 0.005 });
-                                        fees.push({ label: 'Trueque Service', amount: principal * 0.005 });
+                                        fees.push({ label: 'Symmetri Service', amount: principal * 0.005 });
                                         fees.push({ label: 'Gateway', amount: 2.50 });
                                         fees.push({ label: 'Premium Delivery', amount: principal * 0.015 });
 

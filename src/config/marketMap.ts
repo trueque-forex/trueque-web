@@ -42,5 +42,12 @@ export const MarketMap: Record<string, MarketConfig> = {
         length: 11,
         type: 'alphanumeric',
         placeholder: 'CPF or PIX Key'
+    },
+    'PEN': {
+        country: 'Peru',
+        label: 'CCI (Interbank Account)',
+        length: 20,
+        type: 'numeric',
+        placeholder: '0011-...'
     }
 };

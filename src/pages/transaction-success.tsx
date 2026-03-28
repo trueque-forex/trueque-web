@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 import Header from '../components/Header';
+import brandConfig from '../config/brand_config.json';
 import { useSwap } from '../context/SwapContext';
 
 // Timeline States
@@ -103,11 +104,11 @@ export default function TransactionStatusPage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: (active || completed) ? 1 : 0.4, transition: 'all 0.5s' }}>
             <div style={{
                 width: '40px', height: '40px', borderRadius: '50%',
-                backgroundColor: completed ? '#27ae60' : (active ? '#4A90E2' : '#ecf0f1'),
+                backgroundColor: completed ? '#000000' : (active ? '#000000' : '#ecf0f1'),
                 color: (active || completed) ? 'white' : '#bdc3c7',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 'bold', fontSize: '18px', zIndex: 2,
-                boxShadow: active ? '0 0 0 4px rgba(74, 144, 226, 0.2)' : 'none'
+                boxShadow: active ? '0 0 0 4px rgba(0, 0, 0, 0.1)' : 'none'
             }}>
                 {completed ? '✓' : icon}
             </div>
@@ -154,7 +155,25 @@ export default function TransactionStatusPage() {
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: 'sans-serif' }}>
-            <Header />
+            {/* Centered Brand Header for Success Screen */}
+            <header style={{
+                background: 'white',
+                padding: '20px 40px',
+                borderBottom: '1px solid #e1e8ed',
+                textAlign: 'center'
+            }}>
+                <h1 style={{
+                    fontSize: '28px',
+                    fontWeight: brandConfig.theme.fontWeight,
+                    margin: 0,
+                    fontFamily: brandConfig.theme.fontFamily,
+                    letterSpacing: brandConfig.theme.letterSpacing,
+                    color: brandConfig.theme.primaryColor,
+                    cursor: 'pointer'
+                }} onClick={() => router.push('/dashboard')}>
+                    {brandConfig.appName}
+                </h1>
+            </header>
 
             <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px' }}>
 
@@ -236,7 +255,7 @@ export default function TransactionStatusPage() {
                             disabled={status !== 'Completed'}
                             style={{
                                 padding: '12px 24px',
-                                backgroundColor: status === 'Completed' ? '#4A90E2' : '#bdc3c7',
+                                backgroundColor: status === 'Completed' ? '#000000' : '#bdc3c7',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',

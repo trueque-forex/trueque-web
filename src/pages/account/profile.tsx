@@ -32,10 +32,10 @@ export default function ProfilePage(): React.JSX.Element {
             const session = JSON.parse(sessionData);
             if (mounted) {
               setProfile({
-                id: session.truequeId || 'user_demo',
-                email: session.email || 'demo@example.com',
-                name: session.name || session.firstName || 'Juan Tester',
-                created_at: session.created_at,
+                id: session.user?.id || session.id || '...',
+                email: session.user?.email || session.email || '...',
+                name: session.user?.name || session.name || session.firstName || 'User',
+                created_at: session.created_at, // session doesn't usually carry created_at, but we'll leave it if it's there or undefined
                 needsKYC: false // Assume verified if in session for now, or fetch real status
               });
             }

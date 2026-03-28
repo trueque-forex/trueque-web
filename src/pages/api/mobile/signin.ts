@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         if (!pool) throw new Error('DB pool not available');
 
         const query = `
-      SELECT id, password_hash, email, tid, first_name, last_name, country_of_residence, created_at
+      SELECT id, password_hash, email, tid, first_name, last_name, country, phone_number, created_at
       FROM users
       WHERE email_canonical = $1 OR username_canonical = $1
       LIMIT 1
@@ -69,12 +69,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         // Format user object for mobile app
         const userResponse = {
             id: String(user.id),
-            trueque_id: user.tid || `TRQ-${user.id}`,
+            tid: user.tid || `TRQ-${user.id}`,
+            symmetriId: user.tid || `TRQ-${user.id}`,
             email: user.email,
-            country: user.country_of_residence || 'CO',
+            country: user.country || 'CO',
             first_name: user.first_name,
             last_name: user.last_name,
-            phone: null, // Not in DB yet
+            phone: user.phone_number,
             kyc_status: 'not_started', // Not in DB yet
             created_at: user.created_at,
             is_admin: false, // Not in DB yet

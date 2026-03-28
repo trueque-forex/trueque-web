@@ -20,10 +20,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         const now = new Date().toISOString();
-        const userId = parseInt(actor.userId, 10);
+
+        const userId = actor.userId; // Treat as string (UUID)
 
         // Construct Metadata JSON
         const metadata = {
+            name: body.name || 'Unknown', // Stored in metadata now
             method: body.method,
             identifiers: {
                 ...body.identifiers,
@@ -38,14 +40,13 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         const insertText = `
       INSERT INTO beneficiaries
-        (owner_id, name, metadata, created_at)
-      VALUES ($1, $2, $3, $4)
+        (owner_id, metadata, created_at)
+      VALUES ($1, $2, $3)
       RETURNING *
     `;
 
         const values = [
             userId, // Now passed as string/bigint, matches owner_id(bigint)
-            body.name || 'Unknown',
             JSON.stringify(metadata),
             now,
         ];
@@ -60,7 +61,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             return res.status(201).json({
                 id: String(row.id),
                 user_id: String(row.owner_id),
-                name: row.name,
+                name: parsedMd.name || 'Unknown', // Read from metadata
                 country: parsedMd.country || 'US',
                 method: parsedMd.method || 'unknown',
                 identifiers: parsedMd.identifiers || {},
@@ -69,13 +70,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             });
         } catch (e: any) {
             console.error('beneficiaries.POST error', e);
-            return res.status(500).json({ error: 'internal_error' });
+
+            // SCHEMA PROBE
+            try {
+                const { rows: cols } = await query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'beneficiaries'");
+                const foundCols = cols.map((c: any) => `${c.column_name}(${c.data_type})`).join(', ');
+                console.error('PROBE COLUMNS:', foundCols);
+                return res.status(500).json({
+                    error: 'db_schema_mismatch',
+                    message: `Missing Columns. Found: ${foundCols}`,
+                    detail: e.message
+                });
+            } catch (probeErr) {
+                return res.status(500).json({ error: 'internal_error', detail: e.message });
+            }
         }
     }
 
     // GET: List beneficiaries
     if (req.method === 'GET') {
-        const userId = parseInt(actor.userId, 10);
+        const userId = actor.userId;
         const { method } = req.query;
 
         const selectText = `
@@ -106,7 +120,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 return {
                     id: String(row.id),
                     user_id: String(row.owner_id),
-                    name: row.name,
+                    name: md.name || row.name || 'Unknown', // Prefer metadata, fallback to row (if it existed)
                     country: md.country || row.country || 'US',
                     method: method,
                     identifiers: identifiers,
@@ -130,7 +144,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             return res.status(400).json({ error: 'id, method, and identifiers required' });
         }
 
-        const userId = parseInt(actor.userId, 10);
+        const userId = actor.userId;
         const beneficiaryId = body.id;
 
         // 1. Fetch Existing
@@ -176,22 +190,20 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         md.method = body.method;
         md.identifiers = body.identifiers;
 
+        // Update name in metadata
+        md.name = body.name || md.name || existingRow.name;
+
         // 3. Save Back
         const updateText = `
             UPDATE beneficiaries 
-            SET metadata = $1, 
-                name = $2 
-            WHERE id = $3 AND owner_id = $4
+            SET metadata = $1
+            WHERE id = $2 AND owner_id = $3
             RETURNING *
         `;
-
-        // Update name if provided, else keep existing
-        const newName = body.name || existingRow.name;
 
         try {
             const { rows: updatedRows } = await query(updateText, [
                 JSON.stringify(md),
-                newName,
                 beneficiaryId,
                 userId
             ]);
@@ -202,7 +214,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             return res.status(200).json({
                 id: String(row.id),
                 user_id: String(row.owner_id),
-                name: row.name,
+                name: md.name, // Read from metadata
                 country: md.country || 'US',
                 method: md.method,
                 identifiers: md.identifiers,

@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router'
 import { useState } from 'react'
+import brandConfig from '../config/brand_config.json'
 
 export default function EstimatePage() {
   const router = useRouter()
@@ -115,7 +116,7 @@ export default function EstimatePage() {
             onChange={e => setFallbackConsent(e.target.checked)}
             className="mr-2"
           />
-          I authorize Trueque to close this transaction at market rate using my registered bank info if no match is found.
+          I authorize {brandConfig.appName} to close this transaction at market rate using my registered bank info if no match is found.
         </label>
 
         <p className="text-xs text-gray-600 italic mt-2">

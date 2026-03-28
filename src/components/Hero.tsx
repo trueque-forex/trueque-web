@@ -9,7 +9,7 @@ export default function Hero() {
         Streamlining the currency exchange business with transparency and trust.
       </h1>
       <p className="text-lg text-gray-600 mb-8">
-        Trueque empowers senders and receivers with instant matching, audit-grade fairness, and corridor-specific clarity.
+        Symmetri empowers senders and receivers with instant matching, audit-grade fairness, and corridor-specific clarity.
       </p>
       <div className="mb-8">
         <CorridorSelector />
