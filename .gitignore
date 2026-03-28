@@ -1,4 +1,4 @@
-﻿# Project-level ignores
+# Project-level ignores
 Trueque_untracked_backup_*/
 keys/
 *.pem
@@ -13,3 +13,19 @@ trueque-keys-*
 trueque-keys-encrypted.zip
 C:\Users\werne\trueque_quarantine_backups
 node_modules
+
+# Logs & Databases
+*.log
+*.sqlite
+*.db
+
+# Archives & Backups
+*.zip
+*.tar.gz
+
+# Build outputs
+.next/
+
+# Diagnostic Scripts
+check_users.ts
+audit_db.js
