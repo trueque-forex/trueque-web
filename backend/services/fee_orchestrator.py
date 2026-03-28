@@ -35,10 +35,10 @@ class FeeOrchestrator:
 
     def get_transparent_quote(
         self, 
-        amount_send: float, 
+        amount_send: Decimal, 
         currency_from: str, 
         currency_to: str, 
-        mid_market_rate: float,
+        mid_market_rate: Decimal,
         payment_method: str = 'bank_transfer',
         outbound_method: str = 'bank_rtp',
         trueque_id: str = None,
@@ -52,8 +52,8 @@ class FeeOrchestrator:
         """
         
         # Convert inputs to Decimal
-        d_amount_send = Decimal(str(amount_send)) if amount_send is not None else Decimal('0')
-        d_mid_market_rate = Decimal(str(mid_market_rate)) if mid_market_rate is not None else Decimal('0')
+        d_amount_send = amount_send if amount_send is not None else Decimal('0')
+        d_mid_market_rate = mid_market_rate if mid_market_rate is not None else Decimal('0')
 
         # 1. Determine Corridor / Regions
         id_country = self._parse_country_from_id(trueque_id)
@@ -77,11 +77,12 @@ class FeeOrchestrator:
         # 2. Base Structural Costs
         # Use Decimal for fees
         GATEWAY_TECH_FEE = Decimal(str(global_ov.get('gateway_tech_fee', 2.50)))
-        PLATFORM_FEE_PCT = Decimal(str(global_ov.get('trueque_fee_base', 0.005)))
         
         # 3. Inbound Fees (Source Friction)
-        inbound_fees = src_config.get('inbound_fees', {})
-        method_fee = inbound_fees.get(payment_method, inbound_fees.get('bank_transfer')) # fallback
+        inbound_fees = src_config.get('inbound_gateways', {})
+        method_fee = inbound_fees.get(payment_method, inbound_fees.get('rtp_bizum')) # fallback
+        if not method_fee:
+             method_fee = list(inbound_fees.values())[0] if inbound_fees else {}
         
         inbound_pct = Decimal(str(method_fee.get('pct', 0.0)))
         inbound_fixed = Decimal(str(method_fee.get('fixed', 0.0)))
@@ -101,12 +102,20 @@ class FeeOrchestrator:
             
             liquidity_fee = d_amount_send * buffer_pct
             
-        # 5. Trueque Platform Fee
-        platform_fee = d_amount_send * PLATFORM_FEE_PCT
+        # 5. Symmetri Platform Fee (Tiered: 1.0% <= 500, 1.5% > 500)
+        # Boundary: 500.00 USD Equivalent (Simplified to 500 units for V1)
+        if d_amount_send <= Decimal('500.00'):
+            fee_rate = Decimal('0.010') # 1.0%
+        else:
+            fee_rate = Decimal('0.015') # 1.5%
+            
+        platform_fee = d_amount_send * fee_rate
         
         # 6. Gateway Outbound / Payout Fee (Destination Friction)
-        outbound_fees = dst_config.get('outbound_fees', {})
-        out_fee_struct = outbound_fees.get(outbound_method, outbound_fees.get('bank_rtp'))
+        outbound_fees = dst_config.get('outbound_rails', {})
+        out_fee_struct = outbound_fees.get(outbound_method, outbound_fees.get('visa_direct'))
+        if not out_fee_struct:
+             out_fee_struct = list(outbound_fees.values())[0] if outbound_fees else {}
         
         out_pct = Decimal(str(out_fee_struct.get('pct', 0.0)))
         out_fixed = Decimal(str(out_fee_struct.get('fixed', 0.0)))
@@ -168,7 +177,7 @@ class FeeOrchestrator:
             "mid_market_rate": float(d_mid_market_rate),
             "effective_exchange_rate": float(effective_exchange_rate),
             "total_cost_percentage": float(round(total_cost_percentage, 4)),
-            "source_currency": currency_from,
+            "currency_from": currency_from,
             "target_currency": currency_to,
             "principal_amount": float(d_amount_send),     # Gross Send
             "net_payout_amount": float(net_payout_amount), # Net Receive

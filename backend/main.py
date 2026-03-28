@@ -20,7 +20,15 @@ def read_root():
 def health_check():
     return {"status": "ok"}
 
-from .routes import quotes, history, offers
+from .routes import quotes, history, offers, trades
 app.include_router(quotes.router)
 app.include_router(history.router)
 app.include_router(offers.router)
+app.include_router(trades.router)
+
+from .routes import compliance
+app.include_router(compliance.router)
+
+from .routes import admin
+app.include_router(admin.router)
+

@@ -4,8 +4,9 @@ import traceback
 from datetime import datetime
 from decimal import Decimal, getcontext
 
-from fastapi import APIRouter, HTTPException, Query
-
+from fastapi import APIRouter, HTTPException, Query, Depends
+from sqlalchemy.orm import Session
+from ..database import get_db
 from ..controllers.payment_controller import PaymentController
 
 # Helper (Should be shared)
@@ -31,17 +32,29 @@ controller = PaymentController()
 # Set decimal precision for safe currency math
 getcontext().prec = 28
 
+from ..services.fx_consensus import FXConsensusService
+
 @router.get("/transparent")
 async def get_transparent_quote(
-    amount: float = Query(..., gt=0),
+    amount: Decimal = Query(..., gt=0),
     currency_from: str = Query(..., min_length=3, max_length=3),
     currency_to: str = Query(..., min_length=3, max_length=3),
-    rate: float = Query(..., gt=0),
+    # rate: float = Query(..., gt=0), # DEPRECATED: Client cannot dictate rate
     tier: str = Query("T1"),
     inbound_method: str = Query("debit_card"),
-    outbound_method: str = Query("visa_direct")
+    outbound_method: str = Query("visa_direct"),
+    user_id: str = Query(None),
+    db: Session = Depends(get_db)
 ):
-    try:
+#    try:
+        # 0. Rate Integrity (Consensus Engine)
+        # We ignore client provisioned rate and fetch "Truth Rate"
+        rate, is_unstable = FXConsensusService.get_consensus_rate(currency_from, currency_to, user_id or "ANON_QUOTE")
+        
+        if is_unstable:
+             # In strict mode, we might reject. For now, we proceed but Audit Log flagged it.
+             pass
+
         # 1. Sandbox/Limit Logic (Simplified for now)
         # In a real app, we check user tier. Here, we just check amount.
         limit_exceeded = False # Default
@@ -55,10 +68,10 @@ async def get_transparent_quote(
 
         # 3. Get Quote from Controller
         quote = controller.get_authorization_quote(
-            amount_send=amount, # Controller expects float
+            amount_send=amount,
             currency_from=currency_from,
             currency_to=currency_to,
-            mid_market_rate=rate,
+            mid_market_rate=rate, # Enforced Consensus Rate
             payment_method=inbound_method,
             outbound_method=outbound_method
         )
@@ -86,7 +99,9 @@ async def get_transparent_quote(
                     dest_country=dest_country,
                     amount_principal=amount,
                     inbound_method=inbound_method,
-                    outbound_method=outbound_method
+                    outbound_method=outbound_method,
+                    db=db,
+                    user_id=user_id
                 )
                 quote['friction_breakdown'] = friction_data
                 quote['total_user_cost'] = friction_data['gross_payment_amount']
@@ -101,12 +116,24 @@ async def get_transparent_quote(
 
         return quote
 
+@router.get("/rate")
+async def get_fx_rate(
+    from_currency: str = Query(..., min_length=3, max_length=3),
+    to_currency: str = Query(..., min_length=3, max_length=3),
+    user_id: str = Query(None)
+):
+    """
+    Direct access to the FX Consensus Engine (Truth Rate).
+    Used by Frontend for transparent display before quoting.
+    """
+    try:
+        rate, is_unstable = FXConsensusService.get_consensus_rate(from_currency, to_currency, user_id or "ANON_RATE")
+        return {
+            "rate": rate,
+            "is_unstable": is_unstable,
+            "engine": "FX_CONSENSUS"
+        }
     except Exception as e:
-        # Print full traceback to terminal for debugging
-        print(f"!!! Error in /quotes/transparent: {str(e)}")
-        traceback.print_exc()
-        
-        # Return proper HTTP error
-        if isinstance(e, ValueError):
-             raise HTTPException(status_code=400, detail=str(e))
-        raise HTTPException(status_code=500, detail="Internal Server Error: Quote calculation failed.")
+        # Fallback handling or error propagation
+        print(f"[FX Rate Error] {e}")
+        raise HTTPException(status_code=500, detail="Rate fetch failed")

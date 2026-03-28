@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
 from decimal import Decimal
 
@@ -15,9 +15,14 @@ class OfferCreate(BaseModel):
     
     # Compliance
     # Compliance
-    remittance_purpose: Optional[str] = Field(None, description="Purpose of remittance")
-    sender_ip: Optional[str] = Field(None, description="Client IP")
-    device_fingerprint: Optional[str] = Field(None, description="Device Fingerprint")
+    remittance_purpose: str = Field(..., description="Purpose of remittance (FAMILY_SUPPORT, MEDICAL, EDUCATION, SAVINGS)")
+    
+    @validator('remittance_purpose')
+    def validate_purpose(cls, v):
+        allowed = ["FAMILY_SUPPORT", "MEDICAL", "EDUCATION", "SAVINGS"]
+        if v not in allowed:
+            raise ValueError(f"Invalid purpose. Must be one of {allowed}")
+        return v
 
     # Routing / Addressing
     recipient_alias: Optional[str] = Field(None, description="CBU Alias (Argentina)")

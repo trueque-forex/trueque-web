@@ -69,8 +69,8 @@ class UserKYC(Base):
     user = relationship("User", back_populates="kyc")
 
 
-class Transaction(Base):
-    __tablename__ = 'transactions'
+class KYC_Transaction(Base):
+    __tablename__ = 'kyc_transactions' # Renaming table to avoid conflict if created
     
     id = Column(Integer, primary_key=True)
     transaction_id = Column(String(20), unique=True, nullable=False, index=True)  # Trueque ID format

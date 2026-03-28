@@ -1,25 +1,22 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric, TIMESTAMP, JSON
 from backend.database import Base
 from datetime import datetime
 
 class Offer(Base):
     __tablename__ = "offers"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(String, nullable=False)
-    uuid = Column(String, nullable=False, unique=True)
-    country = Column(String, nullable=False)
-    currency_from = Column(String, nullable=False)
-    currency_to = Column(String, nullable=False)
-    amount_from = Column(Numeric(18, 6), nullable=False)
-    amount_to = Column(Numeric(18, 6), nullable=False)
-    amount = Column(Numeric(18, 6), nullable=False)
-    market_rate = Column(Numeric(18, 6), nullable=False)
+    # Use String for the ID as the DB uses UUID strings
+    id = Column(String, primary_key=True) 
+    created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow)
+    user_id = Column(String, nullable=False, index=True)
+    swap_type = Column(String, default="SYNTHETIC")
+    amount_offered = Column(Numeric(precision=20, scale=4), nullable=False)
+    currency_offered = Column(String, nullable=False)
+    amount_wanted = Column(Numeric(precision=20, scale=4), nullable=False)
+    currency_wanted = Column(String, nullable=False)
+    exchange_rate = Column(Numeric(precision=20, scale=8), nullable=False)
+    fee_total = Column(Numeric(precision=20, scale=4), nullable=True)
+    fee_details = Column(JSON, nullable=True)
+    expires_at = Column(TIMESTAMP(timezone=True), nullable=True)
     status = Column(String, default="open")
-    matched_offer_id = Column(Integer, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-    # Compliance Metadata
-    remittance_purpose = Column(String, nullable=True) # e.g. FAMILY_SUPPORT
-    sender_ip = Column(String, nullable=True)
-    device_fingerprint = Column(String, nullable=True)
+    is_public = Column(Boolean, default=True)

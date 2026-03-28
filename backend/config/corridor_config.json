@@ -81,11 +81,15 @@
             "outbound_rails": {
                 "transferencias_3_0": {
                     "cost": 0.00,
-                    "label": "Immediate Transfer"
+                    "label": "Bank or Wallet (CBU/CVU)"
                 },
-                "visa_direct": {
+                "card_push": {
                     "cost": 1.50,
-                    "label": "Debit Card Payout"
+                    "label": "Debit Card"
+                },
+                "merchant_voucher": {
+                    "cost": 0.00,
+                    "label": "Merchant Pickup / Voucher"
                 }
             }
         },
@@ -148,6 +152,90 @@
                     "label": "Push to Card"
                 }
             }
+        },
+        "BR": {
+            "name": "Brazil",
+            "currency": "BRL",
+            "tax_rate_on_fees": 0.00,
+            "inbound_gateways": {
+                "rtp_pix": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "PIX (Instant)"
+                },
+                "debit_card": {
+                    "pct": 0.02,
+                    "fixed": 0.30,
+                    "label": "Debit Card"
+                }
+            },
+            "outbound_rails": {
+                "pix_payout": {
+                    "cost": 0.00,
+                    "label": "PIX Transfer"
+                }
+            }
+        },
+        "PE": {
+            "name": "Peru",
+            "currency": "PEN",
+            "tax_rate_on_fees": 0.18,
+            "inbound_gateways": {
+                "rtp_cci": {
+                    "pct": 0.00,
+                    "fixed": 0.50,
+                    "label": "CCI Transfer"
+                }
+            },
+            "outbound_rails": {
+                "cci_payout": {
+                    "cost": 2.00,
+                    "label": "Interbank Transfer"
+                }
+            }
+        },
+        "DO": {
+            "name": "Dominican Republic",
+            "currency": "DOP",
+            "tax_rate_on_fees": 0.18,
+            "inbound_gateways": {
+                "ach_lbtr": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "LBTR (Instant)"
+                }
+            },
+            "outbound_rails": {
+                "lbtr_payout": {
+                    "cost": 1.00,
+                    "label": "Bank Transfer"
+                }
+            }
         }
-    }
+    },
+    "target_markets": [
+        "ES",
+        "PT",
+        "US",
+        "MX",
+        "GT",
+        "CO",
+        "AR",
+        "VE",
+        "BR",
+        "PE"
+    ],
+    "supported_currencies": [
+        "EUR",
+        "USD",
+        "MXN",
+        "GTQ",
+        "COP",
+        "ARS",
+        "VES",
+        "BRL",
+        "PEN"
+    ],
+    "encryption_standard": "AES-256-GCM",
+    "indexing_method": "Blind Indexing (HMAC-SHA256)"
 }

@@ -17,7 +17,7 @@ class FeeCalculator:
         return cls._config
 
     @classmethod
-    def calculate_best_route(cls, country_code: str, amount: float, currency: str) -> List[Dict[str, Any]]:
+    def calculate_best_route(cls, country_code: str, amount: Decimal, currency: str) -> List[Dict[str, Any]]:
         """
         LCR: Returns a list of payment options sorted by total cost (cheapest first).
         Adapted for new config schema (outbound_rails).
@@ -38,7 +38,7 @@ class FeeCalculator:
             # OR we check if it has 'pct'/'fixed'. The prompt example shows "cost": 0.00 or "cost": 1.25.
             # We'll support both formats for robustness.
             
-            amt_dec = Decimal(str(amount))
+            amt_dec = amount
             rail_cost = Decimal("0.00")
             
             if "cost" in fee_struct:
@@ -69,9 +69,11 @@ class FeeCalculator:
     def calculate_friction(cls, 
                            source_country: str, 
                            dest_country: str, 
-                           amount_principal: float, 
+                           amount_principal: Decimal, 
                            inbound_method: str, 
-                           outbound_method: str) -> Dict[str, Any]:
+                           outbound_method: str,
+                           db: Optional[Any] = None,
+                           user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Calculates the 7-layer friction stack.
         Ensures the 'amount_principal' is the SACRED AMOUNT received by beneficiary.
@@ -79,7 +81,7 @@ class FeeCalculator:
         config = cls._load_config()
         
         # 0. Setup Decimals
-        principal = Decimal(str(amount_principal))
+        principal = amount_principal
         
         src_data = config["countries"].get(source_country, {})
         dst_data = config["countries"].get(dest_country, {})
@@ -90,22 +92,9 @@ class FeeCalculator:
         inbound_pct = Decimal(str(inbound_cfg.get("pct", 0.0)))
         inbound_fixed = Decimal(str(inbound_cfg.get("fixed", 0.0)))
         
-        # Inbound fee is usually calculated on the GROSS amount the user pays? 
-        # OR on the Principal? 
-        # Standard: Fee = (Principal * Pct) + Fixed. 
-        # If it needs to be "Gross Up" (i.e. User pays X so that after fees we have Principal), 
-        # the math is: Gross = (Principal + Fixed) / (1 - Pct).
-        # PROMPT SAYS: "Swapper's total covers all layers".
-        # STEP 6 in prompt says: "Final_Payment = Principal + Inbound + Outbound + Liquidity + Trueque + Tax".
-        # This implies "Additive" logic on top of Principal.
-        # "Inbound: Pulls from inbound_gateways...". 
-        # If I strictly follow: Total = P + (P*% + Fixed) + ...
-        # This is strictly additive.
-        
         inbound_fee = (principal * inbound_pct) + inbound_fixed
         
         # 2. Outbound Friction (Dest)
-        # "outbound_rails". Prompt schema shows "cost".
         outbound_cfg = dst_data.get("outbound_rails", {}).get(outbound_method, {})
         outbound_fee = Decimal("0.00")
         if "cost" in outbound_cfg:
@@ -120,7 +109,35 @@ class FeeCalculator:
         liquidity_fee = principal * liq_pct
         
         # 4. Trueque Fee
+        # Logic: If (current + last_24h_volume > 500) -> 1.2%. Else fixed.
         trueque_fee_base = Decimal(str(config.get("global_facillitation_fee", 0.0)))
+        
+        if db and user_id:
+            # Query last 24h volume
+            from ..models.offer_model import Offer
+            from ..models.transaction import Transaction # If we count completed too
+            from sqlalchemy import func
+            from datetime import datetime, timedelta, timezone
+
+            now = datetime.now(timezone.utc)
+            start_monitor = now - timedelta(hours=24)
+            
+            # Using Offer table for "Attempts/Intent" volume as per risk engine style, 
+            # or Transaction for strict settled volume? 
+            # Prompt says "Rolling Volume Audit". Let's check "Offer" volume as it covers what they are *doing*.
+            
+            vol_24h = db.query(func.sum(Offer.amount)).filter(
+                Offer.user_id == user_id,
+                Offer.timestamp >= start_monitor
+            ).scalar() or 0.0
+            
+            current_total = Decimal(str(vol_24h)) + amount_principal
+            
+            if current_total > 500:
+                # Apply 1.2% rate
+                # Is it 1.2% of current swap? Yes "apply ... to the current swap".
+                trueque_fee_base = principal * Decimal("0.012")
+        
         
         # 5. Tax
         # "Tax: Apply tax_rate_on_fees only to the Trueque fee."

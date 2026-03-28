@@ -27,6 +27,7 @@ transactions = Table(
     "transactions",
     metadata,
     Column("id", Integer, primary_key=True),
+    Column("user_id", String, index=True),
     Column("sender_email", String),
     Column("recipient_name", String),
     Column("relationship", String),
@@ -35,6 +36,14 @@ transactions = Table(
     Column("status", String),
     Column("tx_id", String),
     Column("timestamp", DateTime, default=datetime.utcnow),
+    Column("from_currency", String),
+    Column("to_currency", String),
+    Column("rate", Numeric),
+    Column("remittance_purpose", String),
+    Column("transaction_type", String),
+    Column("sender_ip_address", String),
+    Column("kyc_tier_at_execution", Integer),
+    Column("receiver_user_id", Integer),
 )
 
 users = Table(
@@ -52,4 +61,11 @@ users = Table(
     Column("address", String),
     Column("phone_number", String, unique=True, nullable=True),
     Column("created_at", DateTime, default=datetime.utcnow),
+    Column("kyc_tier", Integer, default=0),
+    Column("kyc_status", String, default="PENDING"),
+    Column("user_type", String, default="PEER"),
+    Column("tx_count", Integer, default=0),
+    Column("dob_enc", String),
+    Column("ssn_enc", String),
+    Column("id_number_enc", String),
 )

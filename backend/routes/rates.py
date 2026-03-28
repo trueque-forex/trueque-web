@@ -1,16 +1,23 @@
-from fastapi import APIRouter
-import httpx
+from fastapi import APIRouter, HTTPException
+from backend.services.fx_consensus import FXConsensusService
+import datetime
 
 router = APIRouter()
 
 @router.get("/rates")
 async def get_exchange_rate(from_currency: str, to_currency: str):
-    url = f"https://api.exchangerate.host/convert?from={from_currency}&to={to_currency}"
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url)
-        data = response.json()
+    """
+    Returns the Truth Rate (Consensus Median) from OANDA/Chainlink/Fixer.
+    """
+    try:
+        # Get consensus from the Engine
+        rate, is_unstable = FXConsensusService.get_consensus_rate(from_currency, to_currency)
+        
         return {
-            "rate": data["result"],
-            "timestamp": data["date"]  # ISO format like "2025-09-25"
-
-}
+            "rate": rate,
+            "is_unstable": is_unstable,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "engine": "OANDA-CHAINLINK-FIXER TRIO"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

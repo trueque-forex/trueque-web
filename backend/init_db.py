@@ -23,6 +23,12 @@ def init_db():
     
     logger.info("Creating tables...")
     metadata.create_all(engine)
+    
+    # Also create ORM-defined tables (Transaction, Draft)
+    # Note: Ideally we should unify Base, but for now we patch it here.
+    from backend.models.draft_model import Base as DraftBase
+    DraftBase.metadata.create_all(engine)
+    
     logger.info("✅ Tables created successfully.")
 
 if __name__ == "__main__":
