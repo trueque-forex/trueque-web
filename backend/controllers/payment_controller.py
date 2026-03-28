@@ -1,4 +1,4 @@
-
+from decimal import Decimal
 from typing import Dict, Any, Optional
 from ..services.fee_orchestrator import FeeOrchestrator
 from ..services.match_service import MatchService
@@ -17,10 +17,10 @@ class PaymentController:
 
     def get_authorization_quote(
         self, 
-        amount_send: float, 
+        amount_send: Decimal, 
         currency_from: str, 
         currency_to: str, 
-        mid_market_rate: float, 
+        mid_market_rate: Decimal, 
         payment_method: str = 'bank_transfer',
         outbound_method: str = 'bank_rtp',
         trueque_id: str = None,
