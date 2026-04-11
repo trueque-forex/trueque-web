@@ -1,0 +1,17 @@
+[
+  {
+    "event": "Audit fetch triggered",
+    "corridor": "MX-USD",
+    "userId": "user123",
+    "location": "Redlands, CA",
+    "timestamp": "2025-10-07T10:00:00Z"
+  },
+  {
+    "event": "Fallback acknowledged",
+    "reason": "Missing corridor config",
+    "userId": "user123",
+    "corridor": "MX-USD",
+    "location": "Redlands, CA",
+    "timestamp": "2025-10-07T10:01:00Z"
+  }
+]

@@ -1,4 +1,5 @@
 import React from 'react'
+import brandConfig from '../config/brand_config.json'
 
 export default function Footer() {
   return (
@@ -26,9 +27,13 @@ export default function Footer() {
         >
           Reproducibility Summary
         </a>
+        <span className="mx-2">|</span>
+        <a href="/compliance/about" className="hover:underline">About {brandConfig.appName}</a>
+        <span className="mx-2">|</span>
+        <a href="/compliance/terms" className="hover:underline">Terms</a>
       </div>
       <div>
-        Built with ❤️ by the Trueque team. Empowering global remittance with transparency and trust.
+        We reduce the cost of sending money by offering fair rates, zero hidden costs, and a technological platform that ensures each transfer is in perfect "Symmetri".
       </div>
     </footer>
   )

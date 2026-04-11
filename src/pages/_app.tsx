@@ -1,26 +1,22 @@
-// src/pages/_app.tsx
+import '@/styles/globals.css';
 import type { AppProps } from 'next/app';
-<<<<<<< HEAD
+import { AuthProvider } from '@/context/AuthContext';
+import { SwapProvider } from '@/context/SwapContext';
+import { PersonaProvider } from '@/context/PersonaContext';
 import Head from 'next/head';
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
-    <>
+    <AuthProvider>
       <Head>
+        <title>Symmetri</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta charSet="utf-8" />
-        <title>Trueque</title>
       </Head>
-      <Component {...pageProps} />
-    </>
+      <SwapProvider>
+        <PersonaProvider>
+          <Component {...pageProps} />
+        </PersonaProvider>
+      </SwapProvider>
+    </AuthProvider>
   );
-=======
-import React from 'react';
-
-// Minimal, safe _app that avoids server-only side-effects during client builds.
-// If you need dev-only bootstrap, load it from a server-only entrypoint or
-// require it conditionally inside API routes, not here.
-export default function MyApp({ Component, pageProps }: AppProps) {
-  return <Component {...pageProps} />;
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 }

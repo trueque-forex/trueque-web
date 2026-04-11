@@ -1,0 +1,86 @@
+[
+  {
+    "id": "walmart_mx",
+    "name": "Walmart México",
+    "logo": "🛒",
+    "country": "MX",
+    "currency": "MXN",
+    "minUSD": 20,
+    "maxUSD": 500,
+    "description": "Redeemable at any Walmart, Sam's Club, or Bodega Aurrerá in Mexico",
+    "locations": [
+      { "city": "Ciudad de México", "lat": 19.4326, "lng": -99.1332, "store_id": "WAL-CDMX-001" },
+      { "city": "Guadalajara",      "lat": 20.6597, "lng": -103.3496, "store_id": "WAL-GDL-001" },
+      { "city": "Monterrey",        "lat": 25.6866, "lng": -100.3161, "store_id": "WAL-MTY-001" },
+      { "city": "Puebla",           "lat": 19.0414, "lng": -98.2063,  "store_id": "WAL-PUE-001" },
+      { "city": "Tijuana",          "lat": 32.5027, "lng": -117.0037, "store_id": "WAL-TIJ-001" }
+    ]
+  },
+  {
+    "id": "oxxo_mx",
+    "name": "OXXO",
+    "logo": "🏪",
+    "country": "MX",
+    "currency": "MXN",
+    "minUSD": 20,
+    "maxUSD": 200,
+    "description": "Redeemable at 20,000+ OXXO stores across Mexico",
+    "locations": [
+      { "city": "Ciudad de México", "lat": 19.4285, "lng": -99.1277, "store_id": "OXX-CDMX-001" },
+      { "city": "Guadalajara",      "lat": 20.6755, "lng": -103.3467, "store_id": "OXX-GDL-001" },
+      { "city": "Monterrey",        "lat": 25.6751, "lng": -100.3180, "store_id": "OXX-MTY-001" },
+      { "city": "Mérida",           "lat": 20.9674, "lng": -89.5926,  "store_id": "OXX-MID-001" },
+      { "city": "León",             "lat": 21.1221, "lng": -101.6854, "store_id": "OXX-LEO-001" },
+      { "city": "Tijuana",          "lat": 32.5149, "lng": -117.0382, "store_id": "OXX-TIJ-001" }
+    ]
+  },
+  {
+    "id": "soriana_mx",
+    "name": "Soriana",
+    "logo": "🛍️",
+    "country": "MX",
+    "currency": "MXN",
+    "minUSD": 20,
+    "maxUSD": 300,
+    "description": "Redeemable at Soriana supermarkets throughout Mexico",
+    "locations": [
+      { "city": "Monterrey",        "lat": 25.6614, "lng": -100.3500, "store_id": "SOR-MTY-001" },
+      { "city": "Ciudad de México", "lat": 19.3910, "lng": -99.1656,  "store_id": "SOR-CDMX-001" },
+      { "city": "Torreón",          "lat": 25.5428, "lng": -103.4068, "store_id": "SOR-TRC-001" },
+      { "city": "Saltillo",         "lat": 25.4232, "lng": -100.9933, "store_id": "SOR-SLW-001" }
+    ]
+  },
+  {
+    "id": "farmacias_similares_mx",
+    "name": "Farmacias Similares",
+    "logo": "💊",
+    "country": "MX",
+    "currency": "MXN",
+    "minUSD": 20,
+    "maxUSD": 150,
+    "description": "Redeemable at Farmacias Similares locations nationwide",
+    "locations": [
+      { "city": "Ciudad de México", "lat": 19.4360, "lng": -99.1435, "store_id": "SIM-CDMX-001" },
+      { "city": "Guadalajara",      "lat": 20.6880, "lng": -103.3583, "store_id": "SIM-GDL-001" },
+      { "city": "Puebla",           "lat": 19.0600, "lng": -98.2100,  "store_id": "SIM-PUE-001" },
+      { "city": "Veracruz",         "lat": 19.1748, "lng": -96.1331,  "store_id": "SIM-VER-001" }
+    ]
+  },
+  {
+    "id": "coppel_mx",
+    "name": "Coppel",
+    "logo": "🏬",
+    "country": "MX",
+    "currency": "MXN",
+    "minUSD": 20,
+    "maxUSD": 1000,
+    "description": "Redeemable at Coppel department stores in Mexico",
+    "locations": [
+      { "city": "Culiacán",         "lat": 24.8091, "lng": -107.3940, "store_id": "COP-CUL-001" },
+      { "city": "Ciudad de México", "lat": 19.4200, "lng": -99.1550,  "store_id": "COP-CDMX-001" },
+      { "city": "Guadalajara",      "lat": 20.6609, "lng": -103.3520, "store_id": "COP-GDL-001" },
+      { "city": "Mexicali",         "lat": 32.6245, "lng": -115.4523, "store_id": "COP-MEX-001" },
+      { "city": "Hermosillo",       "lat": 29.0729, "lng": -110.9559, "store_id": "COP-HMO-001" }
+    ]
+  }
+]

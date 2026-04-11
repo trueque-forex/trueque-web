@@ -8,6 +8,7 @@ import type {
   GetServerSidePropsResult,
 } from 'next';
 import { parseSessionFromReq } from './serverAuth';
+import { TruequeSession } from '../types/auth';
 
 type SSRHandler<P = any> = (
   ctx: GetServerSidePropsContext & { session?: any }
@@ -23,7 +24,15 @@ export function withAuth(handler: any): any {
 
     const session = await parseSessionFromReq(req);
 
-    if (!session?.userId) {
+    // STICT API GUARD
+    // 1. Validate standardized structure (Relaxed for string/number)
+    // NOTE: We do NOT check kycStatus here. "PENDING" users are Authenticated but Limited.
+    if (!session || !session.user || !String(session.user.id)) {
+      console.warn('[WITHAUTH] Guard Blocked Request:', {
+        hasSession: !!session,
+        hasUser: !!session?.user,
+        id: session?.user?.id
+      });
       if (isApiRoute) {
         res.status(401).json({ error: 'unauthenticated' });
         return;
@@ -37,8 +46,20 @@ export function withAuth(handler: any): any {
       }
     }
 
+    // 2. FAILSAVE: Reject Legacy Keys to prevent drift
+    // Use type assertion to check for hidden properties not in TruequeSession type
+    /* 
+    if ((session as any).userId) {
+      console.error('[API GUARD] Legacy "userId" detected on session. Request blocked to prevent drift.');
+      if (isApiRoute) {
+        res.status(401).json({ error: 'legacy_property_drift_detected' });
+        return;
+      }
+    } 
+    */
+
     if (isApiRoute) {
-      (req as any).session = session;
+      (req as any).session = session as TruequeSession;
       return handler(contextOrReq, maybeRes);
     } else {
       // For SSR handler: attach session to ctx and call handler

@@ -1,6 +1,5 @@
 from passlib.context import CryptContext
 
-<<<<<<< HEAD
 # Configure bcrypt hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -18,7 +17,6 @@ def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
         return pwd_context.verify(plain_pin[:MAX_BCRYPT_BYTES], hashed_pin)
     except ValueError:
         return False
-=======
 # keep bcrypt available; use bcrypt for <=72-byte inputs
 pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
 BCRYPT_MAX = 72
@@ -29,4 +27,3 @@ def safe_hash(pin: str) -> str:
         raise ValueError("PIN too long for bcrypt")
     # explicitly use bcrypt for inputs within limit so tests see $2b$ prefix
     return pwd_context.hash(pb, scheme="bcrypt")
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

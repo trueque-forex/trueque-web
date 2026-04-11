@@ -1,23 +1,33 @@
-// next.config.js
-<<<<<<< HEAD
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  outputFileTracingRoot: __dirname,
-  reactStrictMode: true
-}
-
-module.exports = nextConfig
-=======
-/** Temporarily allow dev server to start while we fix TypeScript errors incrementally */
-const baseConfig = {
+// Force restart 2
+module.exports = {
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
-};
-
-module.exports = {
-  ...baseConfig,
   typescript: {
     ignoreBuildErrors: true,
+    tsconfigPath: './tsconfig.json'
   },
+  eslint: {
+    ignoreDuringBuilds: true
+  },
+  async rewrites() {
+    return {
+      // beforeFiles: checked before ANY filesystem lookup (use sparingly)
+      beforeFiles: [
+        {
+          source: '/api/rate/:from/:to',
+          destination: 'http://127.0.0.1:8000/api/quotes/rate?from_currency=:from&to_currency=:to'
+        },
+      ],
+      afterFiles: [],
+      // fallback: checked LAST — only if no Next.js page/api file matched (including dynamic routes).
+      // This ensures all Next.js API routes (including [id].ts dynamic routes) take priority.
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'http://127.0.0.1:8000/api/:path*'
+        }
+      ]
+    };
+  }
 };
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

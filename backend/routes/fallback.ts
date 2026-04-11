@@ -16,8 +16,5 @@ router.post('/', async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
 export default router;
-=======
 export default router;
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

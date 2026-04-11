@@ -1,13 +1,20 @@
 from fastapi import APIRouter
 from backend.utils.match_utils import get_market_rate
-from backend.models.match_model import MatchResponse
-from datetime import datetime
+from backend.models.match_model import MatchResponse, MatchRequest
+from datetime import datetime, timezone
+import uuid
 
 router = APIRouter()
 
 @router.post("/match", response_model=MatchResponse)
-def match_advance():
-    rate, rate_source, rate_fallback = get_market_rate("COP", "USD")
+def match_advance(request: MatchRequest):
+    # Extract currencies from corridor (e.g., "USD-MXN")
+    try:
+        from_curr, to_curr = request.corridor.split('-')
+    except ValueError:
+        from_curr, to_curr = "USD", "MXN" # Default fallback
+
+    rate, rate_source, rate_fallback = get_market_rate(from_curr, to_curr)
 
     rate_reason = (
         "The exchange rate shown reflects the last available market snapshot, "
@@ -17,11 +24,11 @@ def match_advance():
     )
 
     return MatchResponse(
-        uuid=advance.uuid,
-        counterparty_uuid=match.uuid,
+        uuid=uuid.uuid4(),
+        counterparty_uuid=uuid.uuid4(),
         market_rate_used=rate,
         rate_source=rate_source,
         rate_fallback=rate_fallback,
         rate_reason=rate_reason,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )

@@ -1,41 +1,41 @@
-<<<<<<< HEAD
 // src/lib/server/db.ts
-let pool: import('pg').Pool | null = null;
+import { Pool } from "pg";
+import getLibPool from "../db"; // re-use src/lib/db.ts singleton
 
-export function getPool() {
-  if (!pool) {
-    // runtime require ensures this is only evaluated on server
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Pool } = require('pg');
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL || 'postgresql://postgres@localhost:5432/trueque_dev',
-      // add ssl or other options here if needed
-    });
-  }
-  return pool;
-=======
-// src/lib/db.ts
-// If you already have a default export, keep it and add this named export.
-// Example using pg Pool lazy init:
+let _pool: Pool | null = null;
 
-import { Pool } from 'pg';
-
-let pool: Pool | null = null;
-
-export default function getPoolDefault() {
-  if (!pool) {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  }
-  return pool;
+export default function getPool(): Pool {
+  if (_pool) return _pool;
+  // reuse the lib pool to ensure a single connection pool per process
+  _pool = getLibPool();
+  return _pool;
 }
 
-export function getPool() {
-  return getPoolDefault();
-}
-
-// Optional small helper export for query
-export async function query(text: string, params?: any[]) {
+/**
+ * Simple query helper (convenience)
+ */
+export async function query<T = any>(text: string, params?: any[]) {
   const p = getPool();
-  return p.query(text, params);
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+  return (p.query as any)(text, params);
+}
+
+/**
+ * Transaction helper:
+ * await transaction(async (client) => { await client.query(...); return result; });
+ * Will BEGIN/COMMIT/ROLLBACK and always release client.
+ */
+export async function transaction<T>(cb: (client: any) => Promise<T>): Promise<T> {
+  const p = getPool();
+  const client = await (p as any).connect();
+  try {
+    await client.query("BEGIN");
+    const result = await cb(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }

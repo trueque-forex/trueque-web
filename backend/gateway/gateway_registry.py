@@ -7,6 +7,7 @@ class Recipient(BaseModel):
     country: str
     pix_key: str | None = None
     clabe: str | None = None
+    iban: str | None = None
     card_number: str | None = None
     expiry: str | None = None
     wallet_id: str | None = None
@@ -32,6 +33,13 @@ class SPEIGateway(BaseGateway):
 
     def send_payout(self, recipient: Recipient) -> str:
         return f"tx_SPEI_{recipient.clabe}_MX"
+
+
+class SEPAGateway(BaseGateway):
+    name = "SEPA"
+
+    def send_payout(self, recipient: Recipient) -> str:
+        return f"tx_SEPA_{recipient.iban}_EU"
 
 
 class VisaDirectGateway(BaseGateway):
@@ -71,6 +79,8 @@ class GatewayRegistry:
                 return PIXGateway()
             elif recipient.country == "MX" and recipient.clabe:
                 return SPEIGateway()
+            elif recipient.country in ["ES", "FR", "DE"] and recipient.iban:
+                return SEPAGateway()
         elif recipient.type == "debit_card":
             if recipient.card_number and recipient.expiry:
                 return VisaDirectGateway()

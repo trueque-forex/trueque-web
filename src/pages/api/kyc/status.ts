@@ -1,31 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-<<<<<<< HEAD
-import { getSession } from '../../../lib/session';
-import { query } from '../../../lib/db';
-
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession(req);
-  if (!session?.userId) return res.status(401).json({ error: 'Authentication required' });
-
-  const userId = session.userId;
-  // read user_kyc_status (fast lookup)
-  const st = await query('SELECT tier, status, last_updated, notes FROM user_kyc_status WHERE user_id = $1 LIMIT 1', [userId]);
-  const row = st.rows[0] ?? null;
-
-  // optionally fetch latest submission summary
-  const sub = await query('SELECT id, status, created_at FROM kyc_submissions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
-  const submission = sub.rows[0] ?? null;
-
-  return res.status(200).json({
-    tier: row?.tier ?? null,
-    status: row?.status ?? (submission ? submission.status : 'none'),
-    lastUpdated: row?.last_updated ?? submission?.created_at ?? null,
-    nextAction: row?.status === 'rejected' ? 'Please re-submit documents' : undefined,
-    details: row?.notes ?? null,
-    submissionId: submission?.id ?? null,
-  });
-}
-=======
 import { getSession, getSessionById } from '../../../lib/session';
 import { issueTruequeIdForUser as issueTruequeIdServer } from '@/server/kyc/issueTruequeId';
 import knexClient from '@/lib/knexClient';
@@ -34,32 +7,8 @@ import cookie from 'cookie';
 
 const db = knexClient;
 
-function base36Encode(n: number): string {
-  return n.toString(36).toUpperCase();
-}
-
-function computeChecksum(payload: string): string {
-  const hash = crypto.createHash('sha256').update(payload).digest();
-  let value = 0;
-  for (let i = 0; i < 5 && i < hash.length; i++) {
-    value = (value << 8) + hash[i];
-  }
-  return base36Encode(value % 36);
-}
-
-export function generateTruequeId(date: Date, countryCode: string, seq: number): string {
-  const yyyy = date.getUTCFullYear().toString().padStart(4, '0');
-  const mm = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const dd = date.getUTCDate().toString().padStart(2, '0');
-  const seqStr = seq.toString().padStart(4, '0');
-  const cc = (countryCode || 'XX').toUpperCase().slice(0, 2);
-  const payload = `T${yyyy}${mm}${dd}${cc}${seqStr}`;
-  const checksum = computeChecksum(payload);
-  return `${payload}${checksum}`;
-}
-
 async function resolveSession(req: NextApiRequest): Promise<any | null> {
-  let session = await getSession(req);
+  let session: any = await getSession(req);
 
   if (!session && process.env.NODE_ENV !== 'production') {
     const auth = (req.headers.authorization || '').trim();
@@ -105,13 +54,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const userId = session.userId ?? session.user?.id ?? null;
-    const kycStatus =
-      session.kycStatus ??
-      session.kyc_status ??
-      session.user?.kycStatus ??
-      session.user?.kyc_status ??
-      'unknown';
+    // STRICT: Prefer session.user.id
+    const userId = session.user?.id || (session as any).userId || null;
+
+    // STRICT: Prefer session.user.kycStatus
+    const kycStatus = (
+      session.user?.kycStatus ||
+      (session as any).kycStatus ||
+      (session as any).kyc_status ||
+      (session.user as any)?.kyc_status ||
+      'unknown'
+    ).toUpperCase();
 
     console.log('🔐 Resolved session', { userId, kycStatus });
 
@@ -122,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         const user = await db('users').where({ id: userId }).first();
         if (user) {
-          trueque_id = user.trueque_id ?? null;
+          trueque_id = user.tid ?? null;
           kyc_verified_at = user.kyc_verified_at ?? null;
         }
       } catch (err) {
@@ -130,7 +83,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    if (kycStatus === 'approved' && !trueque_id && userId) {
+    // Issue SID if PENDING (provisional $200 swap needs Trade Room anonymity)
+    // or APPROVED (full swap access). Acts as a safety net if submit endpoint
+    // failed to issue. The SID is permanent once issued — never regenerated.
+    if ((kycStatus === 'pending' || kycStatus === 'approved') && !trueque_id && userId) {
       let countryHint = session.country ?? session.user?.country ?? null;
 
       if (!countryHint && db) {
@@ -144,13 +100,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
 
-// The issuer's signature is issueTruequeId(userId, countryCode)
-       const issuance = await issueTruequeIdServer(userId, countryHint || 'XX');
-// issuance is { trueque_id: string }
-       if (issuance?.trueque_id) {
-  // success path: issuer already persists changes inside its DB transaction
-}
-       console.log('✅ Issuance result', { userId, trueque_id: issuance?.trueque_id ?? null });
+        // The issuer's signature is issueTruequeId(userId, countryCode)
+        const issuance = await issueTruequeIdServer(userId, countryHint || 'XX');
+        // issuance is { trueque_id: string }
+        if (issuance?.trueque_id) {
+          // success path: issuer already persists changes inside its DB transaction
+        }
+        console.log('✅ Issuance result', { userId, trueque_id: issuance?.trueque_id ?? null });
 
       } catch (err) {
         console.error('❌ issueTruequeIdServer failed:', err);
@@ -164,6 +120,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+
+
     return res.status(200).json({
       kycStatus,
       userId,
@@ -175,4 +133,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'internal_error' });
   }
 }
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

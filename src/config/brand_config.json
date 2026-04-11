@@ -1,0 +1,16 @@
+{
+    "appName": "Symmetri",
+    "tagline": "Algorithmic Trust Orchestrator",
+    "positioning": "Fair Value Protocol",
+    "theme": {
+        "primaryColor": "#000000",
+        "brandColor": "#1A73E8",
+        "actionColor": "#1A73E8",
+        "textColor": "#2c3e50",
+        "successColor": "#27ae60",
+        "errorColor": "#e74c3c",
+        "fontFamily": "'Plus Jakarta Sans', sans-serif",
+        "letterSpacing": "0.02em",
+        "fontWeight": "600"
+    }
+}

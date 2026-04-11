@@ -1,13 +1,29 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Optional
+from decimal import Decimal
 
 class OfferCreate(BaseModel):
-    user_id: int = Field(..., description="ID of the user submitting the offer")
+    user_id: str = Field(..., description="ID of the user submitting the offer")
     uuid: str = Field(..., description="Unique identifier for the offer")
     country: str = Field(..., description="Country code (e.g., 'CO', 'US')")
     currency_from: str = Field(..., description="Currency being sent (e.g., 'COP')")
     currency_to: str = Field(..., description="Currency being received (e.g., 'USD')")
-    amount_from: float = Field(..., description="Amount being sent")
-    amount_to: float = Field(..., description="Amount expected to receive")
-    amount: float = Field(..., description="Anchor amount for matching logic")
-    market_rate: Optional[float] = Field(None, description="Optional market rate override")
+    amount_from: Decimal = Field(..., description="Amount being sent")
+    amount_to: Decimal = Field(..., description="Amount expected to receive")
+    amount: Decimal = Field(..., description="Anchor amount for matching logic", decimal_places=6)
+    market_rate: Optional[Decimal] = Field(None, description="Optional market rate override")
+    
+    # Compliance
+    # Compliance
+    remittance_purpose: str = Field(..., description="Purpose of remittance (FAMILY_SUPPORT, MEDICAL, EDUCATION, SAVINGS)")
+    
+    @validator('remittance_purpose')
+    def validate_purpose(cls, v):
+        allowed = ["FAMILY_SUPPORT", "MEDICAL", "EDUCATION", "SAVINGS"]
+        if v not in allowed:
+            raise ValueError(f"Invalid purpose. Must be one of {allowed}")
+        return v
+
+    # Routing / Addressing
+    recipient_alias: Optional[str] = Field(None, description="CBU Alias (Argentina)")
+    recipient_pix_key: Optional[str] = Field(None, description="Pix Key (Brazil/Mexico/Columbia)")

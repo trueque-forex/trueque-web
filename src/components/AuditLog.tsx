@@ -64,7 +64,7 @@ export default function AuditLog({ entries, filterCorridor, debug = false, onEnt
         </table>
       )}
       <div className="mt-4 text-xs text-gray-500 italic">
-        All transfers are domestic. Trueque does not touch funds. No money crosses borders.
+        All transfers are domestic. Symmetri does not touch funds. No money crosses borders.
       </div>
     </section>
   )

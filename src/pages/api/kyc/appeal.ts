@@ -1,13 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getSession } from '../../../lib/session';
-import { query } from '../../../lib/db';
+import { withAuth } from '@/lib/withAuth';
+import { query } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { TruequeSession } from '@/types/auth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const session = await getSession(req);
-  if (!session?.userId) return res.status(401).json({ error: 'Authentication required' });
+async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const session = (req as any).session as TruequeSession;
 
-  const userId = session.userId;
+  const userId = session.user.id;
 
   if (req.method === 'GET') {
     const r = await query('SELECT id, metadata, created_at FROM kyc_audit_logs WHERE user_id = $1 AND action = $2 ORDER BY created_at DESC LIMIT 1', [userId, 'appeal_submitted']);
@@ -28,3 +28,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   return res.status(405).end();
 }
+
+export default withAuth(handler);

@@ -11,8 +11,5 @@ describe('Rate Integrity Model (TS)', () => {
     const rate = { corridor: 'MX-US', baseRate: 20.5, fee: 1.5, total: 21.0 };
     expect(validateRateIntegrity(rate)).toBe(false);
   });
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+

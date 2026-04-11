@@ -5,8 +5,5 @@ export function validateRateIntegrity(rate: {
   total: number;
 }): boolean {
   return Math.abs(rate.baseRate + rate.fee - rate.total) < 0.001;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+

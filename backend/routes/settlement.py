@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone
 from database import get_db
 from models.offer_model import Offer  # Assuming you're updating Offer directly
 
@@ -25,7 +25,7 @@ def settle_exchange(request: SettlementRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Offer not found")
 
     offer.status = request.status
-    offer.settlement_timestamp = datetime.utcnow()
+    offer.settlement_timestamp = datetime.now(timezone.utc)
     offer.confirmed_by_user_id = request.confirmed_by_user_id
     db.commit()
 

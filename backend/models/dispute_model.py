@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Float, Integer, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Float, Integer, Text, DateTime, ForeignKey, Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
@@ -13,8 +13,8 @@ class Offer(Base):
     country = Column(String)
     currency_from = Column(String)
     currency_to = Column(String)
-    amount = Column(Float)
-    market_rate = Column(Float)
+    amount = Column(Numeric(18, 6))
+    market_rate = Column(Numeric(18, 6))
     status = Column(String, default="pending")
     timestamp = Column(DateTime, default=datetime.utcnow)
 

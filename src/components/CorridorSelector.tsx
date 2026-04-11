@@ -1,20 +1,17 @@
-<<<<<<< HEAD
-=======
 // src/components/CorridorSelector.tsx
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react';
 
 type Country = {
-  name: string
-  iso: string // ISO 3166-1 numeric
-  flag: string
-}
+  name: string;
+  iso: string; // ISO 3166-1 numeric
+  flag: string;
+};
 
 type Corridor = {
-  name: string
-  code: string // Internal corridor code
-  targetIso: string
-}
+  name: string;
+  code: string; // Internal corridor code
+  targetIso: string;
+};
 
 const countries: Country[] = [
   { name: 'Brazil', iso: '076', flag: '🇧🇷' },
@@ -29,7 +26,7 @@ const countries: Country[] = [
   { name: 'Ghana', iso: '288', flag: '🇬🇭' },
   { name: 'Guatemala', iso: '320', flag: '🇬🇹' },
   { name: 'Ecuador', iso: '218', flag: '🇪🇨' },
-]
+];
 
 const corridorMap: Record<string, Corridor[]> = {
   '076': [
@@ -38,9 +35,7 @@ const corridorMap: Record<string, Corridor[]> = {
     { name: 'Send to Spain', code: '03', targetIso: '724' },
     { name: 'Send to Portugal', code: '04', targetIso: '620' },
   ],
-  '032': [
-    { name: 'Send to Spain', code: '05', targetIso: '724' },
-  ],
+  '032': [{ name: 'Send to Spain', code: '05', targetIso: '724' }],
   '484': [
     { name: 'Send to United States', code: '06', targetIso: '840' },
     { name: 'Send to Spain', code: '07', targetIso: '724' },
@@ -49,60 +44,37 @@ const corridorMap: Record<string, Corridor[]> = {
     { name: 'Send to Spain', code: '08', targetIso: '724' },
     { name: 'Send to Ecuador', code: '09', targetIso: '218' },
   ],
-  '862': [
-    { name: 'Send to Colombia', code: '10', targetIso: '170' },
-  ],
+  '862': [{ name: 'Send to Colombia', code: '10', targetIso: '170' }],
   '724': [
     { name: 'Send to Brazil', code: '11', targetIso: '076' },
     { name: 'Send to Argentina', code: '12', targetIso: '032' },
     { name: 'Send to Mexico', code: '13', targetIso: '484' },
     { name: 'Send to Colombia', code: '14', targetIso: '170' },
   ],
-  '566': [
-    { name: 'Send to Ghana', code: '15', targetIso: '288' },
-  ],
-  '288': [
-    { name: 'Send to Nigeria', code: '16', targetIso: '566' },
-  ],
-  '840': [
-    { name: 'Send to Mexico', code: '17', targetIso: '484' },
-  ],
-  '320': [
-    { name: 'Send to Mexico', code: '18', targetIso: '484' },
-  ],
-}
+  '566': [{ name: 'Send to Ghana', code: '15', targetIso: '288' }],
+  '288': [{ name: 'Send to Nigeria', code: '16', targetIso: '566' }],
+  '840': [{ name: 'Send to Mexico', code: '17', targetIso: '484' }],
+  '320': [{ name: 'Send to Mexico', code: '18', targetIso: '484' }],
+};
 
 export default function CorridorSelector({
-<<<<<<< HEAD
-  onSelect,
-}: {
-  onSelect: (params: {
-=======
   onSelect = () => {},
 }: {
-  onSelect?: (params: {
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
-    fromIso: string
-    toIso: string
-    corridorCode: string
-  }) => void
+  onSelect?: (params: { fromIso: string; toIso: string; corridorCode: string }) => void;
 }) {
-  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null)
-  const [availableCorridors, setAvailableCorridors] = useState<Corridor[]>([])
-  const [selectedCorridor, setSelectedCorridor] = useState<Corridor | null>(null)
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
+  const [availableCorridors, setAvailableCorridors] = useState<Corridor[]>([]);
+  const [selectedCorridor, setSelectedCorridor] = useState<Corridor | null>(null);
 
   useEffect(() => {
     if (selectedCountry) {
-      setAvailableCorridors(corridorMap[selectedCountry.iso] || [])
-      setSelectedCorridor(null)
-<<<<<<< HEAD
-=======
+      setAvailableCorridors(corridorMap[selectedCountry.iso] || []);
+      setSelectedCorridor(null);
     } else {
-      setAvailableCorridors([])
-      setSelectedCorridor(null)
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+      setAvailableCorridors([]);
+      setSelectedCorridor(null);
     }
-  }, [selectedCountry])
+  }, [selectedCountry]);
 
   const handleConfirm = () => {
     if (selectedCountry && selectedCorridor) {
@@ -110,9 +82,9 @@ export default function CorridorSelector({
         fromIso: selectedCountry.iso,
         toIso: selectedCorridor.targetIso,
         corridorCode: selectedCorridor.code,
-      })
+      });
     }
-  }
+  };
 
   return (
     <div className="space-y-4">
@@ -120,11 +92,7 @@ export default function CorridorSelector({
         Select your country:
         <select
           value={selectedCountry?.iso || ''}
-          onChange={(e) =>
-            setSelectedCountry(
-              countries.find((c) => c.iso === e.target.value) || null
-            )
-          }
+          onChange={(e) => setSelectedCountry(countries.find((c) => c.iso === e.target.value) || null)}
           className="mt-1 block w-full border rounded px-2 py-1"
         >
           <option value="">-- Choose a country --</option>
@@ -141,11 +109,7 @@ export default function CorridorSelector({
           Select a corridor:
           <select
             value={selectedCorridor?.code || ''}
-            onChange={(e) =>
-              setSelectedCorridor(
-                availableCorridors.find((corr) => corr.code === e.target.value) || null
-              )
-            }
+            onChange={(e) => setSelectedCorridor(availableCorridors.find((corr) => corr.code === e.target.value) || null)}
             className="mt-1 block w-full border rounded px-2 py-1"
           >
             <option value="">-- Choose a corridor --</option>
@@ -162,13 +126,10 @@ export default function CorridorSelector({
         onClick={handleConfirm}
         disabled={!selectedCountry || !selectedCorridor}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        type="button"
       >
         Confirm Corridor
       </button>
     </div>
-  )
-<<<<<<< HEAD
+  );
 }
-=======
-}
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

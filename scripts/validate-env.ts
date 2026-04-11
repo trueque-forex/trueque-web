@@ -12,8 +12,4 @@ if (missing.length > 0) {
   exit(1);
 }
 
-<<<<<<< HEAD
 console.log("✅ All required environment variables are set.\n");
-=======
-console.log("✅ All required environment variables are set.\n");
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

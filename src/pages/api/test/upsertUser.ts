@@ -11,12 +11,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const result = await transaction(async (client: any) => {
-      await client.query('DELETE FROM beneficiaries WHERE email = $1', [email]).catch(() => {});
-      await client.query('DELETE FROM users WHERE email = $1', [email]).catch(() => {});
+      await client.query('DELETE FROM beneficiaries WHERE email = $1', [email]).catch(() => { });
+      await client.query('DELETE FROM users WHERE email = $1', [email]).catch(() => { });
 
       const insertResult = await client.query(
-        `INSERT INTO users (first_name, last_name, email, country_of_residence, is_test, created_at)
-         VALUES ($1,$2,$3,$4,$5,now())
+        `INSERT INTO users (first_name, last_name, email, country_of_residence, is_test, created_at, kyc_status)
+         VALUES ($1,$2,$3,$4,$5,now(), 'INCOMPLETE')
          RETURNING id`,
         [firstName, lastName, email, country, true]
       );
@@ -30,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!newId) throw new Error('failed to create user');
 
       const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const tid = `T${date}${country}${String(newId).padStart(4, '0')}-X`;
+      const tid = `S${date}${country}${String(newId).padStart(4, '0')}-X`;
       await client.query('UPDATE users SET tid = $1 WHERE id = $2', [tid, newId]);
 
       if (beneficiary && beneficiary.name && beneficiary.account) {

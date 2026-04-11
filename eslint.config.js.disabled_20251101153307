@@ -1,0 +1,26 @@
+/*
+ Minimal eslint.config.js for Next + TypeScript projects.
+ Keeps lint behaviour lightweight while avoiding imports of non-exported internals.
+ Adjust rules/plugins as needed after this lands.
+*/
+export default [
+  {
+    files: ["**/*.{js,jsx,ts,tsx}"],
+    languageOptions: {
+      parser: "@typescript-eslint/parser",
+      parserOptions: {
+        project: "./tsconfig.json",
+        ecmaVersion: "latest",
+        sourceType: "module"
+      }
+    },
+    plugins: {
+      "@typescript-eslint": "@typescript-eslint"
+    },
+    rules: {
+      // keep rules minimal; expand later
+      "no-unused-vars": "warn",
+      "@typescript-eslint/no-unused-vars": "warn"
+    }
+  }
+];
