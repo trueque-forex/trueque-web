@@ -48,9 +48,11 @@ jobs:
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
-          else
-            pip install pytest
           fi
+          if [ -f backend/requirements.txt ]; then
+            pip install -r backend/requirements.txt
+          fi
+          pip install pytest  # always ensure pytest is available
 
       - name: Run Python tests
         run: python -m pytest -q
