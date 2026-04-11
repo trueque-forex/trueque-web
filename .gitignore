@@ -1,31 +1,155 @@
-# Project-level ignores
-Trueque_untracked_backup_*/
-keys/
+# ─────────────────────────────────────────────
+# Symmetri / Trueque — .gitignore
+# ─────────────────────────────────────────────
+
+# ── Secrets & Keys ──────────────────────────
+.env
+.env.*
+!.env.example
 *.pem
 *.key
-*.env
-.ssh/
-AppData/
-repo-mirror.git/
-# local secrets
 keys/
+.ssh/
 trueque-keys-*
 trueque-keys-encrypted.zip
-C:\Users\werne\trueque_quarantine_backups
-node_modules
 
-# Logs & Databases
-*.log
-*.sqlite
+# ── Node ────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Next.js build ───────────────────────────
+.next/
+out/
+build/
+
+# ── Python bytecode ─────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pycache
+
+# ── Python test/runtime artifacts ───────────
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+*.egg
+
+# ── Databases (local dev only) ───────────────
 *.db
+*.sqlite
+*.sqlite3
+trueque.db
+trueque_dev.db
+trueque_dev_pre_backfill.dump
 
-# Archives & Backups
+# ── Log files ───────────────────────────────
+*.log
+*.txt
+!README.txt
+!src/**/*.txt
+uvicorn-start.log
+tsc-output.txt
+tsc-resolve.log
+dev_server.log
+
+# ── Debug & diagnostic scripts ───────────────
+# Root-level one-off scripts (not src/)
+check_*.ts
+check_*.js
+check_*.py
+debug_*.ts
+debug_*.js
+debug_*.py
+inspect_*.ts
+inspect_*.js
+verify_*.ts
+verify_*.js
+verify_*.py
+purge_*.ts
+reset_*.ts
+reset_*.js
+reset_*.py
+find_*.ts
+fix_*.ts
+trace_*.ts
+trace_*.js
+hard_purge.ts
+final_*.ts
+monday_reset.ts
+sunday_prep.ts
+stress_test_*.py
+update_address_schema.py
+quick_audit.py
+
+# ── Output / status dump files ───────────────
+*.diff
+status.txt
+new_status.txt
+cached_status.txt
+final_status.txt
+phase2_output.txt
+qa_log.txt
+qa_report.txt
+schema.txt
+schema_dump.sql
+schema_inspection.json
+cols.txt
+cols_output.txt
+tables.txt
+db_schema_output.txt
+full_schema_dump.json
+debug_*.json
+debug_*.txt
+git_*.txt
+
+# ── Temp directories ─────────────────────────
+tmp/
+backups/
+debug/
+scripts/__pycache__/
+
+# ── Test artifacts ───────────────────────────
+test-results/
+playwright-report/data/
+pytest_*.txt
+pytest_collect_errors.txt
+test_output.txt
+coverage/
+.nyc_output/
+
+# ── Archives & Backups ───────────────────────
 *.zip
 *.tar.gz
+*.dump
+Trueque_untracked_backup_*/
+AppData/
+repo-mirror.git/
 
-# Build outputs
-.next/
+# ── TypeScript build info ────────────────────
+tsconfig.tsbuildinfo
 
-# Diagnostic Scripts
-check_users.ts
-audit_db.js
+# ── OS generated ────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editor ──────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ── Migrations (keep .js/.sql, ignore outputs) ─
+migrations/*.txt
+
+# ── Scripts folder: keep source, ignore outputs ─
+scripts/*.txt
+scripts/*.json
+scripts/out.txt
+scripts/curl_payload.json
+scripts/users_*.json
+scripts/users_*.txt
