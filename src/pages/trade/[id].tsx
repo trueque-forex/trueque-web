@@ -15,24 +15,29 @@ import { TradeDetails } from '@/types/trade';
 
 export default function TradeRoom() {
   const router = useRouter();
-  const { id } = router.query;
+  const { id, viewer } = router.query;
   const [trade, setTrade] = useState<TradeDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [signalling, setSignalling] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!id) return;
 
     const fetchTradeState = async () => {
       try {
-        // Updated to use query params as per Gemini 3 snippet
-        const res = await fetch(`/api/trades/details?id=${id}`);
+        const viewerParam = viewer ? `&viewer=${viewer}` : '';
+        const res = await fetch(`/api/trades/details?id=${id}${viewerParam}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (data.error) throw new Error(data.error);
         setTrade(data);
         setLoading(false);
-
         if (data.status === 'COMPLETED') clearInterval(polling);
-      } catch (err) {
-        console.error("Orchestration Sync Error:", err);
+      } catch (err: any) {
+        console.error('Trade room load error:', err);
+        setError(err.message || 'Failed to load trade');
+        setLoading(false);
       }
     };
 
@@ -43,23 +48,33 @@ export default function TradeRoom() {
   }, [id]);
 
   if (loading || !trade) return <LoadingState />;
+  if (error) return (
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: '#ef4444' }}>
+      <div style={{ fontSize: '2rem' }}>⚠️</div>
+      <p style={{ fontWeight: '600' }}>Failed to load trade room</p>
+      <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>{error}</p>
+    </div>
+  );
 
   // Dynamic Metadata based on the Corridor Type
   const isSynthetic = trade.type === 'SYNTHETIC';
 
   const handleSignalFunding = async () => {
+    setSignalling(true);
     try {
       const res = await fetch('/api/trades/signal-funding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trade_id: id })
+        body: JSON.stringify({ trade_id: id, viewer_id: viewer })
       });
       const data = await res.json();
-      if (data.success) {
-        setTrade({ ...trade, status: data.status });
+      if (data.success || data.status) {
+        setTrade(prev => prev ? { ...prev, status: data.status, inbound_confirmed: true } : prev);
       }
     } catch (err) {
-      console.error("Signal Error:", err);
+      console.error('Signal Error:', err);
+    } finally {
+      setSignalling(false);
     }
   };
 
@@ -104,23 +119,23 @@ export default function TradeRoom() {
           <div className="amount-box">
             <div className="fee-row">
               <span>Swap Principal:</span>
-              <span>{trade.amount} {trade.sent_currency || trade.currency}</span>
+              <span>{trade.amount} {trade.sent_currency}</span>
             </div>
             <div className="fee-row divider">
               <span>{isSynthetic ? 'Symmetry & Rail Fees' : 'Gateway & Rail Fees'}:</span>
-              <span>{trade.total_fees || "0.00"} {trade.sent_currency || trade.currency}</span>
+              <span>{trade.total_fees || '0.00'} {trade.sent_currency}</span>
             </div>
             <div className="total-row">
               <span>Total to Fund:</span>
-              <span className="primary-text">{trade.total_to_pay || trade.amount} {trade.sent_currency || trade.currency}</span>
+              <span className="primary-text">{trade.total_to_pay || trade.amount} {trade.sent_currency}</span>
             </div>
           </div>
 
           <PaymentInstructions data={trade.payment_instructions} />
 
           {trade.status !== 'FUNDING_SIGNALED' && !trade.inbound_confirmed && (
-            <button className="signal-btn" onClick={handleSignalFunding}>
-              I have funded my leg
+            <button className="signal-btn" onClick={handleSignalFunding} disabled={signalling}>
+              {signalling ? 'Signalling...' : 'I have funded my leg'}
             </button>
           )}
         </section>
@@ -130,7 +145,7 @@ export default function TradeRoom() {
           <div className="step-tag">Phase 2</div>
           <h2>Counterparty Delivery</h2>
           <p className="description">
-            Value is released in {trade.received_currency || trade.currency_received || '...'} once symmetry is detected and validated on the rails.
+            Value is released in {trade.received_currency || '...'} once symmetry is detected and validated on the rails.
           </p>
 
           <div className="payout-status-box">
@@ -138,7 +153,7 @@ export default function TradeRoom() {
             <div className="beneficiary-name">{trade.beneficiary_name || '...'}</div>
 
             <div className="payout-amount">
-              {trade.received_amount || trade.amount_received || '0.00'} {trade.received_currency || trade.currency_received || ''}
+              {trade.received_amount || '0.00'} {trade.received_currency || ''}
             </div>
             <div className="payout-method">
               Via: <strong>{trade.payout_method || 'Rail'}</strong>

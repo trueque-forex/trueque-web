@@ -172,10 +172,10 @@ export default function BeneficiaryDetailsPage() {
             let finalBankName = banking.bankName;
 
             if (banking.deliveryMethod === 'bank_rtp') {
-                if (destCountry === 'AR') finalAccountNumber = banking.cbu;
-                else if (destCountry === 'EU') finalAccountNumber = banking.iban;
-                else if (destCountry === 'MX') finalAccountNumber = banking.clabe;
-                else finalAccountNumber = banking.accountNumber;
+                if (destCountry === 'AR') finalAccountNumber = banking.cbu || '';
+                else if (destCountry === 'EU') finalAccountNumber = banking.iban || '';
+                else if (destCountry === 'MX') finalAccountNumber = banking.clabe || '';
+                else finalAccountNumber = banking.accountNumber || '';
 
                 // Type map
                 if (banking.accountType === 'CBU') payloadAccountType = 'Bank';

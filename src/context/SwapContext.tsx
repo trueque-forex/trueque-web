@@ -4,12 +4,12 @@ import { useAuth } from './AuthContext'; // Import Auth Hook
 // Types
 interface SwapIntent {
     amount: number;
-    currencyFrom: string;
-    currencyTo: string;
-    rate: number;
+    source_currency: string;
+    target_currency: string;
+    exchange_rate: number;
     timeFrame?: number | string;
     provider?: string;
-    offerType?: 'bank' | 'retail_voucher' | 'wallet' | 'merchant_voucher';
+    offerType?: 'bank' | 'wallet';
 }
 
 interface BeneficiaryData {

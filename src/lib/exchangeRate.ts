@@ -8,7 +8,7 @@
 export async function fetchExchangeRate(from: string, to: string): Promise<number> {
   try {
     // USE INTERNAL API for consistency with Landing Page
-    const response = await fetch(`/api/rate/${from}/${to}`);
+    const response = await fetch(`/api/rate?from=${from}&to=${to}`);
 
     if (!response.ok) {
       throw new Error('Failed to fetch exchange rate');

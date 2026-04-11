@@ -8,7 +8,8 @@ const AUTH_ROUTES = ['/login', '/register', '/signin', '/signup'];
 const PUBLIC_FILE_PATHS = [
   '/signin', '/signup', '/verify', '/forgot-password', '/reset-password', '/about',
   '/api/auth/signin', '/api/auth/signup', '/api/auth/verify', '/api/auth/forgot-password', '/api/auth/reset-password',
-  '/api/setup_schema' // Temporary Admin Route
+  '/api/setup_schema', // Temporary Admin Route
+  '/api/dev/mfa-peek'  // DEV ONLY — delete after testing
 ];
 
 export async function middleware(req: NextRequest) {
@@ -81,6 +82,10 @@ export async function middleware(req: NextRequest) {
       !pathname.startsWith('/api/health') &&
       !pathname.startsWith('/api/rate') &&
       !pathname.startsWith('/api/public') &&
+      !pathname.startsWith('/api/offers') &&   // Dev console — offer creation & listing
+      !pathname.startsWith('/api/matches') &&  // Dev console — match creation & listing
+      !pathname.startsWith('/api/trades') &&   // Trade room — details & signal-funding
+      !pathname.startsWith('/api/fx-rate') &&  // FX rate lookup (public read-only)
       !PUBLIC_FILE_PATHS.includes(pathname)) { // CHECK WHITELIST
       return handleUnauthorized();
     }

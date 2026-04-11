@@ -99,8 +99,8 @@ export default function SwapSummaryPage() {
     // Calculation Logic
     useEffect(() => {
         const amount = effectiveSwapIntent?.amount || parseFloat(router.query.amountIntent as string) || 0;
-        const rate = effectiveSwapIntent?.rate || parseFloat(router.query.rate as string) || 1050.00;
-        const toCurrency = (effectiveSwapIntent?.currencyTo || qTo || 'ARS') as string;
+        const rate = effectiveSwapIntent?.exchange_rate || parseFloat(router.query.rate as string) || 1050.00;
+        const toCurrency = (effectiveSwapIntent?.target_currency || qTo || 'ARS') as string;
 
         if (!amount || !rate) return;
 
@@ -118,7 +118,6 @@ export default function SwapSummaryPage() {
         const isCard = methodType === 'CARD';
         const isCredit = methodCardType === 'credit';
         const deliveryMethod = effectiveBeneficiary?.banking?.deliveryMethod || 'bank_rtp';
-        const isVoucher = effectiveSwapIntent?.offerType === 'retail_voucher' || effectiveSwapIntent?.offerType === 'merchant_voucher';
 
         let inboundPctFee = 0;
         let cardFixedFee = 0;
@@ -203,8 +202,8 @@ export default function SwapSummaryPage() {
 
             const payload = {
                 amount: breakdown.totalToPaySource,
-                currencyFrom: 'EUR',
-                currencyTo: swapIntent?.currencyTo || qTo,
+                source_currency: 'EUR',
+                target_currency: swapIntent?.target_currency || qTo,
                 beneficiaryId: effectiveBeneficiary?.id,
                 provider: swapIntent?.provider
             };
@@ -231,7 +230,7 @@ export default function SwapSummaryPage() {
                     currency: 'EUR',
                     tid: brandedId,
                     amountReceive: breakdown.grossReceive.toFixed(2),
-                    currencyTo: swapIntent?.currencyTo || qTo,
+                    currencyTo: swapIntent?.target_currency || qTo,
                     methodType: methodType || 'RTP',
                     init: 'true'
                 }
@@ -260,17 +259,27 @@ export default function SwapSummaryPage() {
         setShowMFA(true);
     };
 
-    const handleVerifyMFA = () => {
+    const handleVerifyMFA = async () => {
         const fullCode = mfaCode.join('');
-        if (fullCode === '123456') {
-            setShowMFA(false);
-            processSwap();
-        } else {
-            setMfaError('Invalid code. Try 123456');
+        try {
+            const res = await fetch('/api/auth/verify-mfa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: fullCode }),
+            });
+            const data = await res.json();
+            if (data.ok && data.verified) {
+                setShowMFA(false);
+                processSwap();
+            } else {
+                setMfaError('Invalid code. Please check and try again.');
+            }
+        } catch {
+            setMfaError('Verification failed. Please try again.');
         }
     };
 
-    const isVoucher = swapIntent?.offerType === 'retail_voucher' || swapIntent?.offerType === 'merchant_voucher';
+    const isVoucher = false; // Vouchers are handled separately in VoucherCheckout
     const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#57606f' };
 
     return (
@@ -316,7 +325,7 @@ export default function SwapSummaryPage() {
                     </div>
 
                     <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', fontSize: '1.1rem', fontWeight: '700', color: '#2c3e50', border: '1px solid #dcdde1', textAlign: 'center' }}>
-                        Effective Rate: 1 EUR = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.currencyTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(includes all friction)</span>
+                        Effective Rate: 1 EUR = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.target_currency || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(includes all friction)</span>
                     </div>
 
                     {/* COST BREAKDOWN */}
@@ -330,7 +339,7 @@ export default function SwapSummaryPage() {
 
                         <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '20px', color: '#27ae60' }}>
                             <span style={{ fontWeight: '600' }}>Beneficiary Receives (Sacred)</span>
-                            <span style={{ fontWeight: '800' }}>{currencyFmt(breakdown.grossReceive)} {swapIntent?.currencyTo || 'ARS'}</span>
+                            <span style={{ fontWeight: '800' }}>{currencyFmt(breakdown.grossReceive)} {swapIntent?.target_currency || 'ARS'}</span>
                         </div>
 
                         {/* TOTAL COST */}

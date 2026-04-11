@@ -23,6 +23,7 @@ export default function Dashboard() {
     const [recentSwaps, setRecentSwaps] = useState<any[]>([]);
     const [savedBeneficiaries, setSavedBeneficiaries] = useState<any[]>([]);
     const [drafts, setDrafts] = useState<any[]>([]);
+    const [recentVouchers, setRecentVouchers] = useState<any[]>([]);
 
     useEffect(() => {
         // Redirect if not logged in (Client-side Guard)
@@ -79,6 +80,13 @@ export default function Dashboard() {
                 if (draftRes.ok) {
                     const draftData = await draftRes.json();
                     setDrafts(draftData);
+                }
+
+                // Fetch Vouchers (Phase 1)
+                const vRes = await fetch('/api/vouchers/list');
+                if (vRes.ok) {
+                    const vData = await vRes.json();
+                    setRecentVouchers(vData.vouchers || []);
                 }
 
             } catch (err) {
@@ -186,39 +194,72 @@ export default function Dashboard() {
 
                     {/* LEFT COLUMN: ACTION & BENEFICIARIES */}
                     <div>
-                        {/* CTA CARD */}
-                        <div style={{
-                            backgroundColor: 'white',
-                            borderRadius: '16px',
-                            padding: '30px',
-                            marginBottom: '30px',
-                            boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                            textAlign: 'center'
-                        }}>
-                            <h2 style={{ color: '#2c3e50', marginTop: 0 }}>Swap your Money with Symmetri</h2>
-                            <p style={{ color: '#7f8c8d', marginBottom: '25px' }}>
-                                Fast, secure, and at the real market rate.
-                            </p>
-                            <button
-                                onClick={handleStartSwap}
-                                disabled={kycStatus === 'PENDING' && (user?.txCount || 0) > 0}
-                                style={{
-                                    width: '100%',
-                                    padding: '16px',
-                                    backgroundColor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? '#bdc3c7' : brandConfig.theme.actionColor,
-                                    color: 'white',
-                                    fontSize: '18px',
-                                    fontWeight: 'bold',
-                                    border: 'none',
-                                    borderRadius: '12px',
-                                    cursor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'not-allowed' : 'pointer',
-                                    boxShadow: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'none' : `0 4px 12px ${brandConfig.theme.actionColor}4D`,
-                                    transition: 'transform 0.2s',
-                                    opacity: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 0.7 : 1
-                                }}
-                            >
-                                {(kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'Verification in Progress' : 'Start New Swap'}
-                            </button>
+                        {/* TWO-PRODUCT SELECTOR */}
+                        <div style={{ marginBottom: '30px' }}>
+                            <h2 style={{ color: '#2c3e50', marginTop: 0, marginBottom: '16px' }}>What would you like to do?</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+                                {/* PHASE 1 — SEND VALUE */}
+                                <div
+                                    style={{ background: 'white', borderRadius: '16px', padding: '24px', cursor: 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', position: 'relative', overflow: 'hidden' }}
+                                    onClick={() => router.push('/send')}
+                                    onMouseEnter={e => {
+                                        const el = e.currentTarget as HTMLDivElement;
+                                        el.style.borderColor = '#1A73E8';
+                                        el.style.transform = 'translateY(-2px)';
+                                        const tip = el.querySelector('.quick-send-tip') as HTMLElement;
+                                        if (tip) tip.style.opacity = '1';
+                                    }}
+                                    onMouseLeave={e => {
+                                        const el = e.currentTarget as HTMLDivElement;
+                                        el.style.borderColor = '#e2e8f0';
+                                        el.style.transform = 'none';
+                                        const tip = el.querySelector('.quick-send-tip') as HTMLElement;
+                                        if (tip) tip.style.opacity = '0';
+                                    }}
+                                >
+                                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎟️</div>
+                                    <div style={{ fontWeight: '800', fontSize: '15px', color: '#1e293b', marginBottom: '6px' }}>Send Value</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, marginBottom: '14px' }}>
+                                        Your family receives purchasing power redeemable at their preferred grocery store. Mid-market rate, zero Symmetri fees.
+                                    </div>
+                                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#1A73E8', background: '#eff6ff', padding: '4px 10px', borderRadius: '20px', display: 'inline-block' }}>No MTL Required</div>
+
+                                    {/* Quick-send hover tooltip for returning users */}
+                                    <div
+                                        className="quick-send-tip"
+                                        onClick={e => { e.stopPropagation(); router.push('/voucher'); }}
+                                        style={{
+                                            position: 'absolute', bottom: '12px', right: '12px',
+                                            background: '#1A73E8', color: 'white',
+                                            padding: '5px 12px', borderRadius: '20px',
+                                            fontSize: '11px', fontWeight: '700',
+                                            opacity: 0, transition: 'opacity 0.15s',
+                                            cursor: 'pointer', pointerEvents: 'auto',
+                                            boxShadow: '0 2px 8px rgba(26,115,232,0.4)',
+                                        }}
+                                        title="Skip to voucher — for returning users"
+                                    >
+                                        Quick Send ⚡
+                                    </div>
+                                </div>
+
+                                {/* PHASE 2 — P2P SWAP */}
+                                <div
+                                    onClick={handleStartSwap}
+                                    style={{ background: 'white', borderRadius: '16px', padding: '24px', cursor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'not-allowed' : 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', opacity: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 0.6 : 1 }}
+                                    onMouseEnter={e => { if ((kycStatus !== 'PENDING') || (user?.txCount || 0) === 0) { (e.currentTarget as HTMLDivElement).style.borderColor = '#0070f3'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; } }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
+                                >
+                                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>💱</div>
+                                    <div style={{ fontWeight: '800', fontSize: '15px', color: '#1e293b', marginBottom: '6px' }}>Swap Currencies</div>
+                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, marginBottom: '14px' }}>
+                                        Match with someone sending the other way. Both sides settle domestically — no cross-border wire.
+                                    </div>
+                                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#0050b3', background: '#e6f7ff', padding: '4px 10px', borderRadius: '20px', display: 'inline-block' }}>Phase 2 · MTL Required</div>
+                                </div>
+
+                            </div>
                         </div>
 
                         {/* SAVED DRAFTS */}
@@ -309,7 +350,7 @@ export default function Dashboard() {
                     {/* RIGHT COLUMN: RECENT ACTIVITY */}
                     <div>
                         <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Recent Swaps</h3>
-                        <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 15px rgba(0,0,0,0.05)' }}>
+                        <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 15px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
                             {recentSwaps.map((swap) => (
                                 <div key={swap.id} style={{
                                     padding: '20px',
@@ -396,6 +437,53 @@ export default function Dashboard() {
                             ))}
                             <div style={{ padding: '15px', textAlign: 'center', backgroundColor: '#fdfefe', cursor: 'pointer', color: '#4A90E2', fontWeight: '500' }} onClick={() => router.push('/history')}>
                                 View All Activity
+                            </div>
+                        </div>
+
+                        {/* RECENT VOUCHERS */}
+                        <h3 style={{ color: '#34495e', marginBottom: '15px', marginTop: '30px' }}>Recent Vouchers</h3>
+                        <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 15px rgba(0,0,0,0.05)' }}>
+                            {recentVouchers.length === 0 ? (
+                                <div style={{ padding: '20px', textAlign: 'center', color: '#95a5a6', fontSize: '14px' }}>
+                                    No vouchers sent yet.
+                                </div>
+                            ) : recentVouchers.slice(0, 3).map((v: any) => (
+                                <div key={v.id} style={{ padding: '20px', borderBottom: '1px solid #f0f2f5', cursor: 'pointer' }}
+                                    onClick={() => router.push(`/voucher/track/${v.id}`)}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                        <div>
+                                            <div style={{ fontWeight: '600', color: '#2c3e50', marginBottom: '4px' }}>
+                                                {v.retailer_name} Voucher → {v.beneficiary_name || 'Beneficiary'}
+                                            </div>
+                                            <div style={{ fontSize: '13px', color: '#95a5a6' }}>
+                                                {new Date(v.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <div style={{ fontWeight: 'bold', color: '#2c3e50', marginBottom: '4px' }}>
+                                                -{parseFloat(v.amount_usd).toFixed(2)} USD
+                                            </div>
+                                            <div style={{
+                                                fontSize: '12px', fontWeight: '600', padding: '2px 8px', borderRadius: '10px', display: 'inline-block',
+                                                backgroundColor: v.status === 'REDEEMED' ? '#e8f8f5' : v.status === 'EXPIRED' ? '#fdecea' : '#f5f3ff',
+                                                color: v.status === 'REDEEMED' ? '#27ae60' : v.status === 'EXPIRED' ? '#c0392b' : '#7c3aed',
+                                            }}>
+                                                {v.status}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: '#bdc3c7' }}>
+                                        {parseFloat(v.amount_local).toFixed(2)} {v.local_currency} · {v.retailer_name}
+                                        {v.status === 'REDEEMED' && v.historical_redemption_anchor?.city
+                                            ? ` · Redeemed in ${v.historical_redemption_anchor.city}`
+                                            : ''}
+                                    </div>
+                                </div>
+                            ))}
+                            <div style={{ padding: '14px', textAlign: 'center', backgroundColor: '#fdfefe', cursor: 'pointer', color: '#7c3aed', fontWeight: '500', fontSize: '14px', borderTop: '1px solid #f0f2f5' }}
+                                onClick={() => router.push('/vouchers')}>
+                                View All Vouchers
                             </div>
                         </div>
                     </div>

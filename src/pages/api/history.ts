@@ -3,33 +3,48 @@ import { withAuth } from '@/lib/withAuth';
 import { query } from '@/lib/db';
 import { TruequeSession } from '@/types/auth';
 
+// GET /api/history
+// Returns trade history for the calling user from the Postgres trades table.
+// A user appears as maker_id (offer poster) or taker_id (matcher).
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     const session = (req as any).session as TruequeSession;
+    const userId = session.user.id;
 
     try {
-        // PROXY TO PYTHON BACKEND (SQLite)
-        // We use the mock user_id=1 to match what swaps.ts inserts.
-        const pythonRes = await fetch('http://127.0.0.1:8000/history/user/1');
+        const sql = `
+            SELECT
+                t.id,
+                t.amount,
+                t.sent_currency,
+                t.received_currency,
+                t.received_amount,
+                t.status,
+                t.created_at,
+                t.completed_at
+            FROM trades t
+            WHERE t.maker_id = $1 OR t.taker_id = $1
+            ORDER BY t.created_at DESC
+            LIMIT 20
+        `;
+        const result = await query(sql, [userId]);
 
-        if (!pythonRes.ok) {
-            // Fallback to empty if 404 or error
-            return res.status(200).json([]);
-        }
-
-        const backendOffers = await pythonRes.json();
-
-        const history = backendOffers.map((row: any) => ({
-            id: row.uuid,
-            amount: row.amount,
-            currencyFrom: row.currency_from,
-            currencyTo: row.currency_to,
-            status: row.status,
-            date: row.timestamp
+        const history = result.rows.map((row: any) => ({
+            id: row.id,
+            amount: Number(row.amount || 0),
+            currencyFrom: row.sent_currency     || '---',
+            currencyTo:   row.received_currency || '---',
+            valueDelivered: row.received_amount != null
+                ? Number(row.received_amount).toFixed(2)
+                : '---',
+            status: (row.status || 'PENDING').toUpperCase(),
+            date: row.created_at
+                ? new Date(row.created_at).toISOString().split('T')[0]
+                : '---',
         }));
 
         return res.status(200).json(history);
     } catch (e: any) {
-        console.error('History fetch failed', e);
+        console.error('[API/HISTORY] Postgres query failed:', e);
         return res.status(500).json({ error: 'internal_error' });
     }
 }

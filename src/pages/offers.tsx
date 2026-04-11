@@ -1,517 +1,601 @@
-// src/pages/offers.tsx
+// src/pages/offers.tsx  —  Phase 2: Real DB offers + Post an Offer
 import { useRouter } from 'next/router';
 import { useSwap } from '../context/SwapContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 
-// Types including quote data (even if some fields are hidden now)
-type Offer = {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+/** Shape returned by GET /api/offers */
+type DbOffer = {
   id: string;
-  provider: string;
-  amount: number;
-  rate: number;
-  min: number;
-  max: number;
-  speed: string;
-  trust: number;
-  offerAmount: number;
-  currencyFrom: string;
-  currencyTo: string;
-  marketRate: number;
-  totalCost?: number;
-  effectiveRate?: number;
-  isRound?: boolean;
+  swap_type: 'IMMEDIATE' | 'LIMIT';
+  amount_offered: number;
+  currency_offered: string;
+  amount_wanted: number;
+  currency_wanted: string;
+  exchange_rate: number;
+  fee_total: number;
+  expires_at: string | null;
+  created_at: string;
 };
 
-// Helper to generate a mock Trueque ID format: T YYYYMMDD CC SSSS K
-const getMockTruequeID = (country: string, index: number) => {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const seq = String(index + 1).padStart(4, '0');
-  // Simple mock checksum char
-  const checksum = "X";
-  return `T${date}${country}${seq}${checksum}`;
+/** Shape for the Post an Offer form */
+type OfferDraft = {
+  swap_type: 'IMMEDIATE' | 'LIMIT';
+  amount_offered: string;
+  currency_offered: string;
+  amount_wanted: string;
+  currency_wanted: string;
+  exchange_rate: string;
 };
 
-const generateMockOffers = (
-  amountIntent: number,
-  currencyFrom: string,
-  currencyTo: string,
-  marketRate: number
-): Offer[] => {
-  // Mock Profiles - Now anonymous, just Country based routing logic ideally
-  // but we can just assign random countries for diversity in the ID
-  const baseProfiles = [
-    { country: 'AR', min: 10, max: 500, trust: 4.8 },
-    { country: 'MX', min: 50, max: 1000, trust: 4.9 },
-    { country: 'CO', min: 100, max: 2000, trust: 4.7 },
-    { country: 'BR', min: 20, max: 300, trust: 4.6 },
-    { country: 'US', min: 200, max: 5000, trust: 5.0 },
-  ];
+// ─── Post an Offer Modal ──────────────────────────────────────────────────────
 
-  const offers: Offer[] = [];
-  const target = amountIntent;
+function PostOfferModal({
+  defaultFrom,
+  defaultTo,
+  defaultRate,
+  onClose,
+  onPosted,
+}: {
+  defaultFrom: string;
+  defaultTo: string;
+  defaultRate: number;
+  onClose: () => void;
+  onPosted: () => void;
+}) {
+  const [form, setForm] = useState<OfferDraft>({
+    swap_type: 'IMMEDIATE',
+    amount_offered: '',
+    currency_offered: defaultFrom,
+    amount_wanted: '',
+    currency_wanted: defaultTo,
+    exchange_rate: defaultRate > 0 ? defaultRate.toFixed(4) : '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  // Helper to create an offer object
-  const createOffer = (amount: number, profileIndex: number, idSuffix: string, isRound: boolean): Offer => {
-    const profile = baseProfiles[profileIndex % baseProfiles.length];
-    const providerId = getMockTruequeID(profile.country, profileIndex * 100 + Math.floor(amount)); // Unique-ish ID
-
-    return {
-      id: `OFF${amount}${idSuffix}`,
-      provider: providerId, // NOW AN ID, NOT A NAME
-      amount: amount,
-      rate: marketRate,
-      min: profile.min,
-      max: profile.max,
-      speed: 'Instant',
-      trust: profile.trust,
-      offerAmount: amount,
-      currencyFrom,
-      currencyTo,
-      marketRate,
-      isRound
-    };
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  // Inject specific test offers for Sandbox Verification (ES -> AR)
-  // Offer 1: 120,000 ARS (Available, approx €114)
-  offers.push(createOffer(120000, 0, 'ARS1', true));
+  // Auto-compute amount_wanted when offered or rate changes
+  useEffect(() => {
+    const offered = parseFloat(form.amount_offered);
+    const rate = parseFloat(form.exchange_rate);
+    if (!isNaN(offered) && !isNaN(rate) && offered > 0 && rate > 0) {
+      setForm(prev => ({ ...prev, amount_wanted: (offered * rate).toFixed(2) }));
+    }
+  }, [form.amount_offered, form.exchange_rate]);
 
-  // Offer 2: 250,000 ARS (Restricted, approx €238 > €190)
-  offers.push(createOffer(250000, 1, 'ARS2', false));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/offers/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          swap_type: form.swap_type,
+          amount_offered: parseFloat(form.amount_offered),
+          currency_offered: form.currency_offered.toUpperCase(),
+          amount_wanted: parseFloat(form.amount_wanted),
+          currency_wanted: form.currency_wanted.toUpperCase(),
+          exchange_rate: parseFloat(form.exchange_rate),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to post offer');
+      onPosted();
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Unknown error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  // Offer 3: 1,000,000 ARS (Restricted, approx €952 > €190)
-  offers.push(createOffer(1000000, 2, 'ARS3', true));
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: '20px',
+    }}>
+      <div style={{
+        background: 'white', borderRadius: '20px',
+        padding: '40px', maxWidth: '520px', width: '100%',
+        boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
+        position: 'relative',
+      }}>
+        {/* Close */}
+        <button onClick={onClose} style={{
+          position: 'absolute', top: '16px', right: '16px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          fontSize: '22px', color: '#94a3b8', lineHeight: 1,
+        }}>×</button>
 
-  // Return mixed sorted offers
-  return offers.sort((a, b) => a.amount - b.amount);
+        <h2 style={{ fontSize: '22px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
+          Post an Offer
+        </h2>
+        <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '28px' }}>
+          Your offer will be visible to other verified users. Symmetri takes a 1.5% fee at match.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          {/* Swap Type */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={labelStyle}>Offer Type</label>
+            <select name="swap_type" value={form.swap_type} onChange={handleChange} style={inputStyle}>
+              <option value="IMMEDIATE">Immediate</option>
+              <option value="LIMIT">Limit (resting)</option>
+            </select>
+          </div>
+
+          {/* Corridor */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'end', marginBottom: '20px' }}>
+            <div>
+              <label style={labelStyle}>I'm offering</label>
+              <input name="currency_offered" value={form.currency_offered} onChange={handleChange}
+                style={inputStyle} placeholder="USD" maxLength={6} />
+            </div>
+            <div style={{ paddingBottom: '10px', color: '#94a3b8', fontSize: '22px', textAlign: 'center' }}>→</div>
+            <div>
+              <label style={labelStyle}>I want</label>
+              <input name="currency_wanted" value={form.currency_wanted} onChange={handleChange}
+                style={inputStyle} placeholder="MXN" maxLength={6} />
+            </div>
+          </div>
+
+          {/* Amounts */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+            <div>
+              <label style={labelStyle}>Amount I'm offering</label>
+              <input name="amount_offered" value={form.amount_offered} onChange={handleChange}
+                type="number" min="0.01" step="any" style={inputStyle} placeholder="100.00" required />
+            </div>
+            <div>
+              <label style={labelStyle}>Exchange rate</label>
+              <input name="exchange_rate" value={form.exchange_rate} onChange={handleChange}
+                type="number" min="0.000001" step="any" style={inputStyle} placeholder="17.33" required />
+            </div>
+          </div>
+
+          {/* Amount wanted (computed) */}
+          <div style={{
+            background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '10px',
+            padding: '14px 18px', marginBottom: '24px',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          }}>
+            <span style={{ fontSize: '14px', color: '#15803d' }}>Counterparty will send</span>
+            <span style={{ fontWeight: '800', fontSize: '20px', color: '#15803d' }}>
+              {form.amount_wanted ? `${parseFloat(form.amount_wanted).toLocaleString()} ${form.currency_wanted.toUpperCase()}` : '—'}
+            </span>
+          </div>
+
+          {error && (
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c',
+              borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', fontSize: '14px',
+            }}>
+              {error}
+            </div>
+          )}
+
+          <button type="submit" disabled={submitting} style={{
+            width: '100%', background: submitting ? '#94a3b8' : '#2563eb',
+            color: 'white', border: 'none', padding: '15px', borderRadius: '12px',
+            fontWeight: '700', fontSize: '16px', cursor: submitting ? 'not-allowed' : 'pointer',
+            transition: 'background 0.2s',
+          }}>
+            {submitting ? 'Posting...' : 'Post Offer →'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const labelStyle: React.CSSProperties = {
+  display: 'block', fontSize: '13px', fontWeight: '600',
+  color: '#374151', marginBottom: '6px',
 };
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '10px 14px', border: '1px solid #d1d5db',
+  borderRadius: '8px', fontSize: '15px', outline: 'none',
+  boxSizing: 'border-box',
+};
+
+// ─── Main Offers Page ─────────────────────────────────────────────────────────
 
 export default function Offers() {
   const router = useRouter();
   const { setSwapIntent } = useSwap();
-  const {
-    amountIntent: amountIntentQuery,
-    rate: rateQuery,
-    from,
-    to,
-    timeFrame // Should be 0 (Instant) from swap.tsx
-  } = router.query;
+  const { amountIntent: amountIntentQuery, rate: rateQuery, from, to } = router.query;
 
-  const [offers, setOffers] = useState<Offer[]>([]);
+  // Parsed corridor params
+  const currencyFrom = ((from as string) || 'USD').toUpperCase();
+  const currencyTo   = ((to   as string) || 'MXN').toUpperCase();
+  const marketRate   = parseFloat(rateQuery as string) || 0;
+
+  const [offers, setOffers] = useState<DbOffer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeBracket, setActiveBracket] = useState(0); // Default to Instant (0)
+  const [kycStatus, setKycStatus] = useState('');
+  const [txCount, setTxCount] = useState(0);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [fetchError, setFetchError] = useState('');
 
-  // Initialize
+  // ── Load offers from DB ────────────────────────────────────────────────────
+
+  const loadOffers = useCallback(async () => {
+    setLoading(true);
+    setFetchError('');
+    try {
+      const params = new URLSearchParams();
+      if (currencyFrom) params.set('currencyFrom', currencyFrom);
+      if (currencyTo)   params.set('currencyTo',   currencyTo);
+      const res = await fetch(`/api/offers?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: DbOffer[] = await res.json();
+      setOffers(data);
+    } catch (err: any) {
+      console.error('[Offers] Failed to fetch offers:', err);
+      setFetchError('Could not load offers. Please refresh.');
+    } finally {
+      setLoading(false);
+    }
+  }, [currencyFrom, currencyTo]);
+
   useEffect(() => {
     if (!router.isReady) return;
+    loadOffers();
+  }, [router.isReady, loadOffers]);
 
-    // Ensure we have necessary data, default to ES->AR values if missing
-    const amount = parseFloat(amountIntentQuery as string) || 100000;
-    const cFrom = from as string || 'EUR';
-    const cTo = to as string || 'ARS';
-
-    let rate = parseFloat(rateQuery as string) || 1055.00; // EUR->ARS rate
-    // Fix for low-magnitude rate passed from previous screen (e.g. 1.055 instead of 1055)
-    if (cTo === 'ARS' && rate < 100) {
-      rate = rate * 1000;
-    }
-
-    // if (isNaN(amount) || isNaN(rate)) return; -> Removed to allow direct access
-
-    // Use passed timeFrame if available (mapped to bracket), or default to 0
-    let bracket = 0;
-    if (timeFrame) {
-      bracket = parseInt(timeFrame as string);
-    }
-    setActiveBracket(bracket);
-
-    // Generate mock offers
-    const generatedOffers = generateMockOffers(amount, cFrom, cTo, rate);
-    setOffers(generatedOffers);
-    setLoading(false);
-
-  }, [router.isReady, amountIntentQuery, rateQuery, from, to, timeFrame]);
-
-  // Sandbox / KYC Logic
-  const [kycStatus, setKycStatus] = useState<string>('');
-  const [txCount, setTxCount] = useState<number>(0);
+  // ── KYC guard ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Fetch fresh session to check KYC status
     fetch('/api/auth/session')
-      .then(res => res.json())
+      .then(r => r.json())
       .then(data => {
-        if (data.user) {
-          const currentKycStatus = (data.user.kycStatus || data.user.kyc_status || 'NOT_STARTED').toUpperCase();
-          const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
-
-          let statusResult = currentKycStatus;
-          if (!data.user.firstName && !data.user.first_name && currentKycStatus === 'NOT_STARTED') {
-            statusResult = 'NOT_STARTED';
-          }
-
-          if (restrictedStatuses.includes(statusResult)) {
-            console.warn(`[Offers Guard] Redirecting to KYC: Status=${statusResult}`);
-            setIsRedirecting(true);
-            router.replace('/kyc');
-            return;
-          }
-
-          setKycStatus(statusResult);
-          setTxCount(data.user.txCount || 0);
+        if (!data.user) return;
+        const status = (data.user.kycStatus || data.user.kyc_status || 'NOT_STARTED').toUpperCase();
+        const restricted = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
+        if (restricted.includes(status)) {
+          setIsRedirecting(true);
+          router.replace('/kyc');
+          return;
         }
+        setKycStatus(status);
+        setTxCount(data.user.txCount || 0);
       })
-      .catch((err) => {
-        console.warn("Failed to fetch session, defaulting to RESTRICTED/PENDING for safety");
-        setKycStatus('PENDING');
-      });
+      .catch(() => setKycStatus('PENDING'));
   }, []);
 
-  const isSandbox = (kycStatus || '').toUpperCase() === 'PENDING';
-  const SANDBOX_LIMIT = 190; // €190 Limit (approx $200 USD)
+  const isSandbox = kycStatus.toUpperCase() === 'PENDING';
+  const SANDBOX_LIMIT_USD = 200;
 
-  // Fetch Quotes for offers (Background - optional now if we hide friction)
-  // We might still want to fetch it to have the QuoteID ready for the next step?
-  // User says: "Remove friction columns... Show only 'Match Amount' and 'Market Rate'"
-  // So we don't strictly *need* to display the quote data here, but fetching it might pre-warm the cache or validation.
-  // For simplicity and performance, effectively we just show the mock offers now. 
-  // However, let's keep the fetch logic but not display the friction, to ensure backend connectivity is healthy.
+  // ── Offer selection ────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const fetchQuotes = async () => {
-      if (offers.length === 0) return;
+  const handleSelectOffer = (offer: DbOffer) => {
+    // pg returns NUMERIC columns as strings — cast everything to Number() defensively
+    const amountOffered  = Number(offer.amount_offered);
+    const amountWanted   = Number(offer.amount_wanted);
+    const exchangeRate   = Number(offer.exchange_rate);
 
-      const updatedOffers = await Promise.all(offers.map(async (offer) => {
-        try {
-          // Hardcoding bracket to 0 as per new requirements "The system should automatically flag all matches as instant_priority"
-          const url = `http://localhost:8001/api/quotes/transparent?amount=${offer.offerAmount}&currency_from=${offer.currencyFrom}&currency_to=${offer.currencyTo}&rate=${offer.marketRate}&settlement_bracket=0`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const data = await res.json();
-            return {
-              ...offer,
-              totalCost: data.total_cost_to_sender, // Stored but hidden
-              effectiveRate: data.effective_exchange_rate // Stored but hidden
-              // We could store quote_id here if needed
-            };
-          }
-        } catch (e) {
-          console.error("Failed to fetch quote for offer", offer.id, e);
-        }
-        return offer;
-      }));
-      setOffers(updatedOffers);
-    };
+    // Sandbox: block if over limit or trial exhausted
+    const amountInUsd = offer.currency_offered === 'USD'
+      ? amountOffered
+      : amountOffered / exchangeRate;
 
-    // Slight delay to allow initial render
-    if (!loading && offers.length > 0 && !offers[0].totalCost) {
-      fetchQuotes();
+    if (isSandbox && txCount >= 1) {
+      alert('Trial completed. Please complete KYC for full access.');
+      return;
     }
-  }, [loading, activeBracket]); // Adjusted dependencies
-
-
-  const handleSelectOffer = (offer: Offer) => {
-    // Redundant Security Check (Hard Click-Block)
-    // Redundant Security Check (Hard Click-Block)
-    const eurEquivalent = offer.offerAmount / 1055; // Fixed divisor as per requirement
-    const isOverLimit = isSandbox && eurEquivalent > SANDBOX_LIMIT;
-    const isTrialExhausted = isSandbox && txCount >= 1;
-
-    if (isOverLimit || isTrialExhausted) {
-      alert("Trial Limit Reached: This swap exceeds your $200 limit. Please complete KYC for full access.");
-      console.warn("Transfer blocked by Sandbox Rules");
+    if (isSandbox && amountInUsd > SANDBOX_LIMIT_USD) {
+      alert(`Trial Limit: This offer exceeds your $${SANDBOX_LIMIT_USD} limit. Complete KYC for full access.`);
       return;
     }
 
-    // Navigate to Beneficiary first (Step 2.5) -> Then Review/Payment (Step 3)
-    // GLOBAL STATE: Set Swap Intent
     setSwapIntent({
-      amount: offer.offerAmount,
-      currencyFrom: offer.currencyFrom, // EUR
-      currencyTo: offer.currencyTo || 'ARS',
-      rate: offer.marketRate,
-      timeFrame: 0, // Hardcoded Instant
-      provider: offer.provider
+      amount: amountOffered,
+      source_currency: offer.currency_offered,
+      target_currency: offer.currency_wanted,
+      exchange_rate: exchangeRate,
+      timeFrame: 0,
+      provider: offer.id,
     });
 
     router.push({
       pathname: '/beneficiary',
       query: {
-        amountIntent: offer.offerAmount,
-        expectedReceive: (offer.offerAmount * offer.marketRate).toFixed(2),
-        rate: offer.marketRate,
-        from: offer.currencyFrom,
-        to: offer.currencyTo,
+        amountIntent: amountOffered,
+        expectedReceive: amountWanted.toFixed(2),
+        rate: exchangeRate,
+        from: offer.currency_offered,
+        to: offer.currency_wanted,
         timeFrame: 0,
-        provider: offer.provider
-      }
+        offerId: offer.id,
+      },
     });
   };
 
-  const getCurrencyCode = (val: string) => {
-    if (!val) return '';
-    // val might be "Country-Code" or just "Code"
-    if (val.includes('-')) return val.split('-')[1];
-    return val;
-  };
+  // ── Render guards ──────────────────────────────────────────────────────────
 
-  if (loading || isRedirecting) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Loading secure matches...</div>;
+  if (isRedirecting) {
+    return <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Redirecting…</div>;
   }
 
-  const currentStatus = (kycStatus || '').toUpperCase();
   const restrictedStatuses = ['NONE', 'EMPTY', 'INCOMPLETE', 'NOT_STARTED'];
-  if (restrictedStatuses.includes(currentStatus)) {
-    return <div style={{ padding: '40px', textAlign: 'center', color: '#7f8c8d' }}>Redirecting to security profile...</div>;
+  if (!loading && restrictedStatuses.includes(kycStatus.toUpperCase()) && kycStatus !== '') {
+    return <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>Redirecting to profile verification…</div>;
   }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f0f2f5' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f0f4f8' }}>
       <Header />
-      <main style={{ padding: '0 40px', maxWidth: '1000px', margin: '40px auto' }}>
+
+      {showModal && (
+        <PostOfferModal
+          defaultFrom={currencyFrom}
+          defaultTo={currencyTo}
+          defaultRate={marketRate}
+          onClose={() => setShowModal(false)}
+          onPosted={() => {
+            setShowModal(false);
+            loadOffers(); // Refresh list after posting
+          }}
+        />
+      )}
+
+      <main style={{ padding: '0 24px', maxWidth: '1020px', margin: '40px auto' }}>
+        {/* Card wrapper */}
         <div style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          padding: '40px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.08)'
+          backgroundColor: 'white', borderRadius: '20px',
+          padding: '40px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
         }}>
-          {/* Navigation Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          {/* ── Top bar ── */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <button
               onClick={() => router.push({ pathname: '/amount-selection', query: router.query })}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#7f8c8d',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px'
-              }}
+              style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
             >
-              ← Back to Swap
+              ← Back
             </button>
-
             <button
-              onClick={() => {
-                sessionStorage.removeItem('trueque_swap_state');
-                router.push('/dashboard');
-              }}
+              onClick={() => setShowModal(true)}
+              id="post-offer-btn"
               style={{
-                background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
-                fontWeight: '600', cursor: 'pointer'
+                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                color: 'white', border: 'none', padding: '10px 22px',
+                borderRadius: '10px', fontWeight: '700', fontSize: '14px',
+                cursor: 'pointer', letterSpacing: '0.3px',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.35)',
+                transition: 'transform 0.15s, box-shadow 0.15s',
               }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 16px rgba(37,99,235,0.45)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 12px rgba(37,99,235,0.35)'; }}
+            >
+              + Post an Offer
+            </button>
+            <button
+              onClick={() => { sessionStorage.removeItem('trueque_swap_state'); router.push('/dashboard'); }}
+              style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
             >
               Cancel ✕
             </button>
           </div>
 
-          <h2 style={{
-            fontSize: '24px',
-            fontWeight: '600',
-            marginBottom: '10px',
-            color: '#2c3e50'
-          }}>
+          {/* ── Heading ── */}
+          <h1 style={{ fontSize: '26px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>
             Select a Counterparty
-          </h2>
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '28px' }}>
+            Corridor: <strong>{currencyFrom} → {currencyTo}</strong>
+            {marketRate > 0 && <> &nbsp;·&nbsp; Market rate: <strong>{marketRate.toFixed(4)}</strong></>}
+            &nbsp;·&nbsp; Speed: <strong>Instant</strong>
+          </p>
+
+          {/* ── Sandbox banner ── */}
           {isSandbox && (
             <div style={{
-              backgroundColor: '#fff3cd',
-              border: '1px solid #ffeeba',
-              borderRadius: '10px',
-              padding: '15px',
-              marginBottom: '25px',
-              display: 'flex',
-              gap: '12px',
-              alignItems: 'start'
+              background: '#fefce8', border: '1px solid #fde047',
+              borderRadius: '12px', padding: '16px 20px',
+              marginBottom: '28px', display: 'flex', gap: '12px', alignItems: 'flex-start',
             }}>
               <span style={{ fontSize: '20px' }}>🚧</span>
               <div>
-                <strong style={{ display: 'block', color: '#856404', marginBottom: '4px' }}>
+                <strong style={{ display: 'block', color: '#78350f', marginBottom: '4px' }}>
                   Account Verification in Progress
                 </strong>
-                <span style={{ fontSize: '14px', color: '#856404' }}>
-                  Your identity verification is currently in progress. To help you get started immediately, you are eligible for <strong>one trial swap of up to €{SANDBOX_LIMIT}</strong> until your KYC is fully approved.
+                <span style={{ fontSize: '13px', color: '#92400e' }}>
+                  You're eligible for one trial swap up to <strong>${SANDBOX_LIMIT_USD}</strong> while KYC is pending.
                 </span>
               </div>
             </div>
           )}
 
-          <p style={{ color: '#7f8c8d', marginBottom: '30px' }}>
-            Choose a match to proceed. Transaction speed is <strong>Instant</strong>.
-          </p>
+          {/* ── Error ── */}
+          {fetchError && (
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c',
+              borderRadius: '10px', padding: '16px 20px', marginBottom: '24px', fontSize: '14px',
+              display: 'flex', gap: '12px', alignItems: 'center',
+            }}>
+              <span>⚠️</span> {fetchError}
+              <button onClick={loadOffers} style={{
+                marginLeft: 'auto', background: '#fca5a5', border: 'none', padding: '6px 14px',
+                borderRadius: '6px', cursor: 'pointer', fontWeight: '600', color: '#7f1d1d', fontSize: '13px',
+              }}>
+                Retry
+              </button>
+            </div>
+          )}
 
-          {loading ? (
-            <div>Loading offers...</div>
-          ) : (
-            <div style={{ display: 'grid', gap: '15px' }}>
-              {offers.filter(o => o.currencyTo === 'ARS').map((offer) => {
-                const isExact = Math.abs(offer.amount - parseFloat(amountIntentQuery as string)) < 0.01;
+          {/* ── Loading ── */}
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px', animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</div>
+              <p style={{ fontWeight: '600' }}>Loading secure matches…</p>
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
 
-                // ES-AR Logic:
-                // Market Rate is EUR->ARS (e.g. 1050).
-                // Offer Amount is in ARS.
-                // Cost in EUR = Amount / Rate.
-                const costInEur = offer.offerAmount / offer.marketRate;
-                const eurEquivalent = offer.offerAmount / 1055; // Fixed check for limit
+          {/* ── Empty state ── */}
+          {!loading && !fetchError && offers.length === 0 && (
+            <div style={{
+              textAlign: 'center', padding: '60px 20px',
+              background: '#f8fafc', borderRadius: '16px', border: '2px dashed #cbd5e1',
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px' }}>🌐</div>
+              <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
+                No active offers for {currencyFrom} → {currencyTo}
+              </h3>
+              <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '28px', maxWidth: '380px', margin: '0 auto 28px' }}>
+                Be the first to post a {currencyFrom}→{currencyTo} offer.
+                Other verified users will be matched to yours automatically.
+              </p>
+              <button
+                onClick={() => setShowModal(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                  color: 'white', border: 'none', padding: '14px 32px',
+                  borderRadius: '12px', fontWeight: '700', fontSize: '15px',
+                  cursor: 'pointer', boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
+                }}
+              >
+                + Post an Offer
+              </button>
+            </div>
+          )}
 
-                // Sandbox Enforcement
-                const hasUsedTrial = isSandbox && txCount >= 1;
-                const isOverLimit = isSandbox && eurEquivalent > SANDBOX_LIMIT;
+          {/* ── Offer cards ── */}
+          {!loading && offers.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {offers.map((offer) => {
+                const amountInUsd = offer.currency_offered === 'USD'
+                  ? offer.amount_offered
+                  : offer.amount_offered / (offer.exchange_rate || 1);
 
-                // Lockout Logic
-                // If single swap used, EVERYTHING is view-only (disabled).
-                // If over limit, specific offer is disabled.
-                const isLocallyDisabled = isOverLimit;
-                const isGloballyLocked = hasUsedTrial;
-                const isDisabled = isGloballyLocked || isLocallyDisabled;
+                const isSandboxLocked  = isSandbox && txCount >= 1;
+                const isSandboxOverLimit = isSandbox && amountInUsd > SANDBOX_LIMIT_USD;
+                const isDisabled = isSandboxLocked || isSandboxOverLimit;
 
-                // Visual State
-                const opacity = isDisabled ? 0.4 : 1; // Updated to 0.4
-                const pointerEvents = isDisabled ? 'none' : 'auto';
-
-                // Tooltip & Badge Message
-                let badgeMsg = "";
-                let titleMsg = "";
-
-                if (isGloballyLocked) {
-                  titleMsg = "Trial completed. View Only.";
-                  badgeMsg = "Trial Completed - View Only";
-                } else if (isOverLimit) {
-                  titleMsg = `Trial Limit Reached: This swap exceeds your $200 limit.`;
-                  badgeMsg = "Trial Limit Exceeded";
-                }
+                let badgeText = '';
+                if (isSandboxLocked)    badgeText = 'Trial Used — View Only';
+                if (isSandboxOverLimit) badgeText = 'Above Trial Limit';
 
                 return (
                   <div
                     key={offer.id}
-                    title={titleMsg}
+                    id={`offer-card-${offer.id}`}
                     onClick={() => !isDisabled && handleSelectOffer(offer)}
                     style={{
-                      border: isExact ? '2px solid #4A90E2' : '1px solid #e1e8ed',
-                      borderRadius: '12px',
-                      padding: '20px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      border: isDisabled ? '1px solid #e2e8f0' : '1px solid #bfdbfe',
+                      borderRadius: '14px', padding: '22px 26px',
+                      display: 'flex', alignItems: 'center', gap: '20px',
                       cursor: isDisabled ? 'not-allowed' : 'pointer',
-                      backgroundColor: isDisabled ? '#f9f9f9' : (isExact ? '#f0f7ff' : 'white'),
-                      opacity: opacity,
-                      transition: 'transform 0.2s, box-shadow 0.2s',
-                      position: 'relative'
+                      background: isDisabled ? '#f8fafc' : 'white',
+                      opacity: isDisabled ? 0.5 : 1,
+                      transition: 'transform 0.15s, box-shadow 0.15s',
+                      position: 'relative',
                     }}
-                    onMouseEnter={(e) => {
-                      if (!isDisabled) {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 12px rgba(0,0,0,0.05)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isDisabled) {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }
-                    }}
+                    onMouseEnter={e => { if (!isDisabled) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(37,99,235,0.1)'; } }}
+                    onMouseLeave={e => { if (!isDisabled) { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; } }}
+                    title={badgeText}
                   >
-                    {/* Badge Overlay for Restricted Items */}
-                    {isDisabled && (
+                    {/* Sandbox badge */}
+                    {isDisabled && badgeText && (
                       <div style={{
-                        position: 'absolute',
-                        top: '-10px',
-                        right: '20px',
-                        backgroundColor: isGloballyLocked ? '#7f8c8d' : '#e74c3c',
-                        color: 'white',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        position: 'absolute', top: '-10px', right: '18px',
+                        background: isSandboxLocked ? '#64748b' : '#ef4444',
+                        color: 'white', fontSize: '10px', fontWeight: '800',
+                        padding: '3px 10px', borderRadius: '20px', textTransform: 'uppercase',
+                        letterSpacing: '0.6px',
                       }}>
-                        {badgeMsg}
+                        {badgeText}
                       </div>
                     )}
 
-                    {/* 1. Left: Provider Info */}
-                    <div style={{ flex: '0 0 25%' }}>
-                      <div style={{ fontWeight: '700', fontSize: '18px', color: '#2c3e50' }}>
-                        {offer.provider}
+                    {/* Left: ID + type */}
+                    <div style={{ flex: '0 0 22%' }}>
+                      <div style={{
+                        fontFamily: 'monospace', fontSize: '11px', color: '#94a3b8',
+                        marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px',
+                      }}>
+                        Offer
                       </div>
-                      <div style={{ fontSize: '14px', color: '#7f8c8d', marginTop: '4px' }}>
-                        Trust Score: {offer.trust} ⭐
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#1e293b', wordBreak: 'break-all' }}>
+                        {offer.id.slice(0, 8)}…
                       </div>
-                      {offer.isRound && (
-                        <div style={{
-                          marginTop: '5px',
-                          color: '#27ae60',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          backgroundColor: '#e8f5e9',
-                          display: 'inline-block',
-                          padding: '2px 8px',
-                          borderRadius: '4px'
-                        }}>
-                          Efficient Match ✨
+                      <div style={{
+                        marginTop: '6px', display: 'inline-block',
+                        fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px',
+                        background: offer.swap_type === 'IMMEDIATE' ? '#dbeafe' : '#f3e8ff',
+                        color:      offer.swap_type === 'IMMEDIATE' ? '#1d4ed8'  : '#7c3aed',
+                      }}>
+                        {offer.swap_type}
+                      </div>
+                    </div>
+
+                    {/* Center-left: They offer */}
+                    <div style={{ flex: '0 0 22%' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        They offer
+                      </div>
+                      <div style={{ fontWeight: '800', fontSize: '22px', color: '#0f172a' }}>
+                        {Number(offer.amount_offered).toLocaleString()} <span style={{ fontSize: '14px', color: '#64748b' }}>{offer.currency_offered}</span>
+                      </div>
+                    </div>
+
+                    {/* Center: Rate badge */}
+                    <div style={{ flex: '0 0 14%', textAlign: 'center' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        Rate
+                      </div>
+                      <div style={{
+                        fontWeight: '700', fontSize: '14px', color: '#374151',
+                        background: '#f1f5f9', padding: '4px 10px', borderRadius: '8px', display: 'inline-block',
+                      }}>
+                        {Number(offer.exchange_rate).toFixed(4)}
+                      </div>
+                    </div>
+
+                    {/* Center-right: You receive */}
+                    <div style={{ flex: '0 0 22%' }}>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+                        You receive
+                      </div>
+                      <div style={{ fontWeight: '800', fontSize: '22px', color: '#15803d' }}>
+                        {Number(offer.amount_wanted).toLocaleString()} <span style={{ fontSize: '14px', color: '#64748b' }}>{offer.currency_wanted}</span>
+                      </div>
+                    </div>
+
+                    {/* Right: Fee + arrow */}
+                    <div style={{ flex: '1', textAlign: 'right' }}>
+                      {offer.fee_total > 0 && (
+                        <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '6px' }}>
+                          Fee: {Number(offer.fee_total).toFixed(4)} {offer.currency_offered}
                         </div>
                       )}
-                    </div>
-
-                    {/* 2. Center-Left: Match Amount (ARS) */}
-                    <div style={{ flex: '0 0 20%', textAlign: 'left' }}>
-                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        You Get
+                      <div style={{
+                        color: isDisabled ? '#cbd5e1' : '#2563eb',
+                        fontSize: '26px', fontWeight: 'bold', lineHeight: 1,
+                      }}>
+                        →
                       </div>
-                      <div style={{ fontWeight: '700', fontSize: '20px', color: '#27ae60' }}>
-                        {offer.offerAmount.toLocaleString()} ARS
-                      </div>
-                    </div>
-
-                    {/* 3. Center: Rate (The Bridge) */}
-                    <div style={{ flex: '0 0 15%', textAlign: 'center' }}>
-                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        ARS/EUR
-                      </div>
-                      <div style={{ fontWeight: '600', fontSize: '16px', color: '#34495e', backgroundColor: '#ecf0f1', padding: '4px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                        {offer.marketRate.toFixed(2)}
-                      </div>
-                    </div>
-
-                    {/* 4. Center-Right: Cost (EUR) */}
-                    <div style={{ flex: '0 0 20%', textAlign: 'right' }}>
-                      <div style={{ fontSize: '12px', color: '#95a5a6', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        You Swap
-                      </div>
-                      <div style={{ fontWeight: '700', fontSize: '18px', color: '#2c3e50' }}>
-                        €{costInEur.toFixed(2)}
-                      </div>
-                      {isOverLimit && (
-                        <div style={{ fontSize: '11px', color: '#e74c3c', marginTop: '2px', fontWeight: 'bold' }}>
-                          Above Trial Limit
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 5. Right: Action Arrow */}
-                    <div style={{
-                      flex: '0 0 10%',
-                      textAlign: 'right',
-                      color: isDisabled ? '#bdc3c7' : '#4A90E2',
-                      fontWeight: 'bold',
-                      fontSize: '24px'
-                    }}>
-                      &rarr;
                     </div>
                   </div>
                 );
               })}
-            </div >
+            </div>
           )}
-        </div >
-      </main >
-    </div >
+        </div>
+      </main>
+    </div>
   );
 }

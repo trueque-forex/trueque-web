@@ -1,0 +1,21 @@
+{
+    "name": "Symmetri",
+    "short_name": "Symmetri",
+    "description": "To streamline the path to global financial balance by providing technical symmetry and absolute parity, in a highly efficient, profitable platform.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#000000",
+    "icons": [
+        {
+            "src": "/branding/logo-rounded.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "/branding/logo-rounded.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }
+    ]
+}

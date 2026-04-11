@@ -1,91 +1,109 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { transaction } from '../../../lib/db'; // We use the transaction helper from your DB library
+import { transaction } from '../../../lib/db';
+import { withAuth } from '../../../lib/withAuth';
+import { TruequeSession } from '../../../types/auth';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+const SYMMETRI_SWAP_FEE_PCT = 0.015; // 1.5% per side — GEMINI.md §3.2
+
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { offer_id, taker_id } = req.body;
+  const session = (req as any).session as TruequeSession;
+  const takerId = session.user.id; // taker identity from JWT — never from req.body
 
-  if (!offer_id || !taker_id) {
-    return res.status(400).json({ error: 'Missing offer_id or taker_id' });
+  const { offer_id } = req.body;
+  if (!offer_id) {
+    return res.status(400).json({ error: 'Missing offer_id' });
   }
 
   try {
-    // We wrap everything in a transaction to prevent "Race Conditions"
-    // (e.g., two users trying to accept the same offer at the same millisecond)
-    const matchResult = await transaction(async (client) => {
-      
-      // 1. Lock the Offer
-      // "FOR UPDATE" tells Postgres: "Don't let anyone else touch this row until I'm done."
-      const offerQuery = await client.query(
+    const { match, trade } = await transaction(async (client) => {
+      // 1. Lock the offer row — prevents race conditions
+      const offerRes = await client.query(
         `SELECT * FROM offers WHERE id = $1 FOR UPDATE`,
         [offer_id]
       );
-      const offer = offerQuery.rows[0];
+      const offer = offerRes.rows[0];
 
-      if (!offer) {
-        throw new Error('Offer not found');
-      }
+      if (!offer) throw new Error('Offer not found');
+      if (offer.status !== 'OPEN') throw new Error(`Offer is no longer available (status: ${offer.status})`);
+      if (offer.owner_id === takerId) throw new Error('You cannot accept your own offer.');
 
-      // 2. Validation Checks
-      if (offer.status !== 'OPEN') {
-        throw new Error(`Offer is no longer available (Status: ${offer.status})`);
-      }
+      const makerId = offer.owner_id;
 
-      if (offer.user_id === taker_id) {
-        throw new Error('You cannot accept your own offer.');
-      }
-
-      // 3. Create the Match Record
-      // We copy the rates from the offer to "lock them in" at the moment of the handshake
-      const insertMatchSql = `
-        INSERT INTO matches (
-          offer_id,
-          taker_id,
-          final_rate,
-          final_amount_offered,
-          final_amount_wanted,
-          status
-        )
-        VALUES ($1, $2, $3, $4, $5, 'PENDING_SETTLEMENT')
-        RETURNING *;
-      `;
-      
-      const matchRes = await client.query(insertMatchSql, [
-        offer.id,
-        taker_id,
-        offer.exchange_rate,
-        offer.amount_offered,
-        offer.amount_wanted
-      ]);
-      const newMatch = matchRes.rows[0];
-
-      // 4. Close the Offer
-      await client.query(
-        `UPDATE offers SET status = 'MATCHED' WHERE id = $1`,
-        [offer_id]
+      // 2. Calculate 1.5% Symmetri fee on the taker's principal (amount_wanted = what taker pays)
+      const symmetriSwapFee = parseFloat(
+        (parseFloat(offer.amount_wanted) * SYMMETRI_SWAP_FEE_PCT).toFixed(4)
       );
 
-      return newMatch;
+      // 3. Create match record — rates locked at handshake moment
+      const matchRes = await client.query(
+        `INSERT INTO matches (
+          offer_id, maker_id, taker_id,
+          final_rate, final_amount_offered, final_amount_wanted,
+          symmetri_swap_fee, status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'PENDING_SETTLEMENT')
+        RETURNING *`,
+        [
+          offer.id,
+          makerId,
+          takerId,
+          offer.exchange_rate,
+          offer.amount_offered,
+          offer.amount_wanted,
+          symmetriSwapFee,
+        ]
+      );
+      const newMatch = matchRes.rows[0];
+
+      // 4. Close the offer so no one else can take it
+      await client.query(`UPDATE offers SET status = 'MATCHED', updated_at = NOW() WHERE id = $1`, [offer_id]);
+
+      // 5. Create the Trade record (the settled view used by Trade Room)
+      const totalToPay = parseFloat(offer.amount_wanted) + symmetriSwapFee;
+      const tradeRes = await client.query(
+        `INSERT INTO trades (
+          match_id, maker_id, taker_id,
+          amount, sent_currency,
+          received_amount, received_currency,
+          final_rate, symmetri_swap_fee,
+          total_fees, total_to_pay,
+          payment_instructions, type, status
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'DIRECT', 'PENDING_SETTLEMENT')
+        RETURNING *`,
+        [
+          newMatch.id,
+          makerId,
+          takerId,
+          offer.amount_wanted,              // taker sends this
+          offer.currency_wanted,             // taker's send currency
+          offer.amount_offered,              // taker receives this
+          offer.currency_offered,            // taker's receive currency
+          offer.exchange_rate,
+          symmetriSwapFee,
+          symmetriSwapFee,                   // total_fees = symmetri fee (rail fee added by gateway later)
+          totalToPay.toFixed(4),
+          JSON.stringify({
+            rail: 'RTP',
+            concept_code: `TRQ-${newMatch.id.slice(0, 8).toUpperCase()}`,
+            reference: `Symmetri swap ${newMatch.id}`,
+          }),
+        ]
+      );
+
+      return { match: newMatch, trade: tradeRes.rows[0] };
     });
 
-    // 5. Success
-    return res.status(201).json({
-      success: true,
-      match: matchResult
-    });
-
+    return res.status(201).json({ success: true, match, trade });
   } catch (err: any) {
-    console.error('Match Error:', err);
-    return res.status(400).json({ 
-      success: false, 
-      error: err.message || 'Failed to create match' 
-    });
+    console.error('[matches/create] Error:', err);
+    return res.status(400).json({ success: false, error: err.message || 'Failed to create match' });
   }
 }
+
+export default withAuth(handler);

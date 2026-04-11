@@ -49,5 +49,19 @@ export const MarketMap: Record<string, MarketConfig> = {
         length: 20,
         type: 'numeric',
         placeholder: '0011-...'
-    }
+    },
+    'GTQ': {
+        country: 'Guatemala',
+        label: 'Account Number',
+        length: 16,         // variable by bank — 16 is a common length
+        type: 'numeric',
+        placeholder: 'Your bank account number'
+    },
+    'DOP': {
+        country: 'Dominican Republic',
+        label: 'Account Number',
+        length: 16,
+        type: 'numeric',
+        placeholder: 'Your bank account number'
+    },
 };

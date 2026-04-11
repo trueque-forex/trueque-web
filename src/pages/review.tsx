@@ -73,7 +73,6 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
 // CONFIGURATION
 // ----------------------
 const GATEWAY_PROCESSING_COST = 2.50;
-const RETAILER_VOUCHER_FEE = 2.00; // Mock Retailer Fee
 
 // Card Specifics
 const CARD_DEBIT_INBOUND_PCT = 0.015;
@@ -147,7 +146,7 @@ export default function ReviewPage() {
     if (typeof window !== 'undefined') {
       try {
         const s = JSON.parse(localStorage.getItem('trueque_swap_state_persistent') || 'null');
-        if (s) return { amount: parseFloat(s.amount), currencyTo: (s.currencyTo || '').split('-')[1] }; // Partial map
+        if (s) return { amount: parseFloat(s.amount), target_currency: (s.target_currency || '').split('-')[1] }; // Partial map
       } catch { }
     }
     return {};
@@ -181,7 +180,6 @@ export default function ReviewPage() {
     liquidityFee: 0,
     gatewayFee: 0,
     outboundFee: 0,
-    retailerFee: 0,
     platformFee: 0,
     appliedTaxes: [] as { label: string, amountSource: number }[],
     totalFeesSource: 0,
@@ -194,8 +192,8 @@ export default function ReviewPage() {
   useEffect(() => {
     // 1. Resolve Principal
     const amount = effectiveSwapIntent?.amount || parseFloat(router.query.amountIntent as string) || 0;
-    const rate = effectiveSwapIntent?.rate || parseFloat(router.query.rate as string) || 1050.00;
-    const toCurrency = (effectiveSwapIntent?.currencyTo || qTo || 'ARS') as string;
+    const rate = effectiveSwapIntent?.exchange_rate || parseFloat(router.query.rate as string) || 1050.00;
+    const toCurrency = (effectiveSwapIntent?.target_currency || qTo || 'ARS') as string;
 
     if (!amount || !rate) return;
 
@@ -218,7 +216,6 @@ export default function ReviewPage() {
     const isCard = payMethod?.type === 'CARD';
     const isCredit = isCard && payMethod?.cardType === 'credit';
     const deliveryMethod = effectiveBeneficiary?.banking?.deliveryMethod || 'bank_rtp';
-    const isVoucher = effectiveSwapIntent?.offerType === 'retail_voucher' || effectiveSwapIntent?.offerType === 'merchant_voucher';
 
     // 3. Calculate ADDITIVE Fees (Fuel) -> All in EUR
     let inboundPctFee = 0;
@@ -250,15 +247,6 @@ export default function ReviewPage() {
     if (deliveryMethod === 'card_push') outboundFee = principalSource * 0.015;
     else if (deliveryMethod === 'wallet') outboundFee = 0.50;
 
-    // VOUCHER LOGIC
-    let retailerFee = 0;
-    if (isVoucher) {
-      outboundFee = 0; // Disable outbound for vouchers
-      // If Merchant Voucher, maybe fee is different? For now assume same RETAILER_VOUCHER_FEE check.
-      // Or we can differentiate: if (swapIntent.offerType === 'merchant_voucher') ...
-      retailerFee = RETAILER_VOUCHER_FEE;
-    }
-
     // D. COMPLIANCE ENGINE (Dynamic Taxes)
     // FORCE UPDATE: Rename and Ensure 0.6% for ARS
     if (toCurrency === 'ARS') {
@@ -281,8 +269,8 @@ export default function ReviewPage() {
 
     const matchTaxesTotal = appliedTaxes.reduce((acc, t) => acc + t.amountSource, 0);
 
-    // Total Fees = (Inbound % + Card Fixed) + Liquidity + Gateway + Platform + (Outbound OR Retailer) + Taxes
-    const totalFeesSource = inboundPctFee + cardFixedFee + liquidityFee + gatewayFee + outboundFee + retailerFee + platformFee + matchTaxesTotal;
+    // Total Fees = (Inbound % + Card Fixed) + Liquidity + Gateway + Platform + Outbound + Taxes
+    const totalFeesSource = inboundPctFee + cardFixedFee + liquidityFee + gatewayFee + outboundFee + platformFee + matchTaxesTotal;
     const totalToPaySource = principalSource + totalFeesSource;
 
     setBreakdown({
@@ -292,7 +280,6 @@ export default function ReviewPage() {
       liquidityFee,
       gatewayFee,
       outboundFee,
-      retailerFee,
       platformFee,
       appliedTaxes,
       totalFeesSource,
@@ -354,8 +341,8 @@ export default function ReviewPage() {
 
       const payload = {
         amount: breakdown.totalToPaySource,
-        currencyFrom: 'EUR',
-        currencyTo: swapIntent?.currencyTo || qTo,
+        source_currency: 'EUR',
+        target_currency: swapIntent?.target_currency || qTo,
         beneficiaryId: effectiveBeneficiary?.id,
         provider: swapIntent?.provider
       };
@@ -390,7 +377,7 @@ export default function ReviewPage() {
           currency: 'EUR',
           tid: brandedId,
           amountReceive: breakdown.grossReceive.toFixed(2),
-          currencyTo: swapIntent?.currencyTo || qTo,
+          target_currency: swapIntent?.target_currency || qTo,
           methodType: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
           init: 'true'
         }
@@ -433,13 +420,23 @@ export default function ReviewPage() {
     // }
   };
 
-  const handleVerifyMFA = () => {
+  const handleVerifyMFA = async () => {
     const fullCode = mfaCode.join('');
-    if (fullCode === '123456') {
-      setShowMFA(false);
-      processSwap();
-    } else {
-      setMfaError('Invalid code. Try 123456');
+    try {
+      const res = await fetch('/api/auth/verify-mfa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: fullCode }),
+      });
+      const data = await res.json();
+      if (data.ok && data.verified) {
+        setShowMFA(false);
+        processSwap();
+      } else {
+        setMfaError('Invalid code. Please check and try again.');
+      }
+    } catch {
+      setMfaError('Verification failed. Please try again.');
     }
   };
 
@@ -449,7 +446,7 @@ export default function ReviewPage() {
     return <option key={method.id} value={method.id} disabled={method.isExpired}>{method.label} {method.isExpired ? '(Expired)' : ''}</option>;
   };
 
-  const isVoucher = swapIntent?.offerType === 'retail_voucher' || swapIntent?.offerType === 'merchant_voucher';
+  // Styles
 
   // Styles
   const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#57606f' };
@@ -508,11 +505,9 @@ export default function ReviewPage() {
               {/* SACRED RECEIVE */}
               <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '20px', color: '#27ae60' }}>
                 <span style={{ fontWeight: '600' }}>
-                  {isVoucher ?
-                    (swapIntent?.offerType === 'merchant_voucher' ? 'Sacred Merchant Value' : 'Sacred Voucher Value')
-                    : 'Beneficiary Receives (Sacred)'}
+                  Beneficiary Receives (Sacred)
                 </span>
-                <span style={{ fontWeight: '800' }}>{currencyFmt(breakdown.grossReceive)} {swapIntent?.currencyTo || 'ARS'}</span>
+                <span style={{ fontWeight: '800' }}>{currencyFmt(breakdown.grossReceive)} {swapIntent?.target_currency || qTo || 'ARS'}</span>
               </div>
 
               <div style={{ borderTop: '1px solid #eee', margin: '15px 0' }}></div>
@@ -552,19 +547,10 @@ export default function ReviewPage() {
                 <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.platformFee)}</span>
               </div>
 
-              {/* Conditional Outbound vs Retailer */}
-              {!isVoucher && (
                 <div style={rowStyle}>
                   <span>Outbound Fuel (Delivery) <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
                   <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.outboundFee)}</span>
                 </div>
-              )}
-              {isVoucher && (
-                <div style={rowStyle}>
-                  <span>Retailer Activation <Tooltip text="Merchant processing fee" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.retailerFee)}</span>
-                </div>
-              )}
 
               {/* DYNAMIC COMPLIANCE TAXES */}
               {breakdown.appliedTaxes.map((tax, i) => (
@@ -595,7 +581,7 @@ export default function ReviewPage() {
             </div>
 
             <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', fontSize: '1.1rem', fontWeight: '700', color: '#2c3e50', border: '1px solid #dcdde1', textAlign: 'center' }}>
-              Effective Rate: 1 EUR = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.currencyTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(includes all friction)</span>
+              Effective Rate: 1 EUR = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(includes all friction)</span>
             </div>
 
             {/* FOOTER ACTIONS - EXACT HARMONY WITH BENEFICIARY.TSX */}

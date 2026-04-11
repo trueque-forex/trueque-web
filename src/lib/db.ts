@@ -128,7 +128,7 @@ export const query = async (text: string, params?: any[]) => {
 
 export const transaction = async <T>(callback: (client: any) => Promise<T>): Promise<T> => {
   const pool = getPool();
-  const client = await pool.connect();
+  const client = await (pool as any).connect();
   try {
     await client.query('BEGIN');
     const result = await callback(client);

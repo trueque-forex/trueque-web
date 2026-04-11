@@ -3,8 +3,10 @@ import FeeBreakdown from './FeeBreakdown'
 import FallbackNotice from './FallbackNotice'
 
 type Offer = {
+  id: string
   offerAmount: number
-  userId: string
+  owner_id: string
+  exchange_rate: number
   fee?: number
 }
 

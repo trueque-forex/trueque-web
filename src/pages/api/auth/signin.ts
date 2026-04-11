@@ -38,23 +38,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
 
-    // 4. MAP USER TO UI (Single Source of Truth)
+    // 4. MAP USER TO UI
     const mappedUser = mapUserToUI(user);
+    if (!mappedUser) {
+      return res.status(500).json({ error: 'Failed to map user profile' });
+    }
 
-    // 5. CREATE "HALF-SESSION" (MFA Pending)
-    // The Middleware will see mfaVerified: false and force /verify-mfa.
+    // 5. CHECK MFA REQUIREMENT
+    // If mfa_enabled is false (test accounts, or users who haven't enrolled MFA),
+    // skip MFA entirely and create a fully-verified session.
+    if (!user.mfa_enabled) {
+      const sessionToken = await createSession(mappedUser, true); // mfaVerified = true
+      setSessionCookie(res, sessionToken);
+      return res.status(200).json({
+        success: true,
+        message: 'Signed in successfully.',
+        requireMfa: false,
+        mfa_required: false,
+      });
+    }
+
+    // 6. MFA REQUIRED — create half-session and send code
     const sessionToken = await createSession(mappedUser, false);
     setSessionCookie(res, sessionToken);
-
-    // 6. GENERATE MFA CODE
     await generateMfaToken(mappedUser.email);
 
-    // 7. SUCCESS
     return res.status(200).json({
       success: true,
       message: 'Credentials valid. Please verify MFA.',
       requireMfa: true,
-      mfa_required: true // Frontend expects this flag
+      mfa_required: true,
     });
 
   } catch (error: any) {

@@ -9,7 +9,8 @@ interface ProfileProps {
     user: {
         userId: string;
         email: string;
-        name: string;
+        firstName: string;
+        lastName: string;
         kycStatus: string;
         trustScore?: number;
         kycLevel?: string;
@@ -29,14 +30,15 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     }
 
     // Normalize User Data
+    const sessionUser = session.user || {};
     const user = {
-        userId: session.userId || session.truequeId || 'UNKNOWN_ID',
-        email: session.email || 'unknown@example.com',
-        name: session.name || session.firstName || 'Symmetri User',
-        kycStatus: (session.kycStatus || 'PENDING').toUpperCase(),
-        // Mock Trust Score/Level if not in session, as standard
-        trustScore: session.trustScore || 85,
-        kycLevel: session.kycLevel || 'Tier 1'
+        userId: sessionUser.id || sessionUser.tid || 'UNKNOWN_ID',
+        email: sessionUser.email || 'unknown@example.com',
+        firstName: sessionUser.firstName || 'Symmetri',
+        lastName: sessionUser.lastName || 'User',
+        kycStatus: (sessionUser.kycStatus || 'PENDING').toUpperCase(),
+        trustScore: 85,
+        kycLevel: 'Tier 1'
     };
 
     return {
@@ -92,10 +94,10 @@ export default function ProfilePage({ user }: ProfileProps) {
                                 backgroundColor: '#3498db', color: 'white', fontSize: '28px',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
                             }}>
-                                {user.name.charAt(0).toUpperCase()}
+                                {user.firstName.charAt(0).toUpperCase()}
                             </div>
                             <div>
-                                <h2 style={{ margin: 0, fontSize: '24px', color: '#2c3e50' }}>{user.name}</h2>
+                                <h2 style={{ margin: 0, fontSize: '24px', color: '#2c3e50' }}>{user.firstName} {user.lastName}</h2>
                                 <div style={{ color: '#7f8c8d', fontSize: '15px' }}>{user.email}</div>
                             </div>
                             <div style={{

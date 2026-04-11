@@ -16,7 +16,7 @@ export default function getPool(): Pool {
  */
 export async function query<T = any>(text: string, params?: any[]) {
   const p = getPool();
-  return p.query<T>(text, params);
+  return (p.query as any)(text, params);
 }
 
 /**
@@ -26,7 +26,7 @@ export async function query<T = any>(text: string, params?: any[]) {
  */
 export async function transaction<T>(cb: (client: any) => Promise<T>): Promise<T> {
   const p = getPool();
-  const client = await p.connect();
+  const client = await (p as any).connect();
   try {
     await client.query("BEGIN");
     const result = await cb(client);

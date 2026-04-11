@@ -51,6 +51,7 @@ export default function TrackTransactionPage() {
                 // We'll fake a status based on how long user has been on this page for the demo?
                 // Or just show Completed if it is completed.
 
+                if (!json) return;
                 setTx(json);
 
                 // Build logs based on status

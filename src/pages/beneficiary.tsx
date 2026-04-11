@@ -114,7 +114,7 @@ export default function BeneficiaryPage() {
 
   // 4. User & Country Context
   const getDestinationCountry = () => {
-    const to = (swapIntent?.currencyTo || router.query.to || 'ARS').toString().toUpperCase();
+    const to = (swapIntent?.target_currency || router.query.to || 'ARS').toString().toUpperCase();
     if (to === 'ARS') return 'AR';
     if (to === 'EUR') return 'EU';
     if (to === 'MXN') return 'MX';
@@ -122,6 +122,7 @@ export default function BeneficiaryPage() {
     if (to === 'USD') return 'US';
     if (to === 'VES') return 'VE';
     if (to === 'DOP') return 'DO';
+    if (to === 'GTQ') return 'GT';   // Guatemala — Phase 1 market
     if (to === 'PEN') return 'PE';
     if (to === 'COP') return 'CO';
     return 'US'; // Default
@@ -359,6 +360,13 @@ export default function BeneficiaryPage() {
         if (!bankName) newErrors.bankName = 'Select a bank';
         if (!PATTERNS.VE_BANK.test(accountNumber || '')) newErrors.accountNumber = 'Account must be 20 digits';
         if (!idNumber) newErrors.idNumber = 'ID Number (Cédula) required';
+      } else if (destCountry === 'GT') {
+        // Guatemala: account number (no standardized length) + bank name + DPI (13 digits)
+        if (!bankName) newErrors.bankName = 'Please enter the bank name';
+        if (!accountNumber) newErrors.accountNumber = 'Account number is required';
+        if (!idNumber || !/^\d{13}$/.test(idNumber.replace(/[\s-]/g, ''))) {
+          newErrors.idNumber = 'DPI must be 13 digits';
+        }
       } else if (destCountry === 'DO') {
         if (!accountNumber) newErrors.accountNumber = 'Account number required';
         if (!idNumber) newErrors.idNumber = 'Cédula/RNC required';
@@ -440,6 +448,10 @@ export default function BeneficiaryPage() {
         } else if (destCountry === 'VE') {
           identifiers.account_number = banking.accountNumber;
           identifiers.id_number = banking.idNumber;
+        } else if (destCountry === 'GT') {
+          identifiers.bank_name      = banking.bankName;
+          identifiers.account_number = banking.accountNumber;
+          identifiers.id_number      = banking.idNumber; // DPI
         } else if (destCountry === 'DO') {
           identifiers.account_number = banking.accountNumber;
           identifiers.id_number = banking.idNumber;
@@ -922,6 +934,8 @@ export default function BeneficiaryPage() {
                         <option value="+1">🇺🇸 +1</option>
                         <option value="+54">🇦🇷 +54</option>
                         <option value="+52">🇲🇽 +52</option>
+                        <option value="+502">🇬🇹 +502</option>
+                        <option value="+1-809">🇩🇴 +1-809</option>
                         <option value="+55">🇧🇷 +55</option>
                         <option value="+57">🇨🇴 +57</option>
                         <option value="+34">🇪🇸 +34</option>
@@ -1155,7 +1169,7 @@ export default function BeneficiaryPage() {
                               <InputGroup label="Account Number" error={errors.accountNumber}>
                                 <input style={inputStyle} value={contextForm.banking.accountNumber || ''} onChange={(e) => handleBankingChange('accountNumber', e.target.value)} placeholder="Account Number" />
                               </InputGroup>
-                              <InputGroup label="ID Number (Cédula/RNC)" error={errors.idNumber}>
+                              <InputGroup label="National ID (Cédula / RNC)" error={errors.idNumber}>
                                 <input style={inputStyle} value={contextForm.banking.idNumber || ''} onChange={(e) => handleBankingChange('idNumber', e.target.value)} placeholder="001-0000000-0" />
                               </InputGroup>
                               <InputGroup label="Account Type">
@@ -1167,7 +1181,47 @@ export default function BeneficiaryPage() {
                             </>
                           )}
 
-                          {/* PERU */}
+                          {/* GUATEMALA */}
+                          {destCountry === 'GT' && (
+                            <>
+                              <InputGroup label="Bank Name" error={errors.bankName}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.bankName || ''}
+                                  onChange={(e) => handleBankingChange('bankName', e.target.value)}
+                                  placeholder="e.g. Banrural, Banco Industrial, BAC"
+                                />
+                              </InputGroup>
+                              <InputGroup label="Account Number" error={errors.accountNumber}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.accountNumber || ''}
+                                  onChange={(e) => handleBankingChange('accountNumber', e.target.value)}
+                                  placeholder="Your bank account number"
+                                />
+                              </InputGroup>
+                              <InputGroup label="Account Type">
+                                <select style={inputStyle} value={contextForm.banking.accountType} onChange={(e) => handleBankingChange('accountType', e.target.value)}>
+                                  <option value="savings">Savings (Ahorro)</option>
+                                  <option value="checking">Checking (Monetaria)</option>
+                                </select>
+                              </InputGroup>
+                              <InputGroup label="National ID (DPI — 13 digits)" error={errors.idNumber}>
+                                <input
+                                  style={inputStyle}
+                                  value={contextForm.banking.idNumber || ''}
+                                  onChange={(e) => handleBankingChange('idNumber', e.target.value.replace(/[^\d]/g, ''))}
+                                  placeholder="0000 00000 0101"
+                                  maxLength={13}
+                                />
+                                <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                                  DPI = Documento Personal de Identificación, issued by RENAP. 13 digits on your ID card.
+                                </div>
+                              </InputGroup>
+                            </>
+                          )}
+
+
                           {destCountry === 'PE' && (
                             <>
                               <InputGroup label="CCI (20 Digits)" error={errors.cci}>

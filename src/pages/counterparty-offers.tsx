@@ -84,12 +84,12 @@ export default function CounterpartyOffers() {
         }
 
         // Update Intent with Provider
-        setSwapIntent(prev => ({
-            ...prev!,
+        setSwapIntent({
+            ...swapIntent!,
             provider: offer.provider,
             rate: offer.marketRate,
             amount: offer.offerAmount // Lock to offer amount if slightly different
-        }));
+        });
 
         router.push('/review');
     };
