@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 import { describe, it, expect } from 'vitest';
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 import { fetchAuditLogs } from '../auditService';
 
 describe('fetchAuditLogs', () => {
@@ -19,8 +16,5 @@ describe('fetchAuditLogs', () => {
     const badCorridor = '';
     await expect(fetchAuditLogs(badCorridor, userId, location)).rejects.toThrow();
   });
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+

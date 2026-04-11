@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Numeric
 from backend.database import Base
 from datetime import datetime
 
@@ -10,8 +10,8 @@ class AuditLog(Base):
     matched_offer_id = Column(Integer, nullable=True)
     user_id = Column(Integer, nullable=False)
     counterparty_id = Column(Integer, nullable=True)
-    market_rate = Column(Float, nullable=False)
-    amount = Column(Float, nullable=False)
+    market_rate = Column(Numeric(18, 6), nullable=False)
+    amount = Column(Numeric(18, 6), nullable=False)
     currency_from = Column(String, nullable=False)
     currency_to = Column(String, nullable=False)
     country = Column(String, nullable=False)

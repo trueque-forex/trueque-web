@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 import { describe, it, expect } from 'vitest';
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 import { acknowledgeFallback } from '../fallbackService';
 
 describe('acknowledgeFallback', () => {
@@ -18,8 +15,5 @@ describe('acknowledgeFallback', () => {
   it('logs error on failure', async () => {
     await expect(acknowledgeFallback('', userId, corridor, location)).rejects.toThrow();
   });
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 // src/pages/offers/create.tsx
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
@@ -53,42 +52,3 @@ export default function CreateOfferPage() {
     </main>
   );
 }
-=======
-// src/pages/api/offers/create.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { withAuth } from '@/lib/withAuth';
-
-async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).end();
-  const session = (req as any).session as { userId: string };
-
-  try {
-    const { amount, rate } = JSON.parse(req.body || '{}');
-
-    if (!amount || Number.isNaN(Number(amount))) {
-      return res.status(400).json({ error: 'invalid_amount' });
-    }
-
-    // For now, if rate is null the server may apply market rate later.
-    const parsedAmount = Number(amount);
-    const parsedRate = rate == null ? null : Number(rate);
-
-    // TODO: persist offer in DB and validate maker permissions/KYC if required.
-    const offerId = `offer_${Date.now()}`;
-    const createdAt = new Date().toISOString();
-
-    // Return minimal payload for client navigation and confirmation.
-    return res.status(201).json({
-      offerId,
-      owner: session.userId,
-      amount: parsedAmount,
-      rate: parsedRate,
-      createdAt,
-    });
-  } catch (err: any) {
-    return res.status(500).json({ error: 'internal_error', message: err?.message || String(err) });
-  }
-}
-
-export default withAuth(handler);
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

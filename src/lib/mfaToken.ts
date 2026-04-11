@@ -1,51 +1,60 @@
-// lib/mfaToken.ts
-// DEV / TEST implementation for MFA pending tokens.
-//
-// Behavior (dev):
-// - createMfaPendingToken({ userId, tid }) returns a short opaque token string.
-// - Tokens are stored in an in-memory map (global.__DEV_MFA_PENDING) for lookup during challenge verification.
-// - This is intentionally simple for local testing. Replace with a signed JWT or DB-backed persistent token before production.
+// src/lib/mfaToken.ts
 
-import { v4 as uuidv4 } from 'uuid';
+// 1. IN-MEMORY STORAGE (The "Vault")
+// We use a global Map so codes survive "hot-reloads" while you are coding.
+// This acts as our temporary Redis.
+const globalMfaStore = global as unknown as { mfaStore: Map<string, { code: string; expires: number }> };
+if (!globalMfaStore.mfaStore) {
+  globalMfaStore.mfaStore = new Map();
+}
 
-type CreateMfaArgs = { userId: string; tid?: string; expiresInSeconds?: number };
+/**
+ * GENERATE TOKEN
+ * Creates a 6-digit code and stores it for 10 minutes.
+ */
+export async function generateMfaToken(email: string): Promise<string> {
+  // Generate random 6-digit string
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
 
-const DEFAULT_EXPIRES = 5 * 60; // 5 minutes
+  // Set expiration (10 minutes from now)
+  const expires = Date.now() + 10 * 60 * 1000;
 
-export function createMfaPendingToken({ userId, tid, expiresInSeconds }: CreateMfaArgs): string {
-  const token = uuidv4(); // opaque token for dev
-  const expiresAt = Date.now() + 1000 * (expiresInSeconds || DEFAULT_EXPIRES);
+  // Store it in memory
+  globalMfaStore.mfaStore.set(email, { code: token, expires });
 
-  const entry = { token, userId, tid: tid || null, createdAt: Date.now(), expiresAt };
-
-  const g: any = global;
-  if (!g.__DEV_MFA_PENDING) g.__DEV_MFA_PENDING = new Map<string, any>();
-  g.__DEV_MFA_PENDING.set(token, entry);
-
-  // For convenience in dev, also log the mapping (remove in prod)
-  if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line no-console
-    console.log('DEV MFA PENDING CREATED', { token, userId, tid, expiresAt });
-  }
+  // === CRITICAL FOR DEV ===
+  // This prints the code to your terminal so you can see it!
+  console.log(`\n=============================================`);
+  console.log(`🔐 MFA CODE FOR ${email}: ${token}`);
+  console.log(`=============================================\n`);
 
   return token;
 }
 
-// Helper for verifying token in dev. Returns stored entry or null.
-export function verifyMfaPendingToken(token: string) {
-  const g: any = global;
-  const map: Map<string, any> | undefined = g.__DEV_MFA_PENDING;
-  if (!map) return null;
-  const entry = map.get(token);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    map.delete(token);
-    return null;
-  }
-  return entry;
-}
+/**
+ * VERIFY TOKEN
+ * Checks if the code matches and is valid.
+ */
+export async function verifyMfaToken(email: string, code: string): Promise<boolean> {
+  // Check against the stored record
 
-// DEV -> PROD migration notes:
-// - Replace createMfaPendingToken with a secure, signed JWT or a DB row in mfa_attempts/mfa_pending table.
-// - Ensure the token encodes/associates the canonical tid and persists it in audit tables.
-// - Do not use in-memory storage in production. Use a persistent store (DB or redis) and rotate signing keys.
+  const record = globalMfaStore.mfaStore.get(email);
+
+  // 1. Check if record exists
+  if (!record) return false;
+
+  // 2. Check for expiration
+  if (Date.now() > record.expires) {
+    globalMfaStore.mfaStore.delete(email); // Cleanup expired tokens
+    return false;
+  }
+
+  // 3. Check for match
+  if (record.code !== code) {
+    return false;
+  }
+
+  // 4. Success! Delete the code so it can't be used again (Security)
+  globalMfaStore.mfaStore.delete(email);
+  return true;
+}

@@ -107,7 +107,7 @@ export default function KYCForm({ onSubmitted }: KycFormProps) {
       </button>
 
       <p className="mt-4 text-xs text-gray-500 italic">
-        Trueque verifies identity to comply with regulations. Your documents are stored securely and access is restricted.
+        Symmetri verifies identity to comply with regulations. Your documents are stored securely and access is restricted.
       </p>
     </form>
   );

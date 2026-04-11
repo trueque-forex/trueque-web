@@ -1,0 +1,241 @@
+{
+    "global_facillitation_fee": 1.50,
+    "liquidity_buffer_pct": 0.001,
+    "sacred_payout_policy": "STRICT_ZERO_DEDUCTION",
+    "countries": {
+        "ES": {
+            "name": "Spain",
+            "currency": "EUR",
+            "tax_rate_on_fees": 0.21,
+            "inbound_gateways": {
+                "rtp_bizum": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "Bizum (Social Option)"
+                },
+                "debit_card": {
+                    "pct": 0.018,
+                    "fixed": 0.25,
+                    "label": "Standard Debit"
+                },
+                "credit_card": {
+                    "pct": 0.029,
+                    "fixed": 0.30,
+                    "label": "Credit Card"
+                }
+            },
+            "outbound_rails": {
+                "sepa_instant": {
+                    "cost": 0.00,
+                    "label": "SEPA Instant"
+                },
+                "visa_direct": {
+                    "cost": 1.25,
+                    "label": "Instant Card Payout"
+                }
+            }
+        },
+        "PT": {
+            "name": "Portugal",
+            "currency": "EUR",
+            "tax_rate_on_fees": 0.23,
+            "inbound_gateways": {
+                "mb_way": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "MB WAY (Social Option)"
+                },
+                "debit_card": {
+                    "pct": 0.018,
+                    "fixed": 0.25,
+                    "label": "Debit Card"
+                }
+            },
+            "outbound_rails": {
+                "sepa_instant": {
+                    "cost": 0.00,
+                    "label": "SEPA Instant"
+                },
+                "visa_direct": {
+                    "cost": 1.25,
+                    "label": "Instant Card Payout"
+                }
+            }
+        },
+        "AR": {
+            "name": "Argentina",
+            "currency": "ARS",
+            "tax_rate_on_fees": 0.21,
+            "inbound_gateways": {
+                "rtp_alias": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "Alias CBU/CVU"
+                },
+                "card_mercadopago": {
+                    "pct": 0.035,
+                    "fixed": 0.00,
+                    "label": "Local Card"
+                }
+            },
+            "outbound_rails": {
+                "transferencias_3_0": {
+                    "cost": 0.00,
+                    "label": "Bank or Wallet (CBU/CVU)"
+                },
+                "card_push": {
+                    "cost": 1.50,
+                    "label": "Debit Card"
+                },
+                "merchant_voucher": {
+                    "cost": 0.00,
+                    "label": "Merchant Pickup / Voucher"
+                }
+            }
+        },
+        "MX": {
+            "name": "Mexico",
+            "currency": "MXN",
+            "tax_rate_on_fees": 0.16,
+            "digital_service_tax_pct": 0.02,
+            "inbound_gateways": {
+                "rtp_spei": {
+                    "pct": 0.00,
+                    "fixed": 0.05,
+                    "label": "SPEI / DiMo"
+                },
+                "debit_card": {
+                    "pct": 0.024,
+                    "fixed": 0.15,
+                    "label": "Debit Card"
+                }
+            },
+            "outbound_rails": {
+                "spei_payout": {
+                    "cost": 0.00,
+                    "label": "Bank Deposit"
+                },
+                "oxxo_voucher": {
+                    "cost": 0.00,
+                    "label": "OXXO Social Voucher"
+                }
+            }
+        },
+        "US": {
+            "name": "United States",
+            "currency": "USD",
+            "tax_rate_on_fees": 0.00,
+            "inbound_gateways": {
+                "rtp_fednow": {
+                    "pct": 0.00,
+                    "fixed": 0.045,
+                    "label": "FedNow / RTP"
+                },
+                "debit_card": {
+                    "pct": 0.021,
+                    "fixed": 0.25,
+                    "label": "Debit Card"
+                },
+                "credit_card": {
+                    "pct": 0.029,
+                    "fixed": 0.30,
+                    "label": "Credit Card"
+                }
+            },
+            "outbound_rails": {
+                "fednow_payout": {
+                    "cost": 0.00,
+                    "label": "Instant Bank"
+                },
+                "visa_direct": {
+                    "cost": 0.85,
+                    "label": "Push to Card"
+                }
+            }
+        },
+        "BR": {
+            "name": "Brazil",
+            "currency": "BRL",
+            "tax_rate_on_fees": 0.00,
+            "inbound_gateways": {
+                "rtp_pix": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "PIX (Instant)"
+                },
+                "debit_card": {
+                    "pct": 0.02,
+                    "fixed": 0.30,
+                    "label": "Debit Card"
+                }
+            },
+            "outbound_rails": {
+                "pix_payout": {
+                    "cost": 0.00,
+                    "label": "PIX Transfer"
+                }
+            }
+        },
+        "PE": {
+            "name": "Peru",
+            "currency": "PEN",
+            "tax_rate_on_fees": 0.18,
+            "inbound_gateways": {
+                "rtp_cci": {
+                    "pct": 0.00,
+                    "fixed": 0.50,
+                    "label": "CCI Transfer"
+                }
+            },
+            "outbound_rails": {
+                "cci_payout": {
+                    "cost": 2.00,
+                    "label": "Interbank Transfer"
+                }
+            }
+        },
+        "DO": {
+            "name": "Dominican Republic",
+            "currency": "DOP",
+            "tax_rate_on_fees": 0.18,
+            "inbound_gateways": {
+                "ach_lbtr": {
+                    "pct": 0.00,
+                    "fixed": 0.00,
+                    "label": "LBTR (Instant)"
+                }
+            },
+            "outbound_rails": {
+                "lbtr_payout": {
+                    "cost": 1.00,
+                    "label": "Bank Transfer"
+                }
+            }
+        }
+    },
+    "target_markets": [
+        "ES",
+        "PT",
+        "US",
+        "MX",
+        "GT",
+        "CO",
+        "AR",
+        "VE",
+        "BR",
+        "PE"
+    ],
+    "supported_currencies": [
+        "EUR",
+        "USD",
+        "MXN",
+        "GTQ",
+        "COP",
+        "ARS",
+        "VES",
+        "BRL",
+        "PEN"
+    ],
+    "encryption_standard": "AES-256-GCM",
+    "indexing_method": "Blind Indexing (HMAC-SHA256)"
+}

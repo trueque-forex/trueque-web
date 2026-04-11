@@ -6,12 +6,14 @@ export const DEV_USERS = {
     id: '00000000-0000-0000-0000-000000000001',
     email: 'test@example.com',
     full_name: 'Test User',
-    // Correct bcrypt hash for 'YourPassword123'
-    passwordHash: '$2b$12$68aSmSSlTmAxk9WLh1pPYelQ1gflAmOCxD6eIPK5Z85JMpQQmbHTK',
+    passwordHash: '$2b$12$Ox2TASo9p/JhW2qAt7JDf.ZHQQZh4Ow6ST/5TWYAQh6p/.G0Sr5cy',
     mfa_enabled: true,
     tid: '00000000-0000-0000-0000-000000000100',
-    created_at: new Date().toISOString()
-  }
+    created_at: new Date().toISOString(),
+    is_test: true
+  },
+
+
 };
 
 if (typeof global !== 'undefined') {

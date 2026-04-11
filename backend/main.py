@@ -1,0 +1,34 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Allow frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to Trueque Backend"}
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
+
+from .routes import quotes, history, offers, trades
+app.include_router(quotes.router)
+app.include_router(history.router)
+app.include_router(offers.router)
+app.include_router(trades.router)
+
+from .routes import compliance
+app.include_router(compliance.router)
+
+from .routes import admin
+app.include_router(admin.router)
+

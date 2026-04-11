@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-from fastapi import FastAPI
-from backend.routes.recipients import router as recipients_router
-=======
 import logging
 import traceback
 from fastapi import FastAPI, Request
@@ -10,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.routes.recipients import router as recipients_router
 from backend.routes.onboarding import router as onboarding_router
+from backend.routes.auth import router as auth_router
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -17,7 +14,6 @@ logger = logging.getLogger("trueque_debug")
 logger.setLevel(logging.INFO)
 # Optional: show SQL emitted by SQLAlchemy when debugging
 logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 
 app = FastAPI(
     title="Trueque API",
@@ -25,10 +21,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-<<<<<<< HEAD
-# Include core routes
-app.include_router(recipients_router, prefix="/api", tags=["Recipients"])
-=======
 # Request logging middleware (adds a request id and logs start/end)
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -64,4 +56,4 @@ async def all_exception_handler(request: Request, exc: Exception):
 # Include core routes
 app.include_router(recipients_router, prefix="/api", tags=["Recipients"])
 app.include_router(onboarding_router, prefix="/api", tags=["Onboarding"])
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
+app.include_router(auth_router, prefix="/api", tags=["Auth"])

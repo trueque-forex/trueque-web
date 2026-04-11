@@ -1,111 +1,83 @@
-<<<<<<< HEAD
 // src/lib/apiFetch.ts
+// Robust fetch wrapper that returns { res, json } on success and throws an Error with `apiError` on failure.
+
 export type ApiError = {
   status?: number;
+  statusText?: string;
   message: string;
+  body?: any;
+  headers?: Record<string, string>;
   details?: any;
 };
 
 export default async function apiFetch<T = any>(
-  url: string,
-  options: RequestInit = {},
+  input: RequestInfo,
+  init: RequestInit = {},
   opts?: {
     baseUrl?: string;
     timeoutMs?: number;
-    credentials?: RequestCredentials; // override default
+    credentials?: RequestCredentials;
+    skipAuthRedirect?: boolean;
   }
 ): Promise<{ res: Response; json: T | null }> {
-  const controller = new AbortController();
-  const timeout = opts?.timeoutMs;
-  if (timeout) {
-    setTimeout(() => controller.abort(), timeout);
-  }
-
-  const finalUrl = opts?.baseUrl ? new URL(url, opts.baseUrl).toString() : url;
-
-  let response: Response;
-  try {
-    response = await fetch(finalUrl, {
-      ...options,
-      credentials: opts?.credentials ?? 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-      signal: controller.signal,
-    });
-  } catch (err: any) {
-    if (err.name === 'AbortError') {
-      const e: ApiError = { message: 'Request timed out' };
-      throw Object.assign(new Error(e.message), { apiError: e });
-    }
-    const e: ApiError = { message: err?.message || 'Network request failed' };
-    throw Object.assign(new Error(e.message), { apiError: e });
-  }
-
-  // Safe JSON parse: return null for empty bodies or non-JSON
-  let body: any = null;
-  try {
-    const text = await response.text();
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    body = null;
-  }
-
-  if (!response.ok) {
-    const apiErr: ApiError = {
-      status: response.status,
-      message: body?.message || `Request failed: ${response.status}`,
-      details: body?.details ?? body,
-    };
-    const err = new Error(apiErr.message);
-    throw Object.assign(err, { apiError: apiErr });
-  }
-
-  return { res: response, json: body as T };
-=======
-// File: src/lib/apiFetch.ts
-// Lightweight fetch wrapper that returns parsed JSON on success and throws a rich Error on failure.
-
-export type ApiFetchResult<T = unknown> = {
-  ok: boolean;
-  status: number;
-  json: T | null;
-};
-
-export default async function apiFetch<T = unknown>(
-  input: RequestInfo,
-  init?: RequestInit,
-  opts?: { timeoutMs?: number }
-): Promise<ApiFetchResult<T>> {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
   if (opts?.timeoutMs && controller) {
     setTimeout(() => controller.abort(), opts.timeoutMs);
   }
 
+  const finalUrl = opts?.baseUrl ? new URL(String(input), opts.baseUrl).toString() : input;
+
   const requestInit: RequestInit = {
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
+    credentials: opts?.credentials ?? 'include',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
     signal: controller?.signal,
     ...init,
   };
 
-  const res = await fetch(input, requestInit);
+  let res: Response;
+  try {
+    res = await fetch(finalUrl as any, requestInit);
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      const e: ApiError = { message: 'Request timed out' };
+      throw Object.assign(new Error(e.message), { apiError: e });
+    }
+    const e: ApiError = { message: err?.message ?? 'Network request failed' };
+    throw Object.assign(new Error(e.message), { apiError: e });
+  }
 
   // read raw text and attempt to parse JSON
-  const text = await res.text().catch(() => '');
+  let text = '';
+  try {
+    text = await res.text();
+  } catch {
+    text = '';
+  }
+
   let parsedBody: any = null;
   try {
     parsedBody = text ? JSON.parse(text) : null;
   } catch {
-    parsedBody = text;
+    // keep raw text if not JSON
+    parsedBody = text || null;
+  }
+
+  if (res.status === 401) {
+    if (typeof window !== 'undefined' && !(opts as any)?.skipAuthRedirect) {
+      // GRACEFUL REDIRECT: Redirect to Landing with Security Message
+      // AuthContext will handle state updates using the 401 status, but we force navigation here to be safe.
+      localStorage.removeItem('trueque_session');
+      sessionStorage.clear();
+      window.location.href = '/?error=session_expired';
+      console.warn('apiFetch: 401 received. Redirecting to Landing.');
+    }
   }
 
   if (res.ok) {
-    return { ok: true, status: res.status, json: parsedBody as T };
+    return { res, json: parsedBody as T };
   }
 
-  // Build a rich apiError object with status, headers and body for downstream inspection
+  // Build headers object safely
   const headersObj: Record<string, string> = {};
   try {
     if (res.headers && typeof (res.headers as any).forEach === 'function') {
@@ -121,26 +93,29 @@ export default async function apiFetch<T = unknown>(
     // ignore header parsing errors
   }
 
-  const apiErr = {
+  const apiErr: ApiError = {
     status: res.status,
     statusText: res.statusText,
+    message: (() => {
+      const errObj = parsedBody?.error || parsedBody;
+      const baseMsg = errObj?.message || errObj?.error || `Request failed: ${res.status} ${res.statusText}`;
+      const detail = errObj?.detail || parsedBody?.detail;
+      if (typeof baseMsg !== 'string') return JSON.stringify(baseMsg);
+      return detail ? `${baseMsg}: ${detail}` : baseMsg;
+    })(),
     body: parsedBody,
     headers: headersObj,
+    details: parsedBody?.details ?? undefined,
   };
 
-  const message =
-    apiErr.body?.message ??
-    apiErr.body?.error ??
-    `Request failed: ${apiErr.status} ${apiErr.statusText}`;
-
-  const err = new Error(message);
+  const err = new Error(apiErr.message);
   Object.assign(err, { apiError: apiErr });
 
   try {
+    // best-effort logging for local debugging
     // eslint-disable-next-line no-console
     console.error('apiFetch throwing', JSON.stringify(apiErr, null, 2));
-  } catch {}
+  } catch { }
 
   throw err;
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)
 }

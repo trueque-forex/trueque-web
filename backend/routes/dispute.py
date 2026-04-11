@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.database import get_db
 from backend.models.offer_model import Offer
 from backend.models.user_model import User
@@ -30,7 +30,7 @@ def flag_dispute(request: DisputeRequest, db: Session = Depends(get_db)):
 
     offer.status = "disputed"
     offer.dispute_reason = request.reason
-    offer.dispute_timestamp = datetime.utcnow()
+    offer.dispute_timestamp = datetime.now(timezone.utc)
     db.commit()
 
     return {

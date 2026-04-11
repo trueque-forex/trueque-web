@@ -166,8 +166,4 @@ export default function BeneficiaryMethodHelper({ onMethodChange, onCreated }: P
       </div>
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 6b1db87 (Initial commit for trueque_web independent repo)

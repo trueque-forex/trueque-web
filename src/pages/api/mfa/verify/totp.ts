@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // Read cookie header and pass it to getSessionById so we can resolve the session
   const cookieHeader = (req as any).headers?.cookie ?? null;
-  const session = await getSessionById(cookieHeader, res);
+  const session = await getSessionById(cookieHeader);
   const userId = session?.userId ?? null;
 
   if (!userId) return res.status(401).json({ message: 'unauthenticated' });

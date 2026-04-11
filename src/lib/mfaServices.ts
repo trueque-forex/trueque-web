@@ -20,7 +20,7 @@ function generateRecoveryCodes(): string[] {
 
 export async function startTotpSetup(userId: string, email: string) {
   const knex: any = getKnex();
-  const secret = speakeasy.generateSecret({ length: 20, name: `Trueque:${email}`, issuer: 'Trueque' });
+  const secret = speakeasy.generateSecret({ length: 20, name: `Symmetri:${email}`, issuer: 'Symmetri' });
   const encrypted = encryptSecret(secret.base32);
 
   try {
@@ -126,7 +126,7 @@ export async function confirmTotpSetup(
 
         await client.query('COMMIT');
       } catch (err) {
-        await client.query('ROLLBACK').catch(() => {});
+        await client.query('ROLLBACK').catch(() => { });
         throw err;
       } finally {
         client.release?.();
@@ -283,7 +283,7 @@ export async function disableMfa(userId: string) {
         ]);
         await client.query('COMMIT');
       } catch (err) {
-        await client.query('ROLLBACK').catch(() => {});
+        await client.query('ROLLBACK').catch(() => { });
         throw err;
       } finally {
         client.release?.();
