@@ -18,9 +18,15 @@ jobs:
       - name: Scan for conflict markers
         run: |
           set -euo pipefail
-          if git grep -n --untracked -e '<<<<<<<' -e '=======' -e '>>>>>>>' >/dev/null; then
+          # Use precise patterns: git markers always have '<<<<<<<' or '>>>>>>>' at
+          # line-start followed by a space, and '=======' is alone on its own line.
+          # This avoids false positives from separator comments like '// ========'
+          # or console.log dividers like '========================================'.
+          if git grep -nP --untracked -e '^<{7} ' -e '^={7}$' -e '^>{7} ' -- \
+               ':(exclude).github/workflows/' > /dev/null 2>&1; then
             echo "::error::Conflict markers detected. Resolve before merging."
-            git --no-pager grep -n -e '<<<<<<<' -e '=======' -e '>>>>>>>' || true
+            git --no-pager grep -nP -e '^<{7} ' -e '^={7}$' -e '^>{7} ' -- \
+               ':(exclude).github/workflows/' || true
             exit 1
           fi
 
