@@ -153,3 +153,31 @@ scripts/out.txt
 scripts/curl_payload.json
 scripts/users_*.json
 scripts/users_*.txt
+
+# ── Root-level one-off operational scripts ───────
+add_*.ts
+add_*.js
+approve_*.ts
+approve_*.js
+audit_*.ts
+audit_*.js
+audit_*.py
+migrate_*.ts
+migrate_*.js
+fix_*.py
+fix_*.js
+
+# ── Backend scratch / temp ───────────────────────
+backend/api/
+backend/clean_*.py
+backend/pytest_*.txt
+
+# ── Regulatory docs (keep out of source control) ─
+Regulatory_Compliance/
+
+# ── GEMINI internal config ───────────────────────
+GEMINI.md
+
+# ── Migrations folder outputs ────────────────────
+migrations/*.txt
+migrations/*.json
