@@ -1,11 +1,12 @@
 from sqlalchemy import (
     Table, Column, Integer, String, JSON, MetaData,
-    DateTime, Numeric
+    DateTime, Numeric, CheckConstraint
 )
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from backend.database import Base
 
-metadata = MetaData()
-
+metadata = Base.metadata
 recipient_profiles = Table(
     "recipient_profiles",
     metadata,
@@ -23,33 +24,12 @@ recipient_profiles = Table(
     Column("created_at", DateTime, default=datetime.utcnow),
 )
 
-transactions = Table(
-    "transactions",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("user_id", String, index=True),
-    Column("sender_email", String),
-    Column("recipient_name", String),
-    Column("relationship", String),
-    Column("gateway", String),
-    Column("amount", Numeric),
-    Column("status", String),
-    Column("tx_id", String),
-    Column("timestamp", DateTime, default=datetime.utcnow),
-    Column("from_currency", String),
-    Column("to_currency", String),
-    Column("rate", Numeric),
-    Column("remittance_purpose", String),
-    Column("transaction_type", String),
-    Column("sender_ip_address", String),
-    Column("kyc_tier_at_execution", Integer),
-    Column("receiver_user_id", Integer),
-)
+
 
 users = Table(
     "users",
     metadata,
-    Column("id", String, primary_key=True),
+    Column("id", PG_UUID(as_uuid=True), primary_key=True),
     Column("trueque_id", String, unique=True, nullable=False),
     Column("email", String, unique=True, nullable=False),
     Column("password_hash", String),
@@ -68,4 +48,8 @@ users = Table(
     Column("dob_enc", String),
     Column("ssn_enc", String),
     Column("id_number_enc", String),
+    Column("symmetri_id", String, unique=True, nullable=True),
+    Column("trade_mask_sid", String, unique=True, nullable=True),
+    CheckConstraint("symmetri_id LIKE '@%'", name="symmetri_id_at_prefix"),
+    CheckConstraint("LENGTH(trade_mask_sid) = 14", name="trade_mask_sid_length"),
 )

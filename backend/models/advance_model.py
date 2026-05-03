@@ -1,13 +1,16 @@
+from backend.database import Base
 from sqlalchemy import Column, Integer, String, Float, DateTime, Numeric
 from datetime import datetime
-from backend.models.transaction import Base  # ✅ Shared Base
+from backend.database import Base
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+import uuid
 
 class Advance(Base):
     __tablename__ = "advances"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, nullable=False)
-    uuid = Column(String, unique=True, nullable=False)
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(PG_UUID(as_uuid=True), nullable=False)
+    uuid = Column(PG_UUID(as_uuid=True), unique=True, nullable=False)
     country = Column(String, nullable=False)
     currency_from = Column(String, nullable=False)
     currency_to = Column(String, nullable=False)

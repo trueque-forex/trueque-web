@@ -1,9 +1,9 @@
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from ..database import get_db
+from backend.database import get_db
 from ..services.fx_consensus import FXConsensusService
-from ..audit_db import AuditDB
+from backend.audit_db import AuditDB
 from ..logic.investor_report import InvestorReportGenerator
 import sqlite3
 import os

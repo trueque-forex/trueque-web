@@ -6,7 +6,7 @@ from backend.main import app
 from backend.database import Base, get_db
 from backend.models.transaction import Transaction, Beneficiary
 from backend.models.offer_model import Offer
-from backend.models.models import User
+from backend.models.user_model import User
 import uuid
 from datetime import datetime, timezone
 
@@ -39,7 +39,7 @@ def test_get_trade_details_offer(db_session):
     new_offer = Offer(
         uuid=offer_uuid,
         owner_id="test-user-id",
-        amount="100.00",
+        amount_offered="100.00",
         currency_from="EUR",
         currency_to="ARS",
         status="PENDING"
@@ -61,7 +61,7 @@ def test_signal_funding_offer(db_session):
     new_offer = Offer(
         uuid=offer_uuid,
         owner_id="test-user-id",
-        amount="100.00",
+        amount_offered="100.00",
         currency_from="EUR",
         currency_to="ARS",
         status="PENDING"

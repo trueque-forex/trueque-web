@@ -125,6 +125,41 @@ async function runMobileTests() {
         log('\n⏭️  Skipping Signin test due to Signup failure.', 'warn');
     }
 
+    // 3. Test Protected Route (Profile) using Token
+    if (signupSuccess) { // Assuming if signup worked, we have a valid flow. Ideally check signinto too but var scope is tricky here without refactor.
+        // Actually, we need the token from signin.
+        // Let's refactor slightly or just re-login.
+        // Simpler: assume the previous steps worked effectively.
+
+        // Refetch token specifically for this step to be robust
+        log('\n3️⃣  Testing Protected Route (/api/user/profile)...', 'info');
+        try {
+            // value of uniqueEmail and password are known
+            const authRes = await makeRequest('/api/mobile/signin', 'POST', {
+                email: uniqueEmail,
+                password: password
+            });
+
+            if (authRes.body.token) {
+                const token = authRes.body.token;
+                const profileRes = await makeRequest('/api/user/profile', 'GET', null, token);
+
+                if (profileRes.statusCode === 200) {
+                    log(`✅ Profile Fetch Successful!`, 'success');
+                    log(`   Data: ${JSON.stringify(profileRes.body)}`, 'info');
+                } else {
+                    log(`❌ Profile Fetch Failed: ${profileRes.statusCode}`, 'error');
+                    console.log(profileRes.body);
+                }
+            } else {
+                log(`⚠️ Could not get token for Step 3`, 'warn');
+            }
+
+        } catch (e) {
+            log(`❌ Profile Test Error: ${e.message}`, 'error');
+        }
+    }
+
     log('\n🏁 Mobile API Test Complete', 'info');
 }
 

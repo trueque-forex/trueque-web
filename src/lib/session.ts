@@ -1,10 +1,11 @@
 // src/lib/session.ts
 import { SignJWT, jwtVerify } from 'jose';
 import { v4 as uuidv4 } from 'uuid';
-import { NextApiResponse } from 'next';
+import { NextApiResponse, NextApiRequest } from 'next';
 import { serialize } from 'cookie';
 import { decrypt as decryptData } from './crypto';
 import { TruequeSession } from '../types/auth'; // IMPORT SHARED TYPE
+import jwt from 'jsonwebtoken';
 
 const SECRET_KEY = process.env.SESSION_SECRET || 'default_local_secret_change_me_in_prod';
 const key = new TextEncoder().encode(SECRET_KEY);
@@ -105,15 +106,68 @@ export async function createSession(user: any, mfaVerified = false) {
 }
 
 // 6. GET SESSION
+// Accepts: (a) cookie-based web session JWT, (b) Authorization: Bearer mobile JWT
 export async function getSession(tokenOrReq: string | any): Promise<TruequeSession | null> {
-  let token = tokenOrReq;
-  // Adapter: handle request object
-  if (typeof tokenOrReq === 'object' && tokenOrReq.cookies) {
-    token = tokenOrReq.cookies.session || tokenOrReq.cookies.trueque_sid;
+  let token: string | null = null;
+
+  if (typeof tokenOrReq === 'string') {
+    // Direct token string passed
+    token = tokenOrReq;
+  } else if (typeof tokenOrReq === 'object') {
+    // Try cookie first (web clients)
+    if (tokenOrReq.cookies) {
+      token = tokenOrReq.cookies.session || tokenOrReq.cookies.trueque_sid || null;
+    }
+    // Fallback: Authorization: Bearer (mobile clients)
+    if (!token) {
+      const authHeader = tokenOrReq.headers?.authorization || tokenOrReq.headers?.Authorization || '';
+      if (authHeader.startsWith('Bearer ')) {
+        const bearerToken = authHeader.slice(7).trim();
+        return await parseMobileBearerToken(bearerToken);
+      }
+    }
   }
 
   if (!token || typeof token !== 'string') return null;
   return await decrypt(token);
+}
+
+/**
+ * Parse and validate a mobile JWT (signed with JWT_SECRET via jsonwebtoken).
+ * Normalises the payload into TruequeSession so withAuth works identically.
+ */
+async function parseMobileBearerToken(token: string): Promise<TruequeSession | null> {
+  try {
+    const secret = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+    const payload = jwt.verify(token, secret) as any;
+    if (!payload?.userId) return null;
+
+    const session: TruequeSession = {
+      user: {
+        id: String(payload.userId),
+        email: payload.email || '',
+        tid: payload.tid || payload.truequeId || '',
+        kycStatus: payload.kyc_status || 'NONE',
+        userType: 'PEER',
+        firstName: payload.first_name || '',
+        lastName: payload.last_name || '',
+        name: [payload.first_name, payload.last_name].filter(Boolean).join(' '),
+        txCount: 0,
+        phone: '',
+        country: payload.country || '',
+        street_address: '',
+        city: '',
+        state: '',
+        postalCode: '',
+      },
+      expires: new Date((payload.exp || 0) * 1000).toISOString(),
+      mfaVerified: false,
+    };
+    return session;
+  } catch (err) {
+    console.warn('[session] parseMobileBearerToken failed:', err);
+    return null;
+  }
 }
 
 // Added back for MFA/Totp flows

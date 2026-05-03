@@ -22,7 +22,7 @@ class TestComplianceAgent(unittest.TestCase):
         mock_db = MagicMock()
         
         # Mock Offers for history
-        o1 = Offer(amount=50, currency_from="USD", currency_to="MXN", remittance_purpose="FAMILY_SUPPORT", timestamp=datetime.now())
+        o1 = Offer(amount_offered=50, currency_from="USD", currency_to="MXN", remittance_purpose="FAMILY_SUPPORT", timestamp=datetime.now())
         mock_db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [o1, o1]
         
         # Mock Transaction for update
@@ -58,7 +58,7 @@ class TestComplianceAgent(unittest.TestCase):
     def test_agent_escalate_flow(self):
         # 1. Setup Mock DB (No family support history)
         mock_db = MagicMock()
-        o1 = Offer(amount=900, currency_from="USD", currency_to="NGN", remittance_purpose="Crypto Purchase", timestamp=datetime.now())
+        o1 = Offer(amount_offered=900, currency_from="USD", currency_to="NGN", remittance_purpose="Crypto Purchase", timestamp=datetime.now())
         mock_db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [o1]
         
         # 2. Trigger Agent (Alert details generic)

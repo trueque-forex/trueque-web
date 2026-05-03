@@ -1,6 +1,6 @@
 
 from typing import Dict, Any
-from .base import BaseConnector
+from backend.connectors.base import BaseConnector
 
 class GenericConnector(BaseConnector):
     """

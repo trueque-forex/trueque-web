@@ -11,6 +11,7 @@ const CARD_FIXED_FEE = 0.30;
 const RTP_FEE_PCT  = 0.0095;
 const RTP_MIN_FEE  = 0.50;
 const RTP_MAX_FEE  = 5.00;
+const LIQUIDITY_FEE_PCT = 0.015;
 /**
  * Minimum floor: $20.00.
  * Rationale: Symmetri earns ~15% retailer commission. At $20 → $3.00/tx covers
@@ -36,7 +37,7 @@ export default function VoucherPage() {
     const [usingSaved, setUsingSaved] = useState(false); // true = user is using their saved method
     const [selectedRetailer, setSelectedRetailer] = useState<Retailer | null>(null);
     const [amountUSD, setAmountUSD] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState<'ach' | 'rtp' | 'card' | 'zelle' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<'rtp' | 'card' | 'zelle' | null>(null);
     const [liveRate, setLiveRate] = useState<number | null>(null);
     const [rateSource, setRateSource] = useState('');
     const [loading, setLoading] = useState(false);
@@ -52,6 +53,7 @@ export default function VoucherPage() {
     const [cardExpiry, setCardExpiry] = useState('');
     const [cardCvv, setCardCvv] = useState('');
     const [cardName, setCardName] = useState('');
+    const [cardZip, setCardZip] = useState('');
     const [bankRouting, setBankRouting] = useState('');
     const [bankAccount, setBankAccount] = useState('');
     const [bankAccountType, setBankAccountType] = useState<'checking' | 'savings'>('checking');
@@ -113,19 +115,21 @@ export default function VoucherPage() {
     const rtpFee        = parseFloat(rtpFeeRaw.toFixed(2));
     const cardFeeRaw    = amountNum > 0 ? (amountNum * CARD_FEE_PCT) + CARD_FIXED_FEE : 0;
     const cardFee       = parseFloat(cardFeeRaw.toFixed(2));
+    const liquidityFee  = paymentMethod === 'card' && amountNum > 0 ? parseFloat((amountNum * LIQUIDITY_FEE_PCT).toFixed(2)) : 0;
     const processorFee  = paymentMethod === 'card' ? cardFee : paymentMethod === 'rtp' ? rtpFee : 0;
     // Always show fee previews regardless of selected method (for option labels)
     const cardFeePreview = amountNum > 0 ? cardFee : null;
+    const liquidityFeePreview = amountNum > 0 ? parseFloat((amountNum * LIQUIDITY_FEE_PCT).toFixed(2)) : null;
     const rtpFeePreview  = amountNum > 0 ? rtpFee  : null;
     // Total the sender pays = intended amount + gateway fee (beneficiary always gets full amountNum)
-    const totalCharged  = parseFloat((amountNum + processorFee).toFixed(2));
+    const totalCharged  = parseFloat((amountNum + processorFee + liquidityFee).toFixed(2));
     const amountLocal   = liveRate ? parseFloat((amountNum * liveRate).toFixed(2)) : 0;
     const zelleHandle     = process.env.NEXT_PUBLIC_ZELLE_HANDLE || 'payments@symmetri.app';
     const zelleDisplayName = process.env.NEXT_PUBLIC_ZELLE_DISPLAY_NAME || 'Symmetri';
     // Gate: is the selected payment method fully filled in?
     const zelleReady  = paymentMethod === 'zelle' && zelleConfirmed;
-    const cardReady   = paymentMethod === 'card'  && cardNumber.replace(/\s/g,'').length >= 15 && cardExpiry.length >= 4 && cardCvv.length >= 3 && cardName.trim().length > 1;
-    const achReady    = (paymentMethod === 'ach' || paymentMethod === 'rtp') && bankRouting.length === 9 && bankAccount.length >= 4 && bankHolderName.trim().length > 1;
+    const cardReady   = paymentMethod === 'card'  && cardNumber.replace(/\s/g,'').length >= 15 && cardExpiry.length >= 4 && cardCvv.length >= 3 && cardName.trim().length > 1 && cardZip.length >= 5;
+    const achReady    = paymentMethod === 'rtp' && bankRouting.length === 9 && bankAccount.length >= 4 && bankHolderName.trim().length > 1;
     // usingSaved counts as ready as long as the payment type is set (Zelle still needs checkbox)
     const paymentReady = (usingSaved && paymentMethod !== null && (paymentMethod !== 'zelle' || zelleConfirmed)) || zelleReady || cardReady || achReady;
 
@@ -158,7 +162,7 @@ export default function VoucherPage() {
                 const maskedLabel =
                     paymentMethod === 'card'
                         ? `Card ****${cardNumber.replace(/\s/g, '').slice(-4)}`
-                        : `ACH ****${bankAccount.slice(-4)}`;
+                        : `RTP ****${bankAccount.slice(-4)}`;
                 const toSave = { type: paymentMethod, label: maskedLabel };
                 try { localStorage.setItem('symmetri_saved_payment', JSON.stringify(toSave)); } catch { /* ignore */ }
                 setSavedPayment(toSave);
@@ -400,9 +404,8 @@ export default function VoucherPage() {
                         <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>How will you pay?</label>
                         <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
                             {[
-                                { id: 'ach',   label: 'Bank Transfer (ACH)',    icon: '🏦', fee: 'Free',                                                                            feeColor: '#16a34a', sub: '1–2 business days · No fee' },
                                 { id: 'rtp',   label: 'Instant Bank (RTP)',      icon: '⚡', fee: rtpFeePreview !== null ? `$${rtpFeePreview.toFixed(2)} fee` : '0.95% · $0.50 min', feeColor: '#b45309', sub: 'Instant (seconds) · Added on top' },
-                                { id: 'card',  label: 'Debit / Credit Card',     icon: '💳', fee: cardFeePreview !== null ? `$${cardFeePreview.toFixed(2)} fee` : '2.9% + $0.30',    feeColor: '#dc2626', sub: 'Instant · Card issuer fee added on top' },
+                                { id: 'card',  label: 'Debit / Credit Card',     icon: '💳', fee: cardFeePreview !== null && liquidityFeePreview !== null ? `$${(cardFeePreview + liquidityFeePreview).toFixed(2)} fee` : '2.9% + $0.30 + 1.5% liquidity',    feeColor: '#dc2626', sub: 'Instant · Card issuer fee added on top' },
                                 { id: 'zelle', label: 'Zelle',                    icon: '💚', fee: 'Free',                                                                            feeColor: '#16a34a', sub: 'Instant · Send to Symmetri Zelle' },
                             ].map(opt => (
                                 <button key={opt.id}
@@ -420,11 +423,11 @@ export default function VoucherPage() {
                             ))}
                         </div>
 
-                        {/* ── ACH / RTP BANK FORM ── shared form, rail chosen by payment method */}
-                        {(paymentMethod === 'ach' || paymentMethod === 'rtp') && (
+                        {/* ── RTP BANK FORM ── */}
+                        {paymentMethod === 'rtp' && (
                             <div style={{ background: '#f8faff', border: '2px solid #c7d2fe', borderRadius: '14px', padding: '20px', marginBottom: '16px' }}>
                                 <div style={{ fontWeight: '700', color: '#3730a3', fontSize: '14px', marginBottom: '4px' }}>
-                                    {paymentMethod === 'rtp' ? '⚡ Bank Account — Instant RTP' : '🏦 Bank Account Details'}
+                                    ⚡ Bank Account — Instant RTP
                                 </div>
                                 {paymentMethod === 'rtp' && (
                                     <div style={{ fontSize: '12px', color: '#b45309', marginBottom: '12px', fontWeight: '500' }}>
@@ -507,6 +510,13 @@ export default function VoucherPage() {
                                                 placeholder="123"
                                                 style={{ width: '100%', padding: '10px 12px', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '14px', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
                                         </div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '4px' }}>Billing Zip Code</label>
+                                        <input id="card-zip" type="text" inputMode="numeric" value={cardZip} maxLength={10}
+                                            onChange={e => setCardZip(e.target.value.replace(/\D/g, ''))}
+                                            placeholder="12345"
+                                            style={{ width: '100%', padding: '10px 12px', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '14px', fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }} />
                                     </div>
                                 </div>
                                 {cardFeePreview && <div style={{ marginTop: '10px', fontSize: '12px', color: '#dc2626', fontWeight: '600', textAlign: 'center' }}>Processor fee: ${cardFeePreview.toFixed(2)} — charged by the network, not Symmetri</div>}
@@ -636,8 +646,10 @@ export default function VoucherPage() {
                                 ['Exchange rate', `1 USD = ${liveRate?.toFixed(4)} ${selectedRetailer.currency}`],
                                 ['Rate source', rateSource],
                                 ['Symmetri fee', '✦ $0.00 — None'],
-                                ['Processor fee', processorFee > 0 ? `$${processorFee.toFixed(2)}` : '$0.00 (ACH)'],
-                            ].map(([label, value]) => (
+                                ['Processor fee', processorFee > 0 ? `$${processorFee.toFixed(2)}` : '$0.00'],
+                            ]
+                            .concat(liquidityFee > 0 ? [['Liquidity advance fee', `$${liquidityFee.toFixed(2)}`]] : [])
+                            .map(([label, value]) => (
                                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9', fontSize: '14px' }}>
                                     <span style={{ color: '#64748b' }}>{label}</span>
                                     <strong style={{ color: label === 'Symmetri fee' ? '#16a34a' : '#1e293b' }}>{value}</strong>

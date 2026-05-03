@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 import uuid
 
 from ..models.offer_model import Offer
-from ..database import get_db
+from backend.database import get_db
 from ..schemas.offer_schema import OfferCreate
 
 router = APIRouter(prefix="/api/offers", tags=["Offers"])
@@ -89,7 +89,7 @@ def create_offer(
             currency_to=offer_in.currency_to,
             amount_from=offer_in.amount,
             amount_to=offer_in.amount, # Simplified: gross=net for history
-            amount=offer_in.amount,
+            amount_offered=offer_in.amount,
             market_rate=1.0, # Mock rate
             status=final_status,
             timestamp=datetime.now(timezone.utc),

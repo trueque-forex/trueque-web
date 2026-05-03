@@ -58,7 +58,7 @@ def test_esco_orchestration_instructions(db_session):
     offer = offer_model.Offer(
         uuid=offer_id,
         owner_id="user123",
-        amount=50.0,
+        amount_offered=50.0,
         currency_from="EUR",
         currency_to="COP",
         amount_from=50.0,
@@ -85,7 +85,7 @@ def test_gateway_not_found_fallback(db_session):
     offer = offer_model.Offer(
         uuid=offer_id,
         owner_id="user123",
-        amount=50.0,
+        amount_offered=50.0,
         currency_from="USD", 
         currency_to="COP",
         amount_from=50.0,

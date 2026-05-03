@@ -2,13 +2,14 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from backend.database import Base
 
 class UserKYC(Base):
     __tablename__ = 'user_kyc'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey('users.id'), unique=True, nullable=False)
     trueque_id = Column(String(20), nullable=False, index=True)
     
     # KYC Status
@@ -76,8 +77,8 @@ class KYC_Transaction(Base):
     transaction_id = Column(String(20), unique=True, nullable=False, index=True)  # Trueque ID format
     
     # User IDs
-    user_a_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    user_b_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_a_id = Column(PG_UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
+    user_b_id = Column(PG_UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     
     # Transaction Details
     user_a_sends_amount = Column(Numeric(15, 2), nullable=False)

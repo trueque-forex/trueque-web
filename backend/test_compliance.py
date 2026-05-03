@@ -17,10 +17,10 @@ class TestCompliance(unittest.TestCase):
         # 1. Mock Data
         mock_user = User(id=1, full_name="John Doe", country="US", kyc_tier=2)
         mock_tx = Transaction(
-            tx_id="tx_123",
+            id="tx_123",
             user_id=1,
             amount=100.0,
-            rate=1.0, 
+            exchange_rate=1.0, 
             status="confirmed",
             from_currency="USD",
             to_currency="MXN",
@@ -58,7 +58,7 @@ class TestCompliance(unittest.TestCase):
     def test_offer_model_fields(self):
         offer = Offer(
             user_id="u1",
-            amount=100,
+            amount_offered=100,
             sender_ip="1.2.3.4",
             device_fingerprint="fp_abc"
         )
@@ -70,9 +70,9 @@ class TestCompliance(unittest.TestCase):
         merchant = User(id=900, full_name="OXXO Official", country="MX", user_type="MERCHANT", kyc_tier=2)
         
         tx = Transaction(
-            tx_id="tx_internal_ledger_1",
+            id="tx_internal_ledger_1",
             user_id=sender.id,
-            receiver_user_id=merchant.id, # Link to Merchant
+            beneficiary_id=merchant.id, # Link to Merchant
             amount=100.0,
             from_currency="EUR",
             to_currency="MXN",

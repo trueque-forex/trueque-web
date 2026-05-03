@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import getPool from '../../../lib/db';
 import { generateTruequeId } from '../../../lib/truequeId';
 import { getUtcDate } from '../../../lib/time';
+import { generateMfaToken } from '../../../lib/mfaToken';
 
 type ApiError = { error: string; message?: string };
 type ApiSuccess = { token: string; user: any };
@@ -61,8 +62,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         if (!pool) throw new Error('DB pool not available');
 
         // Check if user already exists
-        const checkQuery = `SELECT id FROM users WHERE email_canonical = $1 LIMIT 1`;
-        const existing = await pool.query(checkQuery, [email]);
+        const checkQuery = `SELECT id FROM users WHERE email = $1 LIMIT 1`;
+        const existing = await pool.query(checkQuery, [rawEmail]);
 
         if (existing.rows.length > 0) {
             return res.status(409).json({
@@ -81,35 +82,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             : `SYM-${Date.now()}`;
 
         // Insert new user
-        // Insert new user
         const insertQuery = `
       INSERT INTO users (
-        email, email_canonical, password_hash, first_name, last_name,
-        country, tid, created_at, phone_number, kyc_status
+        email, password_hash, first_name, last_name,
+        country, tid, created_at, phone_number, kyc_status, mfa_enabled
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, 'INCOMPLETE')
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 'EMPTY', true)
       RETURNING id, email, first_name, last_name, country, tid, created_at
     `;
 
         const result = await pool.query(insertQuery, [
             rawEmail,
-            email,
             passwordHash,
             firstName,
             lastName,
-            country || 'CO',
+            country || 'US',
             truequeId,
             phone
         ]);
 
         const newUser = result.rows[0];
-
-        // Generate JWT token
-        const token = generateToken({
-            id: newUser.id,
-            email: newUser.email,
-            tid: newUser.tid
-        });
 
         // Format user object for mobile app
         const userResponse = {
@@ -120,7 +112,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             country: newUser.country,
             first_name: newUser.first_name,
             last_name: newUser.last_name,
-            phone: newUser.phone_number,
+            phone: phone,
             kyc_status: 'not_started', // Not in DB yet
             created_at: newUser.created_at,
             is_admin: false // Not in DB yet
@@ -128,9 +120,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
         console.log('[MOBILE SIGNUP] Created new user:', newUser.tid);
 
+        // Always require MFA on signup
+        await generateMfaToken(newUser.email);
+        
         return res.status(201).json({
-            token,
-            user: userResponse
+            mfa_required: true,
+            email: newUser.email,
+            last4: phone ? phone.slice(-4) : '',
         });
 
     } catch (err: any) {

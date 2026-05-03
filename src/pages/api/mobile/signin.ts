@@ -4,6 +4,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import getPool from '../../../lib/db';
+import { generateMfaToken } from '../../../lib/mfaToken';
 
 type ApiError = { error: string; message?: string };
 type ApiSuccess = { token: string; user: any };
@@ -44,13 +45,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         if (!pool) throw new Error('DB pool not available');
 
         const query = `
-      SELECT id, password_hash, email, tid, first_name, last_name, country, phone_number, created_at
+      SELECT id, password_hash, email, tid, first_name, last_name, country, phone_number, created_at, kyc_status, mfa_enabled
       FROM users
-      WHERE email_canonical = $1 OR username_canonical = $1
+      WHERE email = $1
       LIMIT 1
     `;
 
-        const result = await pool.query(query, [email]);
+        const result = await pool.query(query, [rawEmail]);
 
         if (result.rows.length === 0) {
             return res.status(401).json({ error: 'Invalid credentials' });
@@ -63,23 +64,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Generate JWT token
-        const token = generateToken(user);
-
         // Format user object for mobile app
         const userResponse = {
             id: String(user.id),
             tid: user.tid || `TRQ-${user.id}`,
             symmetriId: user.tid || `TRQ-${user.id}`,
             email: user.email,
-            country: user.country || 'CO',
+            country: user.country || 'US',
             first_name: user.first_name,
             last_name: user.last_name,
             phone: user.phone_number,
-            kyc_status: 'not_started', // Not in DB yet
+            kyc_status: user.kyc_status || 'not_started',  // Read from DB
             created_at: user.created_at,
-            is_admin: false, // Not in DB yet
+            is_admin: false,
         };
+
+        // MFA check
+        if (user.mfa_enabled) {
+            await generateMfaToken(user.email);
+            return res.status(200).json({
+                mfa_required: true,
+                email: user.email,
+                last4: user.phone_number ? user.phone_number.slice(-4) : '',
+            });
+        }
+
+        // Generate JWT token for non-MFA flow
+        const token = generateToken(user);
 
         return res.status(200).json({
             token,

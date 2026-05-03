@@ -21,7 +21,7 @@ class TestFinCENReporting(unittest.TestCase):
         # 1. Setup Data: Spanish Sender sending to Nigeria
         mock_user = User(id=101, full_name="Maria Garcia", country="ES", kyc_tier=1)
         mock_tx = Transaction(
-            tx_id="tx_eur_ngn_1",
+            id="tx_eur_ngn_1",
             user_id=101,
             amount=500.00, # EUR
             status="confirmed",

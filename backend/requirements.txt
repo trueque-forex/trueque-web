@@ -20,3 +20,5 @@ uvicorn==0.37.0
 bcrypt==3.2.2
 requests==2.31.0
 cryptography==41.0.0
+python-dotenv==1.0.1
+pytest==8.3.5

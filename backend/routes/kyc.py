@@ -5,11 +5,13 @@ from typing import Optional
 from datetime import datetime, timezone
 import json
 
-from ..models.user_kyc import UserKYC, Transaction
+from ..models.user_kyc import UserKYC
+from ..models.transaction import Transaction
 from ..models.user import User
-from ..database import get_db
+from backend.database import get_db
 from ..services.kyc_service import KYCService
 from ..services.file_upload_service import FileUploadService
+from ..utils.checksum import iso7064_mod97_10
 
 router = APIRouter(prefix="/api/kyc", tags=["KYC"])
 
@@ -179,6 +181,21 @@ async def submit_kyc(
         kyc_record.kyc_status = 'pending'
         kyc_record.kyc_submitted_at = datetime.now(timezone.utc)
         
+        # Phase 2: Generate trade_mask_sid if it doesn't exist
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and not user.trade_mask_sid:
+            country_code = data.get('country', 'XX')[:2].upper()
+            date_str = datetime.now().strftime('%y%m%d')
+            
+            # Get consecutive number (Global count of SIDs + 1)
+            # In production, this should be an atomic sequence
+            sid_count = db.query(User).filter(User.trade_mask_sid.isnot(None)).count()
+            consecutive = f"{(sid_count + 1):04d}"
+            
+            base_sid = f"{country_code}{date_str}{consecutive}"
+            checksum = iso7064_mod97_10(base_sid)
+            user.trade_mask_sid = f"{base_sid}{checksum}"
+            
         db.commit()
         
         # Trigger KYC review process (background job)

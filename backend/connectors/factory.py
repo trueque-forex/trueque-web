@@ -3,8 +3,8 @@ import importlib
 import json
 import os
 from typing import Dict, Any, Type
-from .base import BaseConnector
-from .defaults import GenericConnector
+from backend.connectors.base import BaseConnector
+from backend.connectors.defaults import GenericConnector
 
 class ConnectorFactory:
     _instance = None

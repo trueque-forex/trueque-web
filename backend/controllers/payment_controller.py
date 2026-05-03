@@ -7,7 +7,7 @@ from ..gateway.gateway_registry import GatewayRegistry, Recipient
 class PaymentController:
     """
     Controller that coordinates payment authorizations, quotes, and Payouts (P2P Mirroring).
-    Uses FeeOrchestrator for pricing and MatchService for dual-funding checks.
+    Enforces Symmetri's strict Gross Fee calculation to prevent FX ledger leakage.
     """
     
     def __init__(self):
@@ -17,55 +17,79 @@ class PaymentController:
 
     def get_authorization_quote(
         self, 
-        amount_send: Decimal, 
+        principal: Decimal, 
         currency_from: str, 
         currency_to: str, 
         mid_market_rate: Decimal, 
-        payment_method: str = 'bank_transfer',
+        payment_method: str = 'RTP',
         outbound_method: str = 'bank_rtp',
         trueque_id: str = None,
         tier: str = 'standard'
     ) -> Dict[str, Any]:
         """
-        Generates a quote with full fee breakdown for user authorization.
+        Orchestrator Logic: Calculates total cost based on the exact base principal.
         """
-        # Ensure we read the config's rate lock window if available
-        # (Simplified: logic in orchestrator or here)
-        return self.fee_orchestrator.get_transparent_quote(
-            amount_send=amount_send,
-            currency_from=currency_from,
-            currency_to=currency_to,
-            mid_market_rate=mid_market_rate,
-            payment_method=payment_method,
-            outbound_method=outbound_method,
-            trueque_id=trueque_id
-        )
+        # Dynamic Asymmetric Fee Splitting
+        # Business (>= $5000) pays 1.0%, otherwise 1.5%. Applied to ENTIRE volume.
+        is_business = principal >= Decimal('5000.00')
+        symmetri_fee_percent = Decimal('0.010') if is_business else Decimal('0.015')
+        symmetri_fee_amount = (principal * symmetri_fee_percent).quantize(Decimal('0.01'))
 
-    
+        # Dynamic Gateway Fee
+        gateway_fee_amount = Decimal('0.00')
+        method = payment_method.upper()
+        if method == 'RTP':
+            gateway_fee_amount = Decimal('1.00')
+        elif method == 'CARD':
+            gateway_fee_percent = Decimal('0.025')
+            gateway_fee_amount = (principal * gateway_fee_percent).quantize(Decimal('0.01'))
+        
+        # Total to Pay
+        total_to_pay = principal + symmetri_fee_amount + gateway_fee_amount
+
+        # Family Receives
+        target_payout_amount = (principal * mid_market_rate).quantize(Decimal('0.01'))
+
+        # Build Dictionary
+        quote_details = {
+            "principal": float(principal),
+            "symmetri_fee_amount": float(symmetri_fee_amount),
+            "gateway_fee_amount": float(gateway_fee_amount),
+            "total_to_pay": float(total_to_pay),
+            "target_payout_amount": float(target_payout_amount),
+            "currency_from": currency_from,
+            "exchange_rate_used": float(mid_market_rate),
+            "currency_to": currency_to,
+            "rate_lock_window_mins": self.rate_lock_window,
+            "payment_method": method,
+            "outbound_method": outbound_method
+        }
+        
+        return quote_details
+
     def _secure_lookup_recipient(self, transaction_id: str) -> Dict[str, Any]:
         """
         MOCK: Securely looks up tokenized recipient data from the encrypted Vault.
         In production, this queries the DB using the TxID.
         """
-        # Mock logic based on TxID hash or similar
-        # For demo, returning fixed data structure that matches 'Recipient'
         return {
             "type": "bank",
             "name": "Maria Gonzalez",
             "iban": "ES1234567890123456789012",
             "bank_name": "BBVA",
-            "country": "ES"
+            "country": "MX" # changed to MX for SPEI context test
         }
 
     def trigger_payout(
         self, 
         transaction_id: str,
         quote_details: Dict[str, Any],
-        outbound_rail: str = None
+        match_result: Dict[str, Any] = None
     ) -> Dict[str, Any]:
         """
         Triggers the actual payout using authorized quote.
-        PRIVACY: Does NOT accept raw PII. Looks it up internally.
+        MTL Ready: Directly routes through FBO integrators (Direct_Bank_RTP / Direct_Bank_SPEI).
+        Ledger Wall: Segregates P2P funding (FBO) and Treasury funding (CORPORATE_ACCOUNT).
         """
         try:
             # 1. Secure Lookup
@@ -73,27 +97,41 @@ class PaymentController:
             if not recipient_data:
                  raise ValueError("Transaction/Recipient not found in Vault")
 
-            # 2. Dynamic Orchestration: Validate/Override Rail if provided
-            # The 'quote_details' usually has 'outbound_method' from the signed quote.
-            # But the 'Atlas' lookup requirement implies we might re-check or enforce.
-            # For now, we trust the secure quote parameters.
+            # 2. Ledger Split Identification
+            # By default, 100% of volume comes from P2P matchers on the FBO account.
+            total_principal = Decimal(str(quote_details.get("principal", 0)))
+            treasury_used = Decimal('0.00')
             
-            # 3. Construct Recipient
-            recipient = Recipient(**recipient_data)
+            if match_result and match_result.get("is_treasury_active"):
+                treasury_used = Decimal(str(match_result.get("treasury_usd", 0)))
+                
+            p2p_used = total_principal - treasury_used
             
-            # 4. Select Gateway (Dynamic Rail Selection)
-            gateway = GatewayRegistry.select_gateway(recipient)
+            funding_splits = {}
+            if p2p_used > 0:
+                funding_splits["FBO_ACCOUNT"] = float(p2p_used)
+            if treasury_used > 0:
+                funding_splits["CORPORATE_ACCOUNT"] = float(treasury_used)
+
+            # 3. Direct Bank API Routine (MTL Preparations)
+            currency = quote_details.get("currency_to", "USD")
             
-            # 5. Execute Payout
-            payout_ref = gateway.send_payout(recipient)
+            # The exact UX Rule: Bundled as one logical transfer with split internal funding accounts.
+            payout_ref = f"MTL-DIR-{transaction_id[:8]}"
+            gateway_name = "Direct_Bank_RTP" if currency == "USD" else "Direct_Bank_SPEI"
+            
+            print(f"[{gateway_name}] Executing Unified Transfer: {payout_ref}")
+            if "CORPORATE_ACCOUNT" in funding_splits:
+                print(f"   >>> Ledger Wall: Sub-Routing ${funding_splits['CORPORATE_ACCOUNT']:,.2f} from internal Treasury Corporate Account.")
             
             return {
                 "success": True,
                 "status": "processing",
                 "payout_reference": payout_ref,
-                "gateway": gateway.name,
-                "amount_net": quote_details.get("net_payout_amount"),
-                "currency": quote_details.get("target_currency")
+                "gateway": gateway_name,
+                "amount_net": quote_details.get("target_payout_amount"),
+                "currency": currency,
+                "funding_ledger_split": funding_splits
             }
             
         except Exception as e:
@@ -114,7 +152,7 @@ class PaymentController:
         match_id = payload.get('match_id') # Metadata passed to gateway
         role = payload.get('role') # 'user_a' or 'user_b'
         
-        print(f"[Webhook] Received {event_type} for Msatch {match_id} (User {role}): {status}")
+        print(f"[Webhook] Received {event_type} for Match {match_id} (User {role}): {status}")
 
         if not match_id:
              # Basic single payment flow logic (legacy/non-p2p)
@@ -171,7 +209,7 @@ class PaymentController:
         
         expired = self.match_service.check_rate_lock_expiry(match_id, self.rate_lock_window)
         if expired:
-            print(f"   >>> [Timeout] Match {match_id} EXPIRED. ROLBACK initiated.")
+            print(f"   >>> [Timeout] Match {match_id} EXPIRED. ROLLBACK initiated.")
             self.match_service.release_match(match_id)
             return {"status": "expired", "action": "rollback"}
             

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 
 from ..services.fx_consensus import FXConsensusService
-from ..audit_db import AuditDB
+from backend.audit_db import AuditDB
 
 class InvestorReportGenerator:
     """

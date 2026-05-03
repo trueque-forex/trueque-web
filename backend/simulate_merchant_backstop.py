@@ -106,7 +106,7 @@ def run_simulation():
         logger.error(f"LEDGER CHECK: FAILED. Expected {expected_mxn}, Got {oxxo_wallet.balance}")
 
     # 8. Verify Transaction Record
-    txn = db.query(Transaction).filter_by(receiver_user_id=oxxo.id).first()
+    txn = db.query(Transaction).filter_by(beneficiary_id=oxxo.id).first()
     if txn:
         calc_received = float(txn.amount) * float(txn.rate)
         logger.info(f"Transaction Found: {txn.amount} EUR -> {calc_received} {txn.to_currency}")

@@ -7,6 +7,10 @@ import retailers from '../../../config/retailers.json';
 
 const CARD_FEE_PCT   = 0.029;
 const CARD_FIXED_FEE = 0.30;
+const LIQUIDITY_FEE_PCT = 0.015;
+const RTP_FEE_PCT  = 0.0095;
+const RTP_MIN_FEE  = 0.50;
+const RTP_MAX_FEE  = 5.00;
 
 /** GEMINI.md §3.1 — The Minimum Floor. Hard-reject any voucher below this value. */
 const MIN_ORDER_VALUE = 20.00;
@@ -86,11 +90,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const { rate, source, fallback } = await getLiveRate('USD', retailer.currency);
         const amountLocal  = parseFloat((amountNum * rate).toFixed(2));
 
-        // 2. Fees — processor fee only for card, zero Symmetri fee always
+        // 2. Fees — processor fee for card/RTP, zero Symmetri fee always
         const processorFee = payment_method === 'card'
             ? parseFloat(((amountNum * CARD_FEE_PCT) + CARD_FIXED_FEE).toFixed(2))
+            : payment_method === 'rtp'
+            ? parseFloat((Math.min(Math.max(amountNum * RTP_FEE_PCT, RTP_MIN_FEE), RTP_MAX_FEE)).toFixed(2))
             : 0;
-        const totalCharged = parseFloat((amountNum + processorFee).toFixed(2));
+        const liquidityFee = payment_method === 'card' ? parseFloat((amountNum * LIQUIDITY_FEE_PCT).toFixed(2)) : 0;
+        const totalCharged = parseFloat((amountNum + processorFee + liquidityFee).toFixed(2));
 
         // 3. Unique voucher code
         const voucherCode = generateVoucherCode(retailer_id);
@@ -150,6 +157,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 rate_source:      source,
                 rate_fallback:    fallback,
                 processor_fee:    processorFee,
+                liquidity_fee:    liquidityFee,
                 symmetri_fee:     0,
                 total_charged:    totalCharged,
                 payment_method,

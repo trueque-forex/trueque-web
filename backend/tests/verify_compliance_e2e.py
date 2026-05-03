@@ -53,7 +53,7 @@ class TestComplianceE2E(unittest.TestCase):
         # Create a transaction with high precision decimal
         # 100.12345678, Rate 1.12345678
         t1 = Transaction(
-            tx_id=str(uuid.uuid4()),
+            id=str(uuid.uuid4()),
             user_id="user_test_1",
             from_currency="USD",
             to_currency="EUR",

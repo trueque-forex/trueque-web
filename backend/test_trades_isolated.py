@@ -41,7 +41,7 @@ def db_session():
 
 def test_details_offer(db_session):
     offer_id = str(uuid.uuid4())
-    db_session.add(Offer(uuid=offer_id, owner_id="user1", amount=100, currency_from="EUR", currency_to="ARS", amount_from=100, amount_to=100, market_rate=1.0, country="ES"))
+    db_session.add(Offer(uuid=offer_id, owner_id="user1", amount_offered=100, currency_from="EUR", currency_to="ARS", amount_from=100, amount_to=100, market_rate=1.0, country="ES"))
     db_session.commit()
     
     response = client.get(f"/api/trades/details/{offer_id}")
@@ -50,7 +50,7 @@ def test_details_offer(db_session):
 
 def test_signal_funding(db_session):
     offer_id = str(uuid.uuid4())
-    db_session.add(Offer(uuid=offer_id, owner_id="user1", amount=100, currency_from="EUR", currency_to="ARS", amount_from=100, amount_to=100, market_rate=1.0, country="ES"))
+    db_session.add(Offer(uuid=offer_id, owner_id="user1", amount_offered=100, currency_from="EUR", currency_to="ARS", amount_from=100, amount_to=100, market_rate=1.0, country="ES"))
     db_session.commit()
     
     response = client.post("/api/trades/signal-funding", json={"trade_id": offer_id})

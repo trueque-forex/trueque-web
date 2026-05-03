@@ -106,7 +106,7 @@ class ComplianceReportingService:
         
         query = self.db.query(Transaction, Sender, Receiver).\
             join(Sender, Transaction.user_id == Sender.id).\
-            outerjoin(Receiver, Transaction.receiver_user_id == Receiver.id)
+            outerjoin(Receiver, Transaction.beneficiary_id == Receiver.id)
         
         if start_date:
             query = query.filter(Transaction.timestamp >= start_date)

@@ -33,8 +33,8 @@ def get_trade_details(id: str = Query(...), db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="Trade or Offer not found")
 
     # 2. Find the Active Gateway
-    source_currency = trade.currency if not is_offer else trade.currency_offered
-    target_currency = trade.currency_received if not is_offer else trade.currency_wanted
+    source_currency = trade.source_currency
+    target_currency = trade.target_currency
     
     # Infer corridor code for lookup
     corridor_map = {
@@ -49,22 +49,12 @@ def get_trade_details(id: str = Query(...), db: Session = Depends(get_db)):
     if corridor_code:
         gateway = query.filter(InstitutionalGateway.corridor_code == corridor_code).first()
     else:
-        # Fallback to currency-based lookup for backward compatibility
         gateway = query.filter(InstitutionalGateway.currency == source_currency).first()
 
     if not gateway:
         return {"status": trade.status, "error": f"No active gateway found for corridor {corridor_code or source_currency}"}
 
-    # 3. Handle Hybrid Logic (Vouchers vs. Bank)
     details = gateway.payment_details.copy()
-    voucher_code = None
-    
-    if gateway.rail_type == "RETAILER_API":
-        # Mock a voucher code generation for Soriana/Retailer
-        retailer = details.get("retailer", "MERCHANT")
-        random_suffix = id[:4].upper() + "-" + id[-4:].upper()
-        voucher_code = f"{retailer.upper()}-{random_suffix}"
-        details["code"] = voucher_code
 
     # 4. Hydrate Instructions
     instructions = hydrate_instructions(gateway.instruction_template, details, id)
@@ -75,28 +65,25 @@ def get_trade_details(id: str = Query(...), db: Session = Depends(get_db)):
         "id": id,
         "type": "SYNTHETIC" if is_offer else "DIRECT",
         "status": trade.status,
-        "amount": str(trade.amount if not is_offer else trade.amount_offered),
-        "currency": source_currency,
+        "amount": str(trade.amount),
+        "source_currency": source_currency,
         "payment_instructions": {
             "rail": gateway.rail_type,
             "bank_name": details.get("bank", details.get("retailer", "Symmetri Gateway")),
-            "account_identifier": details.get("clabe") or details.get("phone") or details.get("iban") or "VOUCHER_SERVICE",
+            "account_identifier": details.get("clabe") or details.get("phone") or details.get("iban"),
             "beneficiary": details.get("beneficiary") or details.get("retailer") or "Symmetri",
             "concept_code": reference_code,
-            "voucher_code": voucher_code,
             "step_by_step": instructions
         },
         "inbound_confirmed": getattr(trade, 'inbound_verified', False)
     }
 
-    # Add optional received info
+    response["amount_received"] = str(trade.amount_received)
+    response["target_currency"] = trade.target_currency
+    
     if not is_offer:
-        response["amount_received"] = str(trade.amount_received)
-        response["currency_received"] = trade.currency_received
         response["total_fees"] = str(trade.fee)
     else:
-        response["amount_received"] = str(trade.amount_wanted)
-        response["currency_received"] = trade.currency_wanted
         response["total_fees"] = str(trade.fee_total or "0.00")
 
     return response

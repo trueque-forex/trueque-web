@@ -14,6 +14,7 @@ class ErrorCode(str, Enum):
     # Match/Transaction
     MATCH_EXPIRED = "MATCH_EXPIRED"
     MATCH_INVALID_STATE = "MATCH_INVALID_STATE"
+    PAYMENT_REQUIRED = "PAYMENT_REQUIRED"
     
     # System
     INTERNAL_ERROR = "INTERNAL_ERROR"

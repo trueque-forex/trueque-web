@@ -1,107 +1,46 @@
-# backend/routes/transactions.py
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from pydantic import BaseModel, Field
+from decimal import Decimal
+from typing import Optional
 
-from ..models.transaction import Transaction
-from ..models.user_kyc import UserKYC
-from ..database import get_db
-from ..lib.trueque_id import generate_trueque_id
+from backend.database import get_db
+from ..controllers.transaction_controller import TransactionController
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
-@router.post("/create")
-async def create_transaction(
-    offer_id: str,
-    counterparty_user_id: int,
-    amount_send: float,
-    amount_receive: float,
-    currency_from: str,
-    currency_to: str,
-    user_id: int,  # From authenticated session
-    db: Session = Depends(get_db)
-):
+class VoucherRequest(BaseModel):
+    owner_id: str = Field(..., description="The @Handle or UUID of the owner")
+    principal: Decimal = Field(..., description="The amount to transition, minimum $20.00", ge=20)
+    currency: str = Field(..., description="Source currency code (e.g., USD)")
+    destination_country: str = Field(..., description="Destination country code (e.g., MX)")
+    target_currency: str = Field(..., description="Target currency code (e.g., MXN)")
+    payment_success_token: str = Field(..., description="Required token for Synchronous Lock")
+    beneficiary_id: Optional[str] = Field(None, description="Optional @Handle or UUID of beneficiary")
+
+    class Config:
+        extra = "forbid"
+
+transaction_controller = TransactionController()
+
+@router.post("/voucher")
+async def create_voucher(request: VoucherRequest, db: Session = Depends(get_db)):
     """
-    Create a new transaction
-    Checks KYC requirements before proceeding
+    Exposes Symmetri Flow A: Retail Voucher Creation.
+    Enforces Zero-Custody and $20 Floor.
     """
     try:
-        # Convert to USD for KYC check (simplified - use real exchange rates in production)
-        amount_usd = amount_send if currency_from == 'USD' else amount_receive
-        
-        # Check KYC requirement
-        kyc_record = db.query(UserKYC).filter(UserKYC.user_id == user_id).first()
-        
-        requires_kyc = False
-        kyc_reason = None
-        
-        if not kyc_record:
-            kyc_record = UserKYC(
-                user_id=user_id,
-                trueque_id=get_user_trueque_id(user_id, db),
-                transaction_count=0,
-                total_transaction_value_usd=0
-            )
-            db.add(kyc_record)
-            db.commit()
-        
-        # Check KYC triggers
-        if kyc_record.kyc_status != 'approved':
-            if amount_usd >= 150:
-                requires_kyc = True
-                kyc_reason = "Transaction amount >= $150 USD"
-            elif kyc_record.transaction_count >= 3:
-                requires_kyc = True
-                kyc_reason = "Completed 3+ transactions"
-        
-        if requires_kyc:
-            # Update KYC status
-            kyc_record.kyc_status = 'required'
-            db.commit()
-            
-            raise HTTPException(
-                status_code=403, 
-                detail={
-                    "error": "KYC_REQUIRED",
-                    "message": "Please complete KYC verification to proceed",
-                    "reason": kyc_reason,
-                    "redirect_to": "/kyc"
-                }
-            )
-        
-        # Generate transaction ID
-        transaction_id = generate_trueque_id(
-            datetime.now(timezone.utc),
-            currency_from[:2],
-            kyc_record.transaction_count + 1
+        return transaction_controller.create_retail_voucher(
+            db=db,
+            owner_id=request.owner_id,
+            principal=request.principal,
+            currency=request.currency,
+            destination_country=request.destination_country,
+            target_currency=request.target_currency,
+            payment_success_token=request.payment_success_token,
+            beneficiary_id=request.beneficiary_id
         )
-        
-        # Create transaction
-        transaction = Transaction(
-            transaction_id=transaction_id,
-            user_a_id=user_id,
-            user_b_id=counterparty_user_id,
-            user_a_sends_amount=amount_send,
-            user_a_sends_currency=currency_from,
-            user_b_sends_amount=amount_receive,
-            user_b_sends_currency=currency_to,
-            status='pending',
-            kyc_checked=True,
-            kyc_required=False
-        )
-        
-        db.add(transaction)
-        db.commit()
-        
-        return {
-            "success": True,
-            "transaction_id": transaction_id,
-            "status": "pending",
-            "message": "Transaction created successfully"
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error creating transaction: {str(e)}")
+        if hasattr(e, 'status_code'):
+            raise HTTPException(status_code=e.status_code, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))

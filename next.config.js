@@ -10,6 +10,22 @@ module.exports = {
   eslint: {
     ignoreDuringBuilds: true
   },
+
+  // ── CORS — allow Flutter web (dev) and mobile clients ──────────────────
+  // Production: replace '*' with your actual origin (e.g. 'https://app.symmetri.com')
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin',  value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PUT,PATCH,DELETE,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type,Authorization' },
+        ],
+      },
+    ];
+  },
+
   async rewrites() {
     return {
       // beforeFiles: checked before ANY filesystem lookup (use sparingly)

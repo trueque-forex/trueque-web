@@ -2,12 +2,13 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric, F
 from sqlalchemy.orm import relationship
 from backend.database import Base
 from datetime import datetime, timezone
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 class InternalWallet(Base):
     __tablename__ = "internal_wallets"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True)
     currency = Column(String, default="USD") # Base settlement currency
     balance = Column(Float, default=0)
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

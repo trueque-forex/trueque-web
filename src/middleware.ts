@@ -8,14 +8,33 @@ const AUTH_ROUTES = ['/login', '/register', '/signin', '/signup'];
 const PUBLIC_FILE_PATHS = [
   '/signin', '/signup', '/verify', '/forgot-password', '/reset-password', '/about',
   '/api/auth/signin', '/api/auth/signup', '/api/auth/verify', '/api/auth/forgot-password', '/api/auth/reset-password',
-  '/api/setup_schema', // Temporary Admin Route
-  '/api/dev/mfa-peek'  // DEV ONLY — delete after testing
+  '/api/mobile/signin',   // Mobile JWT auth — no session cookie required
+  '/api/mobile/signup',   // Mobile registration — no session cookie required
+  '/api/setup_schema',    // Temporary Admin Route
+  '/api/dev/mfa-peek'     // DEV ONLY — delete after testing
 ];
 
 export async function middleware(req: NextRequest) {
   const cookie = req.cookies.get('session')?.value || req.cookies.get('trueque_sid')?.value;
   const session = cookie ? await decrypt(cookie) : null;
   const { pathname } = req.nextUrl;
+
+  // ── CORS — allow Flutter web dev (port 8080) and the mobile app ──────────
+  // In production: replace '*' with your actual domain.
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
+  // Handle OPTIONS preflight immediately — no auth needed
+  if (req.method === 'OPTIONS') {
+    return new NextResponse(null, { status: 204, headers: corsHeaders });
+  }
+
+  // Mobile clients send Authorization: Bearer <JWT> instead of a session cookie.
+  // The middleware doesn't validate the JWT (that's withAuth's job) — it just lets
+  // the request through so the handler can verify it via getSession().
+  const hasBearerToken = req.headers.get('authorization')?.startsWith('Bearer ') ?? false;
 
   // 2. ALLOW STATIC ASSETS
   if (
@@ -86,12 +105,20 @@ export async function middleware(req: NextRequest) {
       !pathname.startsWith('/api/matches') &&  // Dev console — match creation & listing
       !pathname.startsWith('/api/trades') &&   // Trade room — details & signal-funding
       !pathname.startsWith('/api/fx-rate') &&  // FX rate lookup (public read-only)
+      !hasBearerToken &&                       // Mobile JWT clients — handler re-validates
       !PUBLIC_FILE_PATHS.includes(pathname)) { // CHECK WHITELIST
       return handleUnauthorized();
     }
   }
 
-  return NextResponse.next();
+  // Pass through — add CORS headers to every API response
+  const response = NextResponse.next();
+  if (pathname.startsWith('/api/')) {
+    response.headers.set('Access-Control-Allow-Origin', corsHeaders['Access-Control-Allow-Origin']);
+    response.headers.set('Access-Control-Allow-Methods', corsHeaders['Access-Control-Allow-Methods']);
+    response.headers.set('Access-Control-Allow-Headers', corsHeaders['Access-Control-Allow-Headers']);
+  }
+  return response;
 }
 
 export const config = {

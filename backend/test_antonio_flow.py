@@ -79,12 +79,12 @@ class TestAntonioNuevoFlow(unittest.TestCase):
         
         # Create Tx
         tx = Transaction(
-            tx_id="tx_antonio_001",
+            id="tx_antonio_001",
             user_id="antonio-uuid-123",
             from_currency="MXN",
             to_currency="USD",
             amount=1500.0,
-            rate=0.05,
+            exchange_rate=0.05,
             status="pending",
             transaction_type="TYPE_DOMESTIC_P2P_MATCH"
         )
@@ -136,12 +136,12 @@ class TestAntonioNuevoFlow(unittest.TestCase):
         
         # Create Tx
         tx = Transaction(
-            tx_id="tx_antonio_001",
+            id="tx_antonio_001",
             user_id="antonio-uuid-123",
             from_currency="MXN",
             to_currency="USD",
             amount=1500.0,
-            rate=0.05,
+            exchange_rate=0.05,
             status="pending",
             transaction_type="TYPE_DOMESTIC_P2P_MATCH"
         )

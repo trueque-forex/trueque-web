@@ -23,7 +23,7 @@
     "country": "MX",
     "currency": "MXN",
     "minUSD": 20,
-    "maxUSD": 200,
+    "maxUSD": 500,
     "description": "Redeemable at 20,000+ OXXO stores across Mexico",
     "locations": [
       { "city": "Ciudad de México", "lat": 19.4285, "lng": -99.1277, "store_id": "OXX-CDMX-001" },
@@ -41,7 +41,7 @@
     "country": "MX",
     "currency": "MXN",
     "minUSD": 20,
-    "maxUSD": 300,
+    "maxUSD": 500,
     "description": "Redeemable at Soriana supermarkets throughout Mexico",
     "locations": [
       { "city": "Monterrey",        "lat": 25.6614, "lng": -100.3500, "store_id": "SOR-MTY-001" },
@@ -57,7 +57,7 @@
     "country": "MX",
     "currency": "MXN",
     "minUSD": 20,
-    "maxUSD": 150,
+    "maxUSD": 500,
     "description": "Redeemable at Farmacias Similares locations nationwide",
     "locations": [
       { "city": "Ciudad de México", "lat": 19.4360, "lng": -99.1435, "store_id": "SIM-CDMX-001" },
@@ -73,7 +73,7 @@
     "country": "MX",
     "currency": "MXN",
     "minUSD": 20,
-    "maxUSD": 1000,
+    "maxUSD": 500,
     "description": "Redeemable at Coppel department stores in Mexico",
     "locations": [
       { "city": "Culiacán",         "lat": 24.8091, "lng": -107.3940, "store_id": "COP-CUL-001" },
