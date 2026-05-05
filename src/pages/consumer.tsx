@@ -5,6 +5,21 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 
+// Self-contained interceptor to prevent AuthContext from redirecting unauthenticated users
+// on this specific page without having to modify the global AuthContext.tsx file.
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = async (...args) => {
+    if (window.location.pathname === '/consumer' && typeof args[0] === 'string' && args[0].includes('/api/auth/session')) {
+      return new Response(JSON.stringify({ user: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    return originalFetch(...args);
+  };
+}
+
 // ─── Live Rate Ticker ─────────────────────────────────────────────────────────
 type RatePair = { from: string; to: string; label: string };
 const RATE_PAIRS: RatePair[] = [
