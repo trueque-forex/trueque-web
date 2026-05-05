@@ -1,0 +1,12 @@
+venv/
+.venv/
+node_modules/
+__pycache__/
+*.db
+*.sqlite3
+.env
+venv313/
+*.tar.gz
+*.log
+*.txt
+backups/
