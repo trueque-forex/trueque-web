@@ -12,7 +12,7 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSession } from '../../../lib/session';
-import { query } from '../../../../lib/db';
+import { query } from '../../../lib/db';
 
 export const MONTHLY_LIMIT_USD = 750;
 export const PER_TX_LIMIT_USD  = 250;
