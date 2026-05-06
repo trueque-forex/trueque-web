@@ -11,6 +11,8 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <title>Symmetri | Technological Swap Currency App</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Canonical: tells Google to credit symmetri.org regardless of which URL serves the page */}
+        <link rel="canonical" href="https://symmetri.org/" />
         <meta name="description" content="Symmetri converts cross-border purchasing power into closed-loop digital vouchers. We optimize working capital and eliminate legacy cash-handling costs for retail partners." />
         <meta name="keywords" content="Symmetri, swap currency app, closed-loop vouchers, cross-border capital, retail OWC optimization, Werner Galvis" />
         
