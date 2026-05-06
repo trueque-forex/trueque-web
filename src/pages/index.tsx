@@ -44,7 +44,7 @@ export default function B2BLandingPage() {
             href="mailto:partners@symmetri.org?subject=Inquiry:%20Phase%201%20Symmetri%20Pilot"
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-300 px-3 py-2 rounded-lg hover:bg-slate-100"
           >
-            Contact Sales
+            Become a Partner
           </a>
         </div>
       </nav>
