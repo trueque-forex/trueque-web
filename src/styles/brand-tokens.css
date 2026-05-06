@@ -1,0 +1,91 @@
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SYMMETRI BRAND TOKENS  —  Single Source of Truth
+ * Extracted from src/pages/index.tsx (the canonical B2B landing page)
+ *
+ * HOW TO USE:
+ *   In Tailwind pages  → use the class names listed in the comments
+ *   In inline-style pages → use the CSS variable values below
+ *   In new components  → always reference this file before picking a color
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+:root {
+  /* ── Typography ─────────────────────────────────────────────── */
+  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  /* Tailwind: font-sans  (configured in tailwind.config.js) */
+
+  /* ── Background ─────────────────────────────────────────────── */
+  --color-bg-base:        #F8FAFC;  /* Tailwind: bg-slate-50  */
+  --color-bg-surface:     #FFFFFF;  /* Tailwind: bg-white     */
+  --color-bg-muted:       #F1F5F9;  /* Tailwind: bg-slate-100 */
+
+  /* ── Text ───────────────────────────────────────────────────── */
+  --color-text-primary:   #0F172A;  /* Tailwind: text-slate-900  — headings    */
+  --color-text-secondary: #334155;  /* Tailwind: text-slate-700  — subheadings */
+  --color-text-muted:     #64748B;  /* Tailwind: text-slate-500  — body copy   */
+  --color-text-subtle:    #94A3B8;  /* Tailwind: text-slate-400  — captions    */
+
+  /* ── Brand Gradient (logo, CTAs, accent text) ───────────────── */
+  --color-brand-from:     #2563EB;  /* Tailwind: blue-600    */
+  --color-brand-to:       #4338CA;  /* Tailwind: indigo-700  */
+  --gradient-brand: linear-gradient(135deg, #2563EB 0%, #4338CA 100%);
+  /* Tailwind: bg-gradient-to-br from-blue-600 to-indigo-700 */
+
+  /* ── Brand Horizontal (headline accent, pill bg, feature icon bg) */
+  --gradient-brand-h: linear-gradient(90deg, #2563EB 0%, #4F46E5 100%);
+  /* Tailwind: bg-gradient-to-r from-blue-600 to-indigo-600 */
+
+  /* ── Feature Accent Colors ──────────────────────────────────── */
+  --color-accent-blue:    #2563EB;  /* Tailwind: blue-600    — feature 1 */
+  --color-accent-indigo:  #4F46E5;  /* Tailwind: indigo-600  — feature 2 */
+  --color-accent-purple:  #9333EA;  /* Tailwind: purple-600  — feature 3 */
+
+  /* ── Borders ────────────────────────────────────────────────── */
+  --color-border:         #E2E8F0;  /* Tailwind: border-slate-200 */
+  --color-border-muted:   #F1F5F9;  /* Tailwind: border-slate-100 */
+
+  /* ── Logo ───────────────────────────────────────────────────── */
+  /* Logo mark: bg-gradient-to-br from-blue-600 to-indigo-700, rounded-xl, w-10 h-10 */
+  /* Logo letter: text-white font-bold text-2xl — the letter "S" */
+  /* Logo wordmark: text-slate-900 font-bold text-2xl tracking-tight — "Symmetri" */
+
+  /* ── CTA Button (primary dark) ──────────────────────────────── */
+  --color-cta-bg:         #0F172A;  /* Tailwind: bg-slate-900 */
+  --color-cta-text:       #FFFFFF;
+
+  /* ── Shadows ────────────────────────────────────────────────── */
+  --shadow-card: 0 4px 24px rgba(148, 163, 184, 0.15);   /* shadow-lg shadow-slate-200/50 */
+  --shadow-glow: 0 0 40px rgba(37, 99, 235, 0.15);       /* blue glow behind logo/CTA     */
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * QUICK REFERENCE — Tailwind class cheat-sheet for Symmetri brand
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ *  Page bg .............. bg-slate-50
+ *  Card / panel bg ...... bg-white  border border-slate-100
+ *  Section divider ...... border-slate-200
+ *
+ *  H1 (gradient) ........ text-transparent bg-clip-text
+ *                         bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600
+ *  H2 (solid) ........... text-slate-900 font-bold
+ *  Body copy ............ text-slate-500 font-light
+ *  Captions / meta ...... text-slate-400
+ *
+ *  Brand logo mark ...... bg-gradient-to-br from-blue-600 to-indigo-700
+ *                         rounded-xl  shadow-md  border border-slate-100
+ *  Brand accent text .... text-transparent bg-clip-text
+ *                         bg-gradient-to-r from-blue-600 to-indigo-600
+ *
+ *  Feature icon — blue .. bg-blue-50   text-blue-600   border-blue-100
+ *  Feature icon — indigo  bg-indigo-50 text-indigo-600 border-indigo-100
+ *  Feature icon — purple  bg-purple-50 text-purple-600 border-purple-100
+ *
+ *  Primary CTA .......... bg-slate-900 text-white hover:bg-slate-800
+ *                         rounded-xl   shadow-xl shadow-slate-900/20
+ *
+ *  Font ................. font-sans  (Plus Jakarta Sans — see tailwind.config.js)
+ * ─────────────────────────────────────────────────────────────────────────────
+ */

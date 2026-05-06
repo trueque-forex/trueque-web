@@ -11,12 +11,11 @@ const PUBLIC_FILE_PATHS = [
   '/api/mobile/signin',   // Mobile JWT auth — no session cookie required
   '/api/mobile/signup',   // Mobile registration — no session cookie required
   '/api/setup_schema',    // Temporary Admin Route
-  '/api/dev/mfa-peek'     // DEV ONLY — delete after testing
+  '/api/dev/mfa-peek',    // DEV ONLY — delete after testing
+  '/social-card',         // OG image screenshotter — no auth required
 ];
 
 export async function middleware(req: NextRequest) {
-  const cookie = req.cookies.get('session')?.value || req.cookies.get('trueque_sid')?.value;
-  const session = cookie ? await decrypt(cookie) : null;
   const { pathname } = req.nextUrl;
 
   // ── CORS — allow Flutter web dev (port 8080) and the mobile app ──────────
@@ -31,12 +30,7 @@ export async function middleware(req: NextRequest) {
     return new NextResponse(null, { status: 204, headers: corsHeaders });
   }
 
-  // Mobile clients send Authorization: Bearer <JWT> instead of a session cookie.
-  // The middleware doesn't validate the JWT (that's withAuth's job) — it just lets
-  // the request through so the handler can verify it via getSession().
-  const hasBearerToken = req.headers.get('authorization')?.startsWith('Bearer ') ?? false;
-
-  // 2. ALLOW STATIC ASSETS
+  // 2. ALLOW STATIC ASSETS — must run before session decryption for performance
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/static') ||
@@ -44,6 +38,22 @@ export async function middleware(req: NextRequest) {
   ) {
     return NextResponse.next();
   }
+
+  // 2b. ALLOW PUBLIC PAGES — bypass ALL auth logic (screenshotter, OG images, etc.)
+  // This runs BEFORE session decryption so authenticated-but-unverified sessions
+  // cannot accidentally intercept these routes.
+  if (PUBLIC_FILE_PATHS.includes(pathname)) {
+    return NextResponse.next();
+  }
+
+  // Decrypt session only for routes that need auth checks
+  const cookie = req.cookies.get('session')?.value || req.cookies.get('trueque_sid')?.value;
+  const session = cookie ? await decrypt(cookie) : null;
+
+  // Mobile clients send Authorization: Bearer <JWT> instead of a session cookie.
+  // The middleware doesn't validate the JWT (that's withAuth's job) — it just lets
+  // the request through so the handler can verify it via getSession().
+  const hasBearerToken = req.headers.get('authorization')?.startsWith('Bearer ') ?? false;
 
   // 3. HELPER: HANDLE UNAUTHORIZED REQUESTS
   // If it's an API call, return JSON. If it's a page, redirect.

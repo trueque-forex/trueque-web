@@ -12,7 +12,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshSession = async () => {
         // Bypass checks on public pages? NO. perform SOFT CHECK.
         // Added /verify-mfa to public paths to prevent circular logic if session fetch has issues
-        const publicPaths = ['/signup', '/signin', '/login', '/', '/auth/mfa', '/verify-mfa', '/about', '/forgot-password', '/voucher', '/voucher-success'];
+        const publicPaths = ['/signup', '/signin', '/login', '/', '/auth/mfa', '/verify-mfa', '/about', '/forgot-password', '/voucher', '/voucher-success', '/social-card'];
 
         try {
             // Use specialized session endpoint that returns fresh DB counts (ignoring drafts)
