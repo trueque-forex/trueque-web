@@ -41,7 +41,7 @@ export default function B2BLandingPage() {
         </div>
         <div>
           <a
-            href="mailto:werner.galvis@symmetri.org?subject=Interest%20in%20Phase%201%20Pilot"
+            href="mailto:partners@symmetri.org?subject=Inquiry:%20Phase%201%20Symmetri%20Pilot"
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-300 px-3 py-2 rounded-lg hover:bg-slate-100"
           >
             Contact Sales
@@ -147,7 +147,7 @@ export default function B2BLandingPage() {
             <div className="relative group mt-8">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500 group-hover:duration-200"></div>
               <a
-                href="mailto:werner.galvis@symmetri.org?subject=Interest%20in%20Phase%201%20Pilot"
+                href="mailto:partners@symmetri.org?subject=Inquiry:%20Phase%201%20Symmetri%20Pilot"
                 className="relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-slate-900 rounded-xl border border-slate-800 hover:bg-slate-800 transition-all duration-300 shadow-xl shadow-slate-900/20 overflow-hidden"
               >
                 <span className="relative z-10 flex items-center gap-2">
