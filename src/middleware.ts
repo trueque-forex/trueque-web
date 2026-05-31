@@ -13,6 +13,7 @@ const PUBLIC_FILE_PATHS = [
   '/api/setup_schema',    // Temporary Admin Route
   '/api/dev/mfa-peek',    // DEV ONLY — delete after testing
   '/social-card',         // OG image screenshotter — no auth required
+  '/demo/retailer',       // Public retailer sales demo — no auth required
 ];
 
 export async function middleware(req: NextRequest) {
