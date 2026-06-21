@@ -1,5 +1,5 @@
-// src/components/CorridorSelector.tsx
 import React, { useState, useEffect } from 'react';
+import { useMarket } from '../context/MarketContext';
 
 type Country = {
   name: string;
@@ -25,6 +25,7 @@ const countries: Country[] = [
   { name: 'Nigeria', iso: '566', flag: '🇳🇬' },
   { name: 'Ghana', iso: '288', flag: '🇬🇭' },
   { name: 'Guatemala', iso: '320', flag: '🇬🇹' },
+  { name: 'Dominican Republic', iso: '214', flag: '🇩🇴' },
   { name: 'Ecuador', iso: '218', flag: '🇪🇨' },
 ];
 
@@ -46,14 +47,18 @@ const corridorMap: Record<string, Corridor[]> = {
   ],
   '862': [{ name: 'Send to Colombia', code: '10', targetIso: '170' }],
   '724': [
+    { name: 'Send to Colombia', code: 'ES-CO', targetIso: '170' },
+    { name: 'Send to Dominican Rep.', code: 'ES-DO', targetIso: '214' },
     { name: 'Send to Brazil', code: '11', targetIso: '076' },
-    { name: 'Send to Argentina', code: '12', targetIso: '032' },
     { name: 'Send to Mexico', code: '13', targetIso: '484' },
-    { name: 'Send to Colombia', code: '14', targetIso: '170' },
   ],
   '566': [{ name: 'Send to Ghana', code: '15', targetIso: '288' }],
   '288': [{ name: 'Send to Nigeria', code: '16', targetIso: '566' }],
-  '840': [{ name: 'Send to Mexico', code: '17', targetIso: '484' }],
+  '840': [
+    { name: 'Send to Mexico', code: '17', targetIso: '484' },
+    { name: 'Send to Guatemala', code: '18', targetIso: '320' },
+    { name: 'Send to Dominican Rep.', code: '19', targetIso: '214' },
+  ],
   '320': [{ name: 'Send to Mexico', code: '18', targetIso: '484' }],
 };
 
@@ -62,9 +67,13 @@ export default function CorridorSelector({
 }: {
   onSelect?: (params: { fromIso: string; toIso: string; corridorCode: string }) => void;
 }) {
+  const { originMarket } = useMarket();
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [availableCorridors, setAvailableCorridors] = useState<Corridor[]>([]);
   const [selectedCorridor, setSelectedCorridor] = useState<Corridor | null>(null);
+
+  const allowedOrigins = originMarket === 'US' ? ['840'] : ['724'];
+  const filteredCountries = countries.filter(c => allowedOrigins.includes(c.iso));
 
   useEffect(() => {
     if (selectedCountry) {
@@ -96,7 +105,7 @@ export default function CorridorSelector({
           className="mt-1 block w-full border rounded px-2 py-1"
         >
           <option value="">-- Choose a country --</option>
-          {countries.map((c) => (
+          {filteredCountries.map((c) => (
             <option key={c.iso} value={c.iso}>
               {c.flag} {c.name}
             </option>

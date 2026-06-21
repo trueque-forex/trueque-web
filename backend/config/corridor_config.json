@@ -211,6 +211,42 @@
                     "label": "Bank Transfer"
                 }
             }
+        },
+        "CO": {
+            "name": "Colombia",
+            "currency": "COP",
+            "tax_rate_on_fees": 0.19,
+            "inbound_gateways": {
+                "pse": {
+                    "pct": 0.015,
+                    "fixed": 0.10,
+                    "label": "PSE"
+                }
+            },
+            "outbound_rails": {
+                "transfiya": {
+                    "cost": 0.00,
+                    "label": "Transfiya"
+                }
+            }
+        },
+        "GT": {
+            "name": "Guatemala",
+            "currency": "GTQ",
+            "tax_rate_on_fees": 0.12,
+            "inbound_gateways": {
+                "ach": {
+                    "pct": 0.00,
+                    "fixed": 0.50,
+                    "label": "Local ACH"
+                }
+            },
+            "outbound_rails": {
+                "ach_payout": {
+                    "cost": 1.00,
+                    "label": "Local ACH Transfer"
+                }
+            }
         }
     },
     "target_markets": [

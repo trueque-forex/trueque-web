@@ -43,6 +43,13 @@ export const MarketMap: Record<string, MarketConfig> = {
         type: 'alphanumeric',
         placeholder: 'CPF or PIX Key'
     },
+    'COP': {
+        country: 'Colombia',
+        label: 'Transfiya / Account Number',
+        length: 11,
+        type: 'numeric',
+        placeholder: 'Phone or Account'
+    },
     'PEN': {
         country: 'Peru',
         label: 'CCI (Interbank Account)',

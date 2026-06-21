@@ -1,5 +1,6 @@
 import Head from 'next/head';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useMarket } from '../context/MarketContext';
 
 // Self-contained interceptor to prevent AuthContext from redirecting unauthenticated users
 // on this specific page without having to modify the global AuthContext.tsx file.
@@ -17,6 +18,15 @@ if (typeof window !== 'undefined') {
 }
 
 export default function B2BLandingPage() {
+  const { originMarket, setOriginMarket } = useMarket();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isES = originMarket === 'ES';
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-blue-500/20 selection:text-blue-900 overflow-hidden">
       <Head>
@@ -39,7 +49,23 @@ export default function B2BLandingPage() {
           </div>
           <span className="text-2xl font-bold text-slate-900 tracking-tight">Symmetri</span>
         </div>
-        <div>
+        <div className="flex items-center gap-6">
+          {mounted && (
+            <div className="flex items-center bg-slate-100 rounded-lg p-1">
+              <button 
+                onClick={() => setOriginMarket('US')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${!isES ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                🇺🇸 US
+              </button>
+              <button 
+                onClick={() => setOriginMarket('ES')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${isES ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                🇪🇸 ES
+              </button>
+            </div>
+          )}
           <a
             href="mailto:partners@symmetri.org?subject=Inquiry:%20Phase%201%20Symmetri%20Pilot"
             className="text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors duration-300 px-3 py-2 rounded-lg hover:bg-slate-100"
@@ -60,7 +86,7 @@ export default function B2BLandingPage() {
             </h1>
             
             <p className="text-base md:text-lg text-slate-600 max-w-3xl font-light leading-relaxed">
-              Symmetri is a technological swap currency platform converting US purchasing power into closed-loop digital vouchers.
+              Symmetri is a technological swap currency platform converting {mounted && isES ? 'European' : 'US'} purchasing power into closed-loop digital vouchers.
             </p>
           </div>
         </section>
@@ -138,9 +164,9 @@ export default function B2BLandingPage() {
                </svg>
             </div>
             <h2 className="text-2xl md:text-4xl font-light tracking-wide leading-tight text-slate-500 mb-10">
-              Connecting US capital to retail networks across <br className="hidden md:block py-2" />
+              Connecting {mounted && isES ? 'European' : 'US'} capital to retail networks across <br className="hidden md:block py-2" />
               <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 mt-4 block pb-2">
-                Mexico, Guatemala, and the Dominican Republic.
+                {mounted && isES ? 'Colombia, the Dominican Republic, and LatAm.' : 'Mexico, Guatemala, and the Dominican Republic.'}
               </span>
             </h2>
 

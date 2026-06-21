@@ -40,96 +40,121 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2b. ALLOW PUBLIC PAGES — bypass ALL auth logic (screenshotter, OG images, etc.)
-  // This runs BEFORE session decryption so authenticated-but-unverified sessions
-  // cannot accidentally intercept these routes.
-  if (PUBLIC_FILE_PATHS.includes(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Decrypt session only for routes that need auth checks
-  const cookie = req.cookies.get('session')?.value || req.cookies.get('trueque_sid')?.value;
-  const session = cookie ? await decrypt(cookie) : null;
-
-  // Mobile clients send Authorization: Bearer <JWT> instead of a session cookie.
-  // The middleware doesn't validate the JWT (that's withAuth's job) — it just lets
-  // the request through so the handler can verify it via getSession().
-  const hasBearerToken = req.headers.get('authorization')?.startsWith('Bearer ') ?? false;
-
-  // 3. HELPER: HANDLE UNAUTHORIZED REQUESTS
-  // If it's an API call, return JSON. If it's a page, redirect.
-  const handleUnauthorized = () => {
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL('/login', req.url));
-  };
-
-  // 4. REDIRECT RULES
-
-  // RULE A: User IS Authenticated
-  if (session?.user) {
-    // Trying to access Login -> Go to Dashboard
-    if (AUTH_ROUTES.includes(pathname)) {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+  // 3. MAIN ROUTE HANDLER
+  async function routeHandler() {
+    if (PUBLIC_FILE_PATHS.includes(pathname)) {
+      return NextResponse.next();
     }
 
-    // MFA CHECK:
-    // If NOT verified, force them to /verify-mfa (unless they are already there or calling the verify API)
-    if (!session.mfaVerified) {
-      if (pathname === '/verify-mfa' || pathname.startsWith('/api/auth')) {
-        // Allow access to verification page and auth APIs
-      } else if (pathname.startsWith('/api/')) {
-        // Block other API calls with JSON 401 (Don't redirect to HTML!)
-        return handleUnauthorized();
-      } else {
-        // Redirect pages to verification
-        return NextResponse.redirect(new URL('/verify-mfa', req.url));
+    const cookie = req.cookies.get('session')?.value || req.cookies.get('trueque_sid')?.value;
+    const session = cookie ? await decrypt(cookie) : null;
+    const hasBearerToken = req.headers.get('authorization')?.startsWith('Bearer ') ?? false;
+
+    const handleUnauthorized = () => {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL('/login', req.url));
+    };
+
+    if (session?.user) {
+      if (AUTH_ROUTES.includes(pathname)) {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
+      if (!session.mfaVerified) {
+        if (pathname === '/verify-mfa' || pathname.startsWith('/api/auth')) {
+          // Allow
+        } else if (pathname.startsWith('/api/')) {
+          return handleUnauthorized();
+        } else {
+          return NextResponse.redirect(new URL('/verify-mfa', req.url));
+        }
+      }
+      if (session.mfaVerified && pathname === '/verify-mfa') {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
       }
     }
 
-    // If Verified, block access to /verify-mfa
-    if (session.mfaVerified && pathname === '/verify-mfa') {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+    if (!session) {
+      if (PROTECTED_ROUTES.some((route) => pathname.startsWith(route))) {
+        return handleUnauthorized();
+      }
+      if (pathname === '/verify-mfa') {
+        return handleUnauthorized();
+      }
+      if (pathname.startsWith('/api/') &&
+        !pathname.startsWith('/api/auth') &&
+        !pathname.startsWith('/api/health') &&
+        !pathname.startsWith('/api/rate') &&
+        !pathname.startsWith('/api/public') &&
+        !pathname.startsWith('/api/offers') &&
+        !pathname.startsWith('/api/matches') &&
+        !pathname.startsWith('/api/trades') &&
+        !pathname.startsWith('/api/fx-rate') &&
+        !hasBearerToken &&
+        !PUBLIC_FILE_PATHS.includes(pathname)) {
+        return handleUnauthorized();
+      }
     }
+
+    const res = NextResponse.next();
+    if (pathname.startsWith('/api/')) {
+      res.headers.set('Access-Control-Allow-Origin', corsHeaders['Access-Control-Allow-Origin']);
+      res.headers.set('Access-Control-Allow-Methods', corsHeaders['Access-Control-Allow-Methods']);
+      res.headers.set('Access-Control-Allow-Headers', corsHeaders['Access-Control-Allow-Headers']);
+    }
+    return res;
   }
 
-  // RULE B: User is NOT Authenticated
-  if (!session) {
-    // Protected Routes -> Block
-    if (PROTECTED_ROUTES.some((route) => pathname.startsWith(route))) {
-      return handleUnauthorized();
-    }
+  const finalResponse = await routeHandler();
 
-    // Verify Page -> Block
-    if (pathname === '/verify-mfa') {
-      return handleUnauthorized();
-    }
+  // MARKET ROUTING DETECTION (Law of Corporate Congruence)
+  const searchParams = req.nextUrl.searchParams;
+  const marketParam = searchParams.get('market');
+  const regionParam = searchParams.get('region');
+  const destParam = searchParams.get('dest');
 
-    // Explicit API Guard for non-public API routes (extra safety)
-    if (pathname.startsWith('/api/') &&
-      !pathname.startsWith('/api/auth') &&
-      !pathname.startsWith('/api/health') &&
-      !pathname.startsWith('/api/rate') &&
-      !pathname.startsWith('/api/public') &&
-      !pathname.startsWith('/api/offers') &&   // Dev console — offer creation & listing
-      !pathname.startsWith('/api/matches') &&  // Dev console — match creation & listing
-      !pathname.startsWith('/api/trades') &&   // Trade room — details & signal-funding
-      !pathname.startsWith('/api/fx-rate') &&  // FX rate lookup (public read-only)
-      !hasBearerToken &&                       // Mobile JWT clients — handler re-validates
-      !PUBLIC_FILE_PATHS.includes(pathname)) { // CHECK WHITELIST
-      return handleUnauthorized();
+  finalResponse.cookies.delete('trueque_market_origin');
+  finalResponse.cookies.delete('trueque_market');
+
+  let originMarket = 'US';
+  let destRegion = 'MX';
+
+  // 1. Evaluate explicit region parameters (e.g., ?region=es-do)
+  if (regionParam) {
+    const parts = regionParam.toLowerCase().split('-');
+    if (parts.length === 2) {
+      originMarket = parts[0] === 'es' ? 'ES' : 'US';
+      destRegion = parts[1].toUpperCase();
     }
+  } 
+  // 2. Evaluate explicit market/dest parameters
+  else if (marketParam || destParam) {
+    if (marketParam) originMarket = marketParam.toLowerCase() === 'es' ? 'ES' : 'US';
+    
+    if (destParam) {
+      destRegion = destParam.toUpperCase();
+    } else {
+      // Default dest if only market is provided
+      destRegion = originMarket === 'ES' ? 'CO' : 'MX';
+    }
+  } 
+  // 3. Fallback to existing cookies
+  else {
+    originMarket = req.cookies.get('symmetri_market')?.value || 'US';
+    destRegion = req.cookies.get('symmetri_dest')?.value || (originMarket === 'ES' ? 'CO' : 'MX');
   }
 
-  // Pass through — add CORS headers to every API response
-  const response = NextResponse.next();
-  if (pathname.startsWith('/api/')) {
-    response.headers.set('Access-Control-Allow-Origin', corsHeaders['Access-Control-Allow-Origin']);
-    response.headers.set('Access-Control-Allow-Methods', corsHeaders['Access-Control-Allow-Methods']);
-    response.headers.set('Access-Control-Allow-Headers', corsHeaders['Access-Control-Allow-Headers']);
+  // Validate destRegion, apply defaults if invalid
+  if (!['MX', 'CO', 'GT', 'DO'].includes(destRegion)) {
+    destRegion = originMarket === 'ES' ? 'CO' : 'MX';
   }
-  return response;
+
+  // Enforce strict bilateral state
+  finalResponse.cookies.set('symmetri_market', originMarket, { path: '/', maxAge: 31536000 });
+  finalResponse.cookies.set('symmetri_dest', destRegion, { path: '/', maxAge: 31536000 });
+
+  return finalResponse;
 }
 
 export const config = {

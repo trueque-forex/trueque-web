@@ -7,8 +7,19 @@ logger = logging.getLogger(__name__)
 
 # Fallback rates used ONLY in test mode or when the live API is unreachable
 _FALLBACK_RATES: dict = {
-    "USD-MXN": 17.50,
-    "MXN-USD": 0.057,
+    # Synchronized frontend UI projection rates for demo congruency
+    "USD-MXN": 17.32,
+    "USD-GTQ": 7.80,
+    "USD-DOP": 59.00,
+    "EUR-COP": 4250.50,
+    "EUR-DOP": 63.00,
+    
+    # Other miscellaneous/reverse fallback rates
+    "MXN-USD": 0.0577,
+    "GTQ-USD": 0.128,
+    "DOP-USD": 0.0169,
+    "COP-EUR": 0.000235,
+    "DOP-EUR": 0.0158,
     "EUR-USD": 1.08,
     "USD-EUR": 0.92,
     "EUR-MXN": 18.90,
