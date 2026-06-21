@@ -139,10 +139,27 @@ export async function middleware(req: NextRequest) {
       destRegion = originMarket === 'ES' ? 'CO' : 'MX';
     }
   } 
-  // 3. Fallback to existing cookies
+  // 3. Fallback to existing cookies OR Vercel Geo-IP
   else {
-    originMarket = req.cookies.get('symmetri_market')?.value || 'US';
-    destRegion = req.cookies.get('symmetri_dest')?.value || (originMarket === 'ES' ? 'CO' : 'MX');
+    const cookieMarket = req.cookies.get('symmetri_market')?.value;
+    const cookieDest = req.cookies.get('symmetri_dest')?.value;
+
+    if (cookieMarket) {
+      // TIER 2: Existing Session (Respect user's locked-in state)
+      originMarket = cookieMarket;
+      destRegion = cookieDest || (originMarket === 'ES' ? 'CO' : 'MX');
+    } else {
+      // TIER 3: Vercel Geo-IP Fallback (For first-time organic traffic)
+      const country = req.headers.get('x-vercel-ip-country');
+      if (country === 'ES') {
+        originMarket = 'ES';
+        destRegion = 'CO';
+      } else {
+        // Default to US architecture for all other unclassified traffic
+        originMarket = 'US';
+        destRegion = 'MX';
+      }
+    }
   }
 
   // Validate destRegion, apply defaults if invalid

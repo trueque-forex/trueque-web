@@ -82,11 +82,11 @@ export default function B2BLandingPage() {
             <div className="pt-8"></div>
             
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-slate-900 via-slate-800 to-slate-600 leading-[1.3] pb-2">
-              Routing Cross-Border Capital <br className="hidden md:block" /> Directly to Your Registers.
+              Intercepting cross-border capital <br className="hidden md:block" /> before it becomes physical cash.
             </h1>
             
             <p className="text-base md:text-lg text-slate-600 max-w-3xl font-light leading-relaxed">
-              Symmetri is a technological swap currency platform converting {mounted && isES ? 'European' : 'US'} purchasing power into closed-loop digital vouchers.
+              Powering zero-CAC synthetic liquidity orchestration for enterprise retail networks across Latin America and the Caribbean.
             </p>
           </div>
         </section>
@@ -177,7 +177,7 @@ export default function B2BLandingPage() {
                 className="relative inline-flex items-center justify-center px-8 py-4 text-base font-bold text-white bg-slate-900 rounded-xl border border-slate-800 hover:bg-slate-800 transition-all duration-300 shadow-xl shadow-slate-900/20 overflow-hidden"
               >
                 <span className="relative z-10 flex items-center gap-2">
-                  Explore Phase 1 Pilot
+                  Become a Partner
                   <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
