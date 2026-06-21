@@ -26,7 +26,7 @@ _FALLBACK_RATES: dict = {
     "MXN-EUR": 0.053,
     "EUR-ARS": 1050.00,
     "ARS-EUR": 0.000952,
-    "USD-COP": 4000.0,
+    "USD-COP": 3950.00,
     "COP-USD": 0.00025,
     "USD-BRL": 5.05,
     "BRL-USD": 0.198,

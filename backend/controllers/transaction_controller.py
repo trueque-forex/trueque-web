@@ -14,11 +14,13 @@ class TransactionController:
     def create_retail_voucher(
         self, 
         db: Session,
-        owner_id: str,
-        principal: Decimal,
-        currency: str,
-        destination_country: str,
-        target_currency: str,
+        sender_id: str,
+        origin_market: str,
+        origin_currency: str,
+        destination_market: str,
+        destination_currency: str,
+        amount_origin: Decimal,
+        retailer_id: str,
         payment_success_token: str = None,
         beneficiary_id: str = None
     ) -> Dict[str, Any]:
@@ -28,7 +30,7 @@ class TransactionController:
         """
         
         # 1. THE $20 FLOOR (Hard Constraint)
-        if principal < Decimal('20.00'):
+        if amount_origin < Decimal('20.00'):
             raise TruequeError(
                 ErrorCode.VALIDATION_ERROR, 
                 "Minimum Order Value (MOV) is $20.00. Payload rejected.",
@@ -46,20 +48,21 @@ class TransactionController:
 
         # 3. MARGIN LOGIC (Hidden 15% B2B Wholesale Discount)
         # Store as absolute Decimal value
-        wholesale_margin = (principal * Decimal('0.15')).quantize(Decimal('0.0001'))
+        wholesale_margin = (amount_origin * Decimal('0.15')).quantize(Decimal('0.0001'))
 
         # 4. Create Transaction Record
         new_tx = Transaction(
-            owner_id=owner_id,
-            amount=principal,
-            currency=currency,
-            destination_country_code=destination_country,
-            target_currency=target_currency,
+            user_id=sender_id,
+            amount=amount_origin,
+            source_currency=origin_currency,
+            destination_country_code=destination_market,
+            target_currency=destination_currency,
             retailer_wholesale_margin=wholesale_margin,
             beneficiary_id=beneficiary_id,
+            vendor_id=retailer_id,
             status="pending_fulfillment",
             type="VOUCHER_CREATION",
-            description=f"Retail Voucher for {destination_country}"
+            description=f"Retail Voucher for {retailer_id} in {destination_market} from {origin_market}"
         )
 
         try:

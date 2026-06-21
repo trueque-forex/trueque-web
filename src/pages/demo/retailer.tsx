@@ -145,6 +145,12 @@ export default function RetailerDemo() {
       destCurrency = 'GTQ';
       currencyRate = 7.80;
       countryCode = 'GT';
+    } else if (destRegion === 'CO') {
+      targetId = 'exito';
+      destText = 'Colombia';
+      destCurrency = 'COP';
+      currencyRate = 3950.00;
+      countryCode = 'CO';
     } else { // Default to MX for US
       targetId = TARGET_RETAILER;
       destText = 'México';

@@ -129,7 +129,7 @@ export default function B2BLandingPage() {
                   </div>
                   <h3 className="text-xl font-bold text-slate-900 mb-3">Zero Cash Handling</h3>
                   <p className="text-sm text-slate-500 leading-relaxed font-light">
-                    Eliminate vaulting, transport costs, and physical security risks. Symmetri transactions are 100% digital from US origin to your point of sale.
+                    Eliminate vaulting, transport costs, and physical security risks. Symmetri transactions are 100% digital from the sender's origin directly to your point of sale.
                   </p>
                 </div>
               </div>

@@ -10,13 +10,15 @@ from ..controllers.transaction_controller import TransactionController
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
 class VoucherRequest(BaseModel):
-    owner_id: str = Field(..., description="The @Handle or UUID of the owner")
-    principal: Decimal = Field(..., description="The amount to transition, minimum $20.00", ge=20)
-    currency: str = Field(..., description="Source currency code (e.g., USD)")
-    destination_country: str = Field(..., description="Destination country code (e.g., MX)")
-    target_currency: str = Field(..., description="Target currency code (e.g., MXN)")
+    sender_id: str = Field(..., description="The UUID of the sender")
+    origin_market: str = Field(..., description="Origin market code (e.g., US, ES)")
+    origin_currency: str = Field(..., description="Source currency code (e.g., USD, EUR)")
+    destination_market: str = Field(..., description="Destination market code (e.g., GT, DO)")
+    destination_currency: str = Field(..., description="Target currency code (e.g., GTQ, DOP)")
+    amount_origin: Decimal = Field(..., description="The amount to transition, minimum $20.00", ge=20)
+    retailer_id: str = Field(..., description="Retailer ID (e.g., latorre)")
     payment_success_token: str = Field(..., description="Required token for Synchronous Lock")
-    beneficiary_id: Optional[str] = Field(None, description="Optional @Handle or UUID of beneficiary")
+    beneficiary_id: Optional[str] = Field(None, description="Optional UUID of beneficiary")
 
     class Config:
         extra = "forbid"
@@ -32,11 +34,13 @@ async def create_voucher(request: VoucherRequest, db: Session = Depends(get_db))
     try:
         return transaction_controller.create_retail_voucher(
             db=db,
-            owner_id=request.owner_id,
-            principal=request.principal,
-            currency=request.currency,
-            destination_country=request.destination_country,
-            target_currency=request.target_currency,
+            sender_id=request.sender_id,
+            origin_market=request.origin_market,
+            origin_currency=request.origin_currency,
+            destination_market=request.destination_market,
+            destination_currency=request.destination_currency,
+            amount_origin=request.amount_origin,
+            retailer_id=request.retailer_id,
             payment_success_token=request.payment_success_token,
             beneficiary_id=request.beneficiary_id
         )
