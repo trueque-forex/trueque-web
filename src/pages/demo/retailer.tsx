@@ -338,7 +338,7 @@ export default function RetailerDemo() {
                       />
                     </div>
                     <p style={{ fontSize: 12, color: muted, margin: '6px 0 0', fontStyle: 'italic' }}>
-                      Envío típico {originText} → {countryCode}: 20 – 2,000 por transacción
+                      Envío típico {originText} → {countryCode}: {isES ? '€' : '$'}20 – {isES ? '€' : '$'}2,000 por transacción
                     </p>
                     {usdAmt > 0 && (
                       <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: greenBg, border: `1px solid ${greenBdr}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
