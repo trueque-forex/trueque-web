@@ -307,9 +307,6 @@ export default function RetailerDemo() {
                       <div style={{ fontSize: 16, fontWeight: 800, color: navy, letterSpacing: '-0.01em' }}>
                         {retailer.name}
                       </div>
-                      <div style={{ fontSize: 13, color: muted, marginTop: 2 }}>
-                        {retailer.category} · {destText}
-                      </div>
                     </div>
                     <div style={{
                       padding: '5px 12px', borderRadius: 20,
@@ -477,7 +474,6 @@ export default function RetailerDemo() {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Redimible en</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#fbbf24' }}>{retailer.name}</div>
-                    <div style={{ fontSize: 10, color: '#64748b' }}>{retailer.flag} {destText}</div>
                   </div>
                 </div>
                 <div style={{ padding: '14px 18px', background: cardBg, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -522,7 +518,6 @@ export default function RetailerDemo() {
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   ¿Qué significa esto para {retailer.name}?
                 </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Propuesta de valor · {retailer.name}</div>
               </div>
             </div>
 
