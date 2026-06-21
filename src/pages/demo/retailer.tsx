@@ -44,14 +44,7 @@ const USD_TO_MXN = 17.32;
 const TARGET_RETAILER = 'merco'; // ← swap this id to rebrand the whole demo
 // ─────────────────────────────────────────────────────────────────────────────
 
-const ORCHESTRATION_STEPS = [
-  { icon: '🔐', label: 'Autenticando identidad del remitente…'           },
-  { icon: '📡', label: 'Obteniendo tasa de mercado en tiempo real…'      },
-  { icon: '⚖️',  label: 'Tasa bloqueada — sin diferencial aplicado'       },
-  { icon: '🏦', label: 'Registrando instrucción de cobro…'                },
-  { icon: '📲', label: 'Notificando al beneficiario en México…'           },
-  { icon: '🎫', label: 'Emitiendo vale de circuito cerrado Symmetri…'    },
-];
+
 
 const RETAILERS = [
   { id: 'abarrey',      name: 'Abarrey',               flag: '\ud83c\uddf2\ud83c\uddfd', city: 'Hermosillo, Son.',  category: 'Supermercado' },
@@ -166,6 +159,15 @@ export default function RetailerDemo() {
   const [sid, setSid]               = useState('');
   const timerRef                    = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  const orchestrationSteps = [
+    { icon: '🔐', label: 'Autenticando identidad del remitente…'           },
+    { icon: '📡', label: 'Obteniendo tasa de mercado en tiempo real…'      },
+    { icon: '⚖️',  label: 'Tasa bloqueada — sin diferencial aplicado'       },
+    { icon: '🏦', label: 'Registrando instrucción de cobro…'                },
+    { icon: '📲', label: `Notificando al beneficiario en ${destText}…`    },
+    { icon: '🎫', label: 'Emitiendo vale de circuito cerrado Symmetri…'    },
+  ];
+
   const usdAmt = parseFloat(amount) || 0;
   // Phase 1: beneficiary always receives FULL face value. No deduction from user.
   const localAmt = usdAmt * currencyRate;
@@ -178,7 +180,7 @@ export default function RetailerDemo() {
     timerRef.current.forEach(clearTimeout);
     timerRef.current = [];
 
-    ORCHESTRATION_STEPS.forEach((_, i) => {
+    orchestrationSteps.forEach((_, i) => {
       const t = setTimeout(() => setLogVisible(prev => [...prev, i]), i * 620);
       timerRef.current.push(t);
     });
@@ -186,7 +188,7 @@ export default function RetailerDemo() {
     const finish = setTimeout(() => {
       setSid(generateSID(countryCode, Math.floor(Math.random() * 8000) + 1000));
       setStep(3);
-    }, ORCHESTRATION_STEPS.length * 620 + 500);
+    }, orchestrationSteps.length * 620 + 500);
     timerRef.current.push(finish);
   }
 
@@ -306,7 +308,7 @@ export default function RetailerDemo() {
                         {retailer.name}
                       </div>
                       <div style={{ fontSize: 13, color: muted, marginTop: 2 }}>
-                        {retailer.category} · {retailer.city}
+                        {retailer.category} · {destText}
                       </div>
                     </div>
                     <div style={{
@@ -375,11 +377,11 @@ export default function RetailerDemo() {
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: body, marginBottom: 8 }}>
                       <span>Diferencial cambiario</span>
-                      <span style={{ color: green, fontWeight: 700 }}>$0.00 — Cero</span>
+                      <span style={{ color: green, fontWeight: 700 }}>0.00 {srcCurrency} — Cero</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: body, marginBottom: 8 }}>
                       <span>Comisión al usuario</span>
-                      <span style={{ color: green, fontWeight: 700 }}>$0.00 — Gratis</span>
+                      <span style={{ color: green, fontWeight: 700 }}>0.00 {srcCurrency} — Gratis</span>
                     </div>
                     <div style={{ borderTop: `1px solid ${border}`, paddingTop: 10, marginTop: 2, display: 'flex', justifyContent: 'space-between', fontSize: 15 }}>
                       <span style={{ fontWeight: 700, color: navy }}>El beneficiario recibe</span>
@@ -406,7 +408,7 @@ export default function RetailerDemo() {
                     </button>
                     {usdAmt < 20 && usdAmt > 0 && (
                       <p style={{ textAlign: 'center', fontSize: 14, color: '#f59e0b', marginTop: 8, fontWeight: 600 }}>
-                        El monto mínimo es $20.00 USD
+                        El monto mínimo es 20.00 {srcCurrency}
                       </p>
                     )}
                   </div>
@@ -428,7 +430,7 @@ export default function RetailerDemo() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {ORCHESTRATION_STEPS.map((s, i) => (
+                {orchestrationSteps.map((s, i) => (
                   <div key={i} style={{
                     display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 10,
                     background: logVisible.includes(i) ? greenBg : '#f8fafc',
@@ -475,7 +477,7 @@ export default function RetailerDemo() {
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 10, color: '#94a3b8', marginBottom: 2 }}>Redimible en</div>
                     <div style={{ fontSize: 16, fontWeight: 800, color: '#fbbf24' }}>{retailer.name}</div>
-                    <div style={{ fontSize: 10, color: '#64748b' }}>{retailer.flag} {retailer.city}</div>
+                    <div style={{ fontSize: 10, color: '#64748b' }}>{retailer.flag} {destText}</div>
                   </div>
                 </div>
                 <div style={{ padding: '14px 18px', background: cardBg, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
@@ -520,7 +522,7 @@ export default function RetailerDemo() {
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   ¿Qué significa esto para {retailer.name}?
                 </div>
-                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Propuesta de valor · {retailer.city}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Propuesta de valor · {retailer.name}</div>
               </div>
             </div>
 
