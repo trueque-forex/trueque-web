@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { useMarket } from '../../context/MarketContext';
 import { Plus_Jakarta_Sans } from 'next/font/google';
@@ -70,6 +71,8 @@ const RETAILERS = [
   { id: 'exito',        name: 'Grupo Éxito',           flag: '🇨🇴', city: 'Nacional',          category: 'Supermercado' },
   { id: 'latorre',      name: 'Supermercados La Torre',flag: '🇬🇹', city: 'Nacional',          category: 'Supermercado' },
   { id: 'sirena',       name: 'Sirena',                flag: '🇩🇴', city: 'Nacional',          category: 'Supermercado' },
+  { id: 'jumbo', name: 'Jumbo', flag: '🇨🇴', city: 'Nacional', category: 'Supermercado' },
+  { id: 'carulla', name: 'Carulla', flag: '🇨🇴', city: 'Nacional', category: 'Supermercado' },
 ];
 
 // ─── Barcode: dark bars on white — clearly visible ────────────────────────────
@@ -92,7 +95,30 @@ function Barcode() {
 
 export default function RetailerDemo() {
   const { originMarket, destRegion } = useMarket();
-  const isES = originMarket === 'ES';
+  const router = useRouter();
+
+  const urlRegion = router.query.region as string;
+  const urlRetailer = router.query.retailer as string;
+
+  const effectiveOrigin = urlRegion ? urlRegion.split('-')[0].toUpperCase() : originMarket;
+  let effectiveDest = urlRegion ? urlRegion.split('-')[1].toUpperCase() : destRegion;
+
+  if (urlRetailer) {
+    const requestedRetailer = RETAILERS.find(r => r.id === urlRetailer);
+    if (requestedRetailer) {
+      const flagToRegion: Record<string, string> = {
+        '\ud83c\uddf2\ud83c\uddfd': 'MX',
+        '🇨🇴': 'CO',
+        '🇬🇹': 'GT',
+        '🇩🇴': 'DO',
+      };
+      if (flagToRegion[requestedRetailer.flag]) {
+        effectiveDest = flagToRegion[requestedRetailer.flag];
+      }
+    }
+  }
+
+  const isES = effectiveOrigin === 'ES';
 
   const [step, setStep]             = useState<1 | 2 | 3>(1);
   const [amount, setAmount]         = useState('200');
@@ -110,7 +136,7 @@ export default function RetailerDemo() {
   if (isES) {
     originText = 'Europa';
     srcCurrency = 'EUR';
-    if (destRegion === 'DO') {
+    if (effectiveDest === 'DO') {
       targetId = 'sirena';
       destText = 'República Dominicana';
       destCurrency = 'DOP';
@@ -126,19 +152,19 @@ export default function RetailerDemo() {
   } else {
     originText = 'EE.UU.';
     srcCurrency = 'USD';
-    if (destRegion === 'DO') {
+    if (effectiveDest === 'DO') {
       targetId = 'sirena';
       destText = 'República Dominicana';
       destCurrency = 'DOP';
       currencyRate = 59.00;
       countryCode = 'DO';
-    } else if (destRegion === 'GT') {
+    } else if (effectiveDest === 'GT') {
       targetId = 'latorre';
       destText = 'Guatemala';
       destCurrency = 'GTQ';
       currencyRate = 7.80;
       countryCode = 'GT';
-    } else if (destRegion === 'CO') {
+    } else if (effectiveDest === 'CO') {
       targetId = 'exito';
       destText = 'Colombia';
       destCurrency = 'COP';
@@ -151,6 +177,11 @@ export default function RetailerDemo() {
       currencyRate = USD_TO_MXN;
       countryCode = 'MX';
     }
+  }
+
+  // urlRetailer already defined above
+  if (urlRetailer && RETAILERS.some(r => r.id === urlRetailer)) {
+    targetId = urlRetailer;
   }
 
   const retailer = RETAILERS.find(r => r.id === targetId) ?? RETAILERS[0];
