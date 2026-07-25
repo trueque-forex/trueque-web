@@ -73,6 +73,14 @@ const RETAILERS = [
   { id: 'sirena',       name: 'Sirena',                flag: '🇩🇴', city: 'Nacional',          category: 'Supermercado' },
   { id: 'jumbo', name: 'Jumbo', flag: '🇨🇴', city: 'Nacional', category: 'Supermercado' },
   { id: 'carulla', name: 'Carulla', flag: '🇨🇴', city: 'Nacional', category: 'Supermercado' },
+  { id: 'farmatodo',    name: 'Farmatodo',             flag: '🇨🇴', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'cruzverde',    name: 'Cruz Verde',            flag: '🇨🇴', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'larebaja',     name: 'La Rebaja',             flag: '🇨🇴', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'fbatres',      name: 'Farmacias Batres',      flag: '🇬🇹', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'fgaleno',      name: 'Farmacias Galeno',      flag: '🇬🇹', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'cruzverde_gt', name: 'Cruz Verde',            flag: '🇬🇹', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'fcarol',       name: 'Farmacia Carol',        flag: '🇩🇴', city: 'Nacional',          category: 'Farmacia' },
+  { id: 'fhidalgos',    name: 'Farmacia Los Hidalgos', flag: '🇩🇴', city: 'Nacional',          category: 'Farmacia' },
 ];
 
 // ─── Barcode: dark bars on white — clearly visible ────────────────────────────
@@ -136,12 +144,18 @@ export default function RetailerDemo() {
   if (isES) {
     originText = 'Europa';
     srcCurrency = 'EUR';
-    if (effectiveDest === 'DO') {
+    if (effectiveDest === 'DO' || effectiveDest === 'DR') {
       targetId = 'sirena';
       destText = 'República Dominicana';
       destCurrency = 'DOP';
       currencyRate = 63.00;
       countryCode = 'DO';
+    } else if (effectiveDest === 'MX') {
+      targetId = TARGET_RETAILER;
+      destText = 'México';
+      destCurrency = 'MXN';
+      currencyRate = 18.50; // Approximated EUR to MXN rate
+      countryCode = 'MX';
     } else { // Default to CO for ES
       targetId = 'exito';
       destText = 'Colombia';
@@ -152,7 +166,7 @@ export default function RetailerDemo() {
   } else {
     originText = 'EE.UU.';
     srcCurrency = 'USD';
-    if (effectiveDest === 'DO') {
+    if (effectiveDest === 'DO' || effectiveDest === 'DR') {
       targetId = 'sirena';
       destText = 'República Dominicana';
       destCurrency = 'DOP';

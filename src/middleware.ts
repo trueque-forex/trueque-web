@@ -4,16 +4,36 @@ import { decrypt } from './lib/session';
 
 // 1. DEFINE ZONES
 const PROTECTED_ROUTES = ['/dashboard', '/profile', '/settings', '/wallet'];
+// AUTH_ROUTES: Authenticated users are redirected away from these to /dashboard.
+// Includes both Pages Router routes (/signin, /signup) and new App Router routes (/login, /register).
 const AUTH_ROUTES = ['/login', '/register', '/signin', '/signup'];
+
+// PUBLIC_FILE_PATHS: No authentication required.
+// Includes all new App Router marketing routes (Layers 2–3 of the merge plan).
 const PUBLIC_FILE_PATHS = [
-  '/signin', '/signup', '/verify', '/forgot-password', '/reset-password', '/about',
-  '/api/auth/signin', '/api/auth/signup', '/api/auth/verify', '/api/auth/forgot-password', '/api/auth/reset-password',
-  '/api/mobile/signin',   // Mobile JWT auth — no session cookie required
-  '/api/mobile/signup',   // Mobile registration — no session cookie required
-  '/api/setup_schema',    // Temporary Admin Route
-  '/api/dev/mfa-peek',    // DEV ONLY — delete after testing
-  '/social-card',         // OG image screenshotter — no auth required
-  '/demo/retailer',       // Public retailer sales demo — no auth required
+  // ── Pages Router auth (existing) ────────────────────────────────────────
+  '/signin', '/signup', '/verify', '/forgot-password', '/reset-password',
+  // ── App Router auth (new) ───────────────────────────────────────────────
+  '/login', '/register',
+  // ── App Router marketing (new) ──────────────────────────────────────────
+  '/',                   // Consumer homepage
+  '/about',              // Technology identity
+  '/partners',           // B2B partner page
+  '/faq',                // Consumer FAQ
+  '/legal/privacy',      // Privacy Policy (Moov compliance)
+  '/legal/terms',        // Terms of Service (Moov compliance)
+  // ── API — Auth endpoints ────────────────────────────────────────────────
+  '/api/auth/signin', '/api/auth/signup', '/api/auth/verify',
+  '/api/auth/forgot-password', '/api/auth/reset-password',
+  // ── API — Mobile (Bearer token, no session cookie) ──────────────────────
+  '/api/mobile/signin',
+  '/api/mobile/signup',
+  // ── API — Admin / Dev ───────────────────────────────────────────────────
+  '/api/setup_schema',   // Temporary Admin Route
+  '/api/dev/mfa-peek',   // DEV ONLY — delete after testing
+  // ── Public pages ────────────────────────────────────────────────────────
+  '/social-card',        // OG image screenshotter
+  '/demo/retailer',      // Public retailer sales demo — NO backend wiring
 ];
 
 export async function middleware(req: NextRequest) {

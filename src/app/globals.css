@@ -1,0 +1,75 @@
+/* src/app/globals.css
+ * App Router stylesheet — imported by src/app/layout.tsx only.
+ * The Pages Router continues using src/styles/globals.css separately.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Marketing animations ─────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes scalePulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.04); }
+}
+
+.animate-fade-in-up   { animation: fadeInUp 0.65s ease-out both; }
+.animate-fade-in-up-1 { animation: fadeInUp 0.65s ease-out 0.10s both; }
+.animate-fade-in-up-2 { animation: fadeInUp 0.65s ease-out 0.20s both; }
+.animate-fade-in-up-3 { animation: fadeInUp 0.65s ease-out 0.30s both; }
+.animate-fade-in-up-4 { animation: fadeInUp 0.65s ease-out 0.40s both; }
+.animate-float        { animation: float 4s ease-in-out infinite; }
+.animate-scale-pulse  { animation: scalePulse 3s ease-in-out infinite; }
+
+/* ── Utility helpers ──────────────────────────────────────────────────────── */
+/* Reverting to light mode aesthetics */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.glass-light {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+}
+
+.gradient-text-hero {
+  background: linear-gradient(135deg, #1A73E8 0%, #2c3e50 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-brand {
+  background: linear-gradient(90deg, #1A73E8 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hide scrollbar in number spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] { -moz-appearance: textfield; }
