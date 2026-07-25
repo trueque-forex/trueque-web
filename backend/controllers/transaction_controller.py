@@ -52,7 +52,7 @@ class TransactionController:
 
         # 4. Create Transaction Record
         new_tx = Transaction(
-            user_id=sender_id,
+            owner_id=sender_id,          # owner_id per GEMINI.md §2.2 — NEVER user_id
             amount=amount_origin,
             source_currency=origin_currency,
             destination_country_code=destination_market,
@@ -69,14 +69,14 @@ class TransactionController:
             db.add(new_tx)
             db.commit()
             db.refresh(new_tx)
-            
+
             # TODO: Ping Partner Retailer API here using payment_success_token
             # ...
-            
+
             return {
                 "success": True,
                 "transaction_id": str(new_tx.id),
-                "principal": float(principal),
+                "principal": float(amount_origin),   # Fixed: was `principal` (undefined)
                 "margin_captured": float(wholesale_margin),
                 "status": "authorized_for_fulfillment"
             }

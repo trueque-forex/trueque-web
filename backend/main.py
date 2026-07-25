@@ -35,7 +35,7 @@ def health_check():
 # --- ROUTER REGISTRATION ---
 # We removed the prefix here because it is already defined 
 # inside each individual router file (like transactions.py).
-from backend.routes import quotes, history, offers, trades, transactions, kyc, compliance, admin
+from backend.routes import quotes, history, offers, trades, transactions, kyc, compliance, admin, beneficiaries
 
 app.include_router(quotes.router)
 app.include_router(history.router)
@@ -45,3 +45,4 @@ app.include_router(transactions.router)
 app.include_router(kyc.router)
 app.include_router(compliance.router)
 app.include_router(admin.router)
+app.include_router(beneficiaries.router)

@@ -96,6 +96,28 @@
         "MX": {
             "name": "Mexico",
             "currency": "MXN",
+            "retailers": [
+                { "id": "abarrey", "name": "Abarrey", "city": "Hermosillo, Son.", "category": "Supermercado" },
+                { "id": "aki", "name": "AKI", "city": "Mérida, Yuc.", "category": "Supermercado" },
+                { "id": "alsuper", "name": "Alsuper", "city": "Hermosillo, Son.", "category": "Supermercado" },
+                { "id": "calimax", "name": "Calimax", "city": "Tijuana, BC", "category": "Supermercado" },
+                { "id": "casaley", "name": "Casa Ley", "city": "Culiacán, Sin.", "category": "Supermercado" },
+                { "id": "chedraui", "name": "Chedraui", "city": "Nacional", "category": "Supermercado" },
+                { "id": "dunosusa", "name": "Dunosusa Abarrotes", "city": "Mérida, Yuc.", "category": "Abarrotes" },
+                { "id": "elflorido", "name": "El Florido", "city": "Tijuana, BC", "category": "Supermercado" },
+                { "id": "fbenavides", "name": "Farmacias Benavides", "city": "Monterrey, NL", "category": "Farmacia" },
+                { "id": "fahorro", "name": "Farmacias del Ahorro", "city": "Nacional", "category": "Farmacia" },
+                { "id": "fguadalajara", "name": "Farmacias Guadalajara", "city": "Guadalajara, Jal.", "category": "Farmacia" },
+                { "id": "heb", "name": "HEB", "city": "Monterrey, NL", "category": "Supermercado" },
+                { "id": "kiosko", "name": "Kiosko", "city": "Colima / Jalisco", "category": "Conveniencia" },
+                { "id": "lacomer", "name": "La Comer", "city": "CDMX", "category": "Supermercado" },
+                { "id": "merco", "name": "Merco Supermercado", "city": "Apodaca, NL", "category": "Supermercado" },
+                { "id": "merza", "name": "Merza", "city": "Morelia, Mich.", "category": "Supermercado" },
+                { "id": "oxxo", "name": "OXXO", "city": "Nacional", "category": "Conveniencia" },
+                { "id": "smart", "name": "S-Mart", "city": "Chihuahua, Chih.", "category": "Supermercado" },
+                { "id": "soriana", "name": "Soriana", "city": "Nacional", "category": "Supermercado" },
+                { "id": "walmart", "name": "Walmart MX", "city": "Nacional", "category": "Supermercado" }
+            ],
             "tax_rate_on_fees": 0.16,
             "digital_service_tax_pct": 0.02,
             "inbound_gateways": {
@@ -197,6 +219,11 @@
         "DO": {
             "name": "Dominican Republic",
             "currency": "DOP",
+            "retailers": [
+                { "id": "sirena", "name": "Sirena", "city": "Nacional", "category": "Supermercado" },
+                { "id": "fcarol", "name": "Farmacia Carol", "city": "Nacional", "category": "Farmacia" },
+                { "id": "fhidalgos", "name": "Farmacia Los Hidalgos", "city": "Nacional", "category": "Farmacia" }
+            ],
             "tax_rate_on_fees": 0.18,
             "inbound_gateways": {
                 "ach_lbtr": {
@@ -215,6 +242,14 @@
         "CO": {
             "name": "Colombia",
             "currency": "COP",
+            "retailers": [
+                { "id": "exito", "name": "Grupo Éxito", "city": "Nacional", "category": "Supermercado" },
+                { "id": "jumbo", "name": "Jumbo", "city": "Nacional", "category": "Supermercado" },
+                { "id": "carulla", "name": "Carulla", "city": "Nacional", "category": "Supermercado" },
+                { "id": "farmatodo", "name": "Farmatodo", "city": "Nacional", "category": "Farmacia" },
+                { "id": "cruzverde", "name": "Cruz Verde", "city": "Nacional", "category": "Farmacia" },
+                { "id": "larebaja", "name": "La Rebaja", "city": "Nacional", "category": "Farmacia" }
+            ],
             "tax_rate_on_fees": 0.19,
             "inbound_gateways": {
                 "pse": {
@@ -233,6 +268,12 @@
         "GT": {
             "name": "Guatemala",
             "currency": "GTQ",
+            "retailers": [
+                { "id": "latorre", "name": "Supermercados La Torre", "city": "Nacional", "category": "Supermercado" },
+                { "id": "fbatres", "name": "Farmacias Batres", "city": "Nacional", "category": "Farmacia" },
+                { "id": "fgaleno", "name": "Farmacias Galeno", "city": "Nacional", "category": "Farmacia" },
+                { "id": "cruzverde_gt", "name": "Cruz Verde", "city": "Nacional", "category": "Farmacia" }
+            ],
             "tax_rate_on_fees": 0.12,
             "inbound_gateways": {
                 "ach": {

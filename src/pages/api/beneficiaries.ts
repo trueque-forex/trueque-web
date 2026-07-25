@@ -1,230 +1,105 @@
 // src/pages/api/beneficiaries.ts
+//
+// ✅ DATA-ORCHESTRATION MANDATE (GEMINI.md §5)
+// This handler is a PURE PROXY to FastAPI.
+// It MUST NOT import from '@/lib/db', '@/lib/server/db', 'knex', or any DB client.
+// The only allowed imports are: Next.js types, withAuth, and TruequeSession.
+//
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { query } from '@/lib/server/db';
 import { withAuth } from '@/lib/withAuth';
 import { TruequeSession } from '@/types/auth';
 
+const FASTAPI_BASE = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
+
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     const session = (req as any).session as TruequeSession;
+    // owner_id is read EXCLUSIVELY from the verified JWT session — never from req.body or req.query
+    const ownerId: string = session.user.id;
 
-    // DEBUG: Inspect session content
-    console.log('[BENEFICIARIES] Session User:', session.user.email);
+    // ── GET — list beneficiaries ──────────────────────────────────────────────
+    if (req.method === 'GET') {
+        try {
+            const fastApiRes = await fetch(
+                `${FASTAPI_BASE}/api/beneficiaries?owner_id=${encodeURIComponent(ownerId)}`,
+                { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+            );
+            const data = await fastApiRes.json();
+            if (!fastApiRes.ok) {
+                console.error('[beneficiaries.GET] FastAPI error:', data);
+                return res.status(fastApiRes.status).json({ error: data.detail || 'FastAPI Error' });
+            }
+            return res.status(200).json(data);
+        } catch (err: any) {
+            console.error('[beneficiaries.GET] Proxy error:', err.message);
+            return res.status(500).json({ error: err.message || 'Internal Server Error' });
+        }
+    }
 
-    const actor = { userId: session.user.id };
-
-    // POST: Create new beneficiary
+    // ── POST — create beneficiary ─────────────────────────────────────────────
     if (req.method === 'POST') {
-        const body = req.body;
-        if (!body || !body.method || !body.identifiers) {
-            return res.status(400).json({ error: 'method and identifiers required' });
+        const { name, method, identifiers, country } = req.body;
+        if (!method || !identifiers) {
+            return res.status(400).json({ error: 'method and identifiers are required' });
         }
 
-        const now = new Date().toISOString();
-
-        const userId = actor.userId; // Treat as string (UUID)
-
-        // Construct Metadata JSON
-        const metadata = {
-            name: body.name || 'Unknown', // Stored in metadata now
-            method: body.method,
-            identifiers: {
-                ...body.identifiers,
-                // Ensure flat fields are preserved inside metadata for legacy views if needed
-                email: body.identifiers.email,
-                phone: body.identifiers.phone_number,
-                bank_name: body.identifiers.bank_name,
-                account_number: body.identifiers.account_number
-            },
-            country: body.country
+        // Strict bilateral payload — owner_id injected from session, never trusted from body
+        const payload = {
+            owner_id: ownerId,
+            name: name || 'Unknown',
+            method,
+            identifiers,
+            country: country || 'US',
         };
 
-        const insertText = `
-      INSERT INTO beneficiaries
-        (owner_id, metadata, created_at)
-      VALUES ($1, $2, $3)
-      RETURNING *
-    `;
-
-        const values = [
-            userId, // Now passed as string/bigint, matches owner_id(bigint)
-            JSON.stringify(metadata),
-            now,
-        ];
-
         try {
-            const { rows } = await query(insertText, values);
-            const row = rows[0];
-            const md = row.metadata || {};
-            // Handle double-encoded JSON if driver returns string
-            const parsedMd = typeof md === 'string' ? JSON.parse(md) : md;
-
-            return res.status(201).json({
-                id: String(row.id),
-                user_id: String(row.owner_id),
-                name: parsedMd.name || 'Unknown', // Read from metadata
-                country: parsedMd.country || 'US',
-                method: parsedMd.method || 'unknown',
-                identifiers: parsedMd.identifiers || {},
-                status: 'approved',
-                created_at: row.created_at
+            const fastApiRes = await fetch(`${FASTAPI_BASE}/api/beneficiaries`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
-        } catch (e: any) {
-            console.error('beneficiaries.POST error', e);
-
-            // SCHEMA PROBE
-            try {
-                const { rows: cols } = await query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'beneficiaries'");
-                const foundCols = cols.map((c: any) => `${c.column_name}(${c.data_type})`).join(', ');
-                console.error('PROBE COLUMNS:', foundCols);
-                return res.status(500).json({
-                    error: 'db_schema_mismatch',
-                    message: `Missing Columns. Found: ${foundCols}`,
-                    detail: e.message
-                });
-            } catch (probeErr) {
-                return res.status(500).json({ error: 'internal_error', detail: e.message });
+            const data = await fastApiRes.json();
+            if (!fastApiRes.ok) {
+                console.error('[beneficiaries.POST] FastAPI rejected payload:', data);
+                return res.status(fastApiRes.status).json({ error: data.detail || 'FastAPI Error' });
             }
+            return res.status(201).json(data);
+        } catch (err: any) {
+            console.error('[beneficiaries.POST] Proxy error:', err.message);
+            return res.status(500).json({ error: err.message || 'Internal Server Error' });
         }
     }
 
-    // GET: List beneficiaries
-    if (req.method === 'GET') {
-        const userId = actor.userId;
-        const { method } = req.query;
-
-        const selectText = `
-        SELECT * FROM beneficiaries 
-        WHERE owner_id = $1 
-        ORDER BY created_at DESC
-    `;
-
-        try {
-            const { rows } = await query(selectText, [userId]);
-
-            const mappedRows = rows.map((row: any) => {
-                let md = row.metadata || {};
-                if (typeof md === 'string') {
-                    try { md = JSON.parse(md); } catch (e) { }
-                }
-
-                // Fallback for Legacy/Flat Rows
-                const method = md.method || (row.bank_name ? 'bank_rtp' : 'unknown');
-                const identifiers = md.identifiers || {
-                    email: row.email,
-                    phone_number: row.phone_number,
-                    bank_name: row.bank_name,
-                    account_number: row.account_number,
-                    account_type: row.account_type,
-                };
-
-                return {
-                    id: String(row.id),
-                    user_id: String(row.owner_id),
-                    name: md.name || row.name || 'Unknown', // Prefer metadata, fallback to row (if it existed)
-                    country: md.country || row.country || 'US',
-                    method: method,
-                    identifiers: identifiers,
-                    saved_methods: md.saved_methods,
-                    status: 'approved',
-                    created_at: row.created_at
-                };
-            });
-
-            return res.status(200).json(mappedRows);
-        } catch (e: any) {
-            console.error('beneficiaries.GET error', e);
-            return res.status(500).json({ error: 'internal_error' });
-        }
-    }
-
-    // PUT: Update existing beneficiary (e.g. adding a new method)
+    // ── PUT — update / merge payment method ───────────────────────────────────
     if (req.method === 'PUT') {
-        const body = req.body;
-        if (!body || !body.id || !body.method || !body.identifiers) {
-            return res.status(400).json({ error: 'id, method, and identifiers required' });
+        const { id, name, method, identifiers } = req.body;
+        if (!id || !method || !identifiers) {
+            return res.status(400).json({ error: 'id, method, and identifiers are required' });
         }
 
-        const userId = actor.userId;
-        const beneficiaryId = body.id;
-
-        // 1. Fetch Existing
-        const selectText = `SELECT * FROM beneficiaries WHERE id = $1 AND owner_id = $2`;
-        const { rows } = await query(selectText, [beneficiaryId, userId]);
-
-        if (rows.length === 0) {
-            return res.status(404).json({ error: 'Beneficiary not found' });
-        }
-
-        const existingRow = rows[0];
-        let md = existingRow.metadata || {};
-        if (typeof md === 'string') {
-            try { md = JSON.parse(md); } catch (e) { }
-        }
-
-        // 2. Update/Merge Metadata
-        // Ensure 'saved_methods' structure exists
-        if (!md.saved_methods) {
-            md.saved_methods = {};
-            // Migration: Move current root method to saved_methods if valid
-            if (md.method && md.identifiers) {
-                md.saved_methods[md.method] = md.identifiers;
-            } else if (existingRow.bank_name) {
-                // LEGACY MIGRATION: Record has no metadata method, but has legacy columns.
-                // We must save this as 'bank_rtp' before overwriting root.
-                md.saved_methods['bank_rtp'] = {
-                    email: existingRow.email,
-                    phone_number: existingRow.phone_number,
-                    bank_name: existingRow.bank_name,
-                    account_number: existingRow.account_number,
-                    cbu: existingRow.cbu || existingRow.account_identifier, // Heuristic
-                    account_type: existingRow.account_type,
-                    country: existingRow.country
-                };
-            }
-        }
-
-        // Add/Update the specific method being saved
-        md.saved_methods[body.method] = body.identifiers;
-
-        // Also update the "Last Used" / Top-level fields for backward compatibility
-        md.method = body.method;
-        md.identifiers = body.identifiers;
-
-        // Update name in metadata
-        md.name = body.name || md.name || existingRow.name;
-
-        // 3. Save Back
-        const updateText = `
-            UPDATE beneficiaries 
-            SET metadata = $1
-            WHERE id = $2 AND owner_id = $3
-            RETURNING *
-        `;
+        // owner_id injected from session — user can only mutate their own records
+        const payload = {
+            id,
+            owner_id: ownerId,
+            name,
+            method,
+            identifiers,
+        };
 
         try {
-            const { rows: updatedRows } = await query(updateText, [
-                JSON.stringify(md),
-                beneficiaryId,
-                userId
-            ]);
-
-            const row = updatedRows[0];
-            // Start using the saved_methods structure in response
-            // (Client filters this list anyway)
-            return res.status(200).json({
-                id: String(row.id),
-                user_id: String(row.owner_id),
-                name: md.name, // Read from metadata
-                country: md.country || 'US',
-                method: md.method,
-                identifiers: md.identifiers,
-                saved_methods: md.saved_methods, // New Field
-                status: 'approved',
-                created_at: row.created_at
+            const fastApiRes = await fetch(`${FASTAPI_BASE}/api/beneficiaries`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
             });
-        } catch (e: any) {
-            console.error('beneficiaries.PUT error', e);
-            return res.status(500).json({ error: 'internal_error' });
+            const data = await fastApiRes.json();
+            if (!fastApiRes.ok) {
+                console.error('[beneficiaries.PUT] FastAPI rejected payload:', data);
+                return res.status(fastApiRes.status).json({ error: data.detail || 'FastAPI Error' });
+            }
+            return res.status(200).json(data);
+        } catch (err: any) {
+            console.error('[beneficiaries.PUT] Proxy error:', err.message);
+            return res.status(500).json({ error: err.message || 'Internal Server Error' });
         }
     }
 
