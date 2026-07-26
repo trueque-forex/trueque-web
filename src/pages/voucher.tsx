@@ -27,6 +27,23 @@ const MAX_MONTHLY_USD = 750.00;
 
 type Retailer = typeof retailers[0];
 
+function isExpiryValid(expiry: string) {
+    if (expiry.length !== 5) return false;
+    const [mStr, yStr] = expiry.split('/');
+    if (!mStr || !yStr || mStr.length !== 2 || yStr.length !== 2) return false;
+    const m = parseInt(mStr, 10);
+    const y = parseInt(`20${yStr}`, 10);
+    if (m < 1 || m > 12) return false;
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    if (y < currentYear) return false;
+    if (y === currentYear && m < currentMonth) return false;
+    return true;
+}
+
 export default function VoucherPage() {
     const router = useRouter();
     const { user } = useAuth();
@@ -90,7 +107,7 @@ export default function VoucherPage() {
         fetch(`/api/rate?from=USD&to=${selectedRetailer.currency}`)
             .then(r => r.json())
             .then(d => {
-                setLiveRate(d.rate);
+                setLiveRate(parseFloat(d.rate));
                 setRateSource(d.source || 'OpenExchangeRates');
             })
             .catch(() => setLiveRate(null));
@@ -128,7 +145,7 @@ export default function VoucherPage() {
     const zelleDisplayName = process.env.NEXT_PUBLIC_ZELLE_DISPLAY_NAME || 'Symmetri';
     // Gate: is the selected payment method fully filled in?
     const zelleReady  = paymentMethod === 'zelle' && zelleConfirmed;
-    const cardReady   = paymentMethod === 'card'  && cardNumber.replace(/\s/g,'').length >= 15 && cardExpiry.length >= 4 && cardCvv.length >= 3 && cardName.trim().length > 1 && cardZip.length >= 5;
+    const cardReady   = paymentMethod === 'card'  && cardNumber.replace(/\s/g,'').length >= 15 && isExpiryValid(cardExpiry) && cardCvv.length >= 3 && cardName.trim().length > 1 && cardZip.length >= 5;
     const achReady    = paymentMethod === 'rtp' && bankRouting.length === 9 && bankAccount.length >= 4 && bankHolderName.trim().length > 1;
     // usingSaved counts as ready as long as the payment type is set (Zelle still needs checkbox)
     const paymentReady = (usingSaved && paymentMethod !== null && (paymentMethod !== 'zelle' || zelleConfirmed)) || zelleReady || cardReady || achReady;
@@ -171,15 +188,15 @@ export default function VoucherPage() {
             router.push({
                 pathname: '/voucher-success',
                 query: {
-                    code: data.voucher.code,
-                    id: data.voucher.id,
+                    code: data.fastapi_response.barcode_data,
+                    id: data.fastapi_response.transaction_id,
                     retailer: selectedRetailer!.name,
-                    amountLocal: data.summary.amount_local,
-                    currency: data.summary.local_currency,
-                    amountUsd: data.summary.amount_usd,
-                    total: data.summary.total_charged,
+                    amountLocal: amountLocal,
+                    currency: selectedRetailer!.currency,
+                    amountUsd: amountNum,
+                    total: totalCharged,
                     paymentMethod: paymentMethod,
-                    expiresAt: data.voucher.expires_at,
+                    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
                     beneficiaryName: fullName,
                     beneficiaryPhone: fullPhone,
                 },
@@ -336,6 +353,14 @@ export default function VoucherPage() {
                                             {paymentMethod === 'card' ? 'Card issuer fee (Visa/MC/Amex)' : 'RTP rail fee'}
                                         </span>
                                         <span style={{ fontWeight: '700', color: '#dc2626' }}>+ ${processorFee.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {liquidityFee > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', color: '#166534' }}>
+                                        <span>
+                                            Liquidity & FX fee
+                                        </span>
+                                        <span style={{ fontWeight: '700', color: '#dc2626' }}>+ ${liquidityFee.toFixed(2)}</span>
                                     </div>
                                 )}
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: processorFee > 0 ? '#fef9c3' : '#dcfce7', borderRadius: '8px', marginTop: '8px', fontSize: '13px', fontWeight: '700' }}>

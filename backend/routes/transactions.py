@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from decimal import Decimal
@@ -26,7 +26,7 @@ class VoucherRequest(BaseModel):
 transaction_controller = TransactionController()
 
 @router.post("/voucher")
-async def create_voucher(request: VoucherRequest, db: Session = Depends(get_db)):
+async def create_voucher(request: VoucherRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Exposes Symmetri Flow A: Retail Voucher Creation.
     Enforces Zero-Custody and $20 Floor.
@@ -42,6 +42,7 @@ async def create_voucher(request: VoucherRequest, db: Session = Depends(get_db))
             amount_origin=request.amount_origin,
             retailer_id=request.retailer_id,
             payment_success_token=request.payment_success_token,
+            background_tasks=background_tasks,
             beneficiary_id=request.beneficiary_id
         )
     except Exception as e:

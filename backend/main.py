@@ -7,6 +7,8 @@ from backend.database import engine, Base
 # before Base.metadata.create_all is called.
 from backend.models.user import User
 from backend.models.transaction import Transaction
+from backend.models.inventory_model import InventoryVoucher
+from backend.models.nomination_model import UserNomination
 
 # --- TRIGGER DATABASE CREATION ---
 # This ensures trueque.db is born with the correct tables and columns.
@@ -35,9 +37,10 @@ def health_check():
 # --- ROUTER REGISTRATION ---
 # We removed the prefix here because it is already defined 
 # inside each individual router file (like transactions.py).
-from backend.routes import quotes, history, offers, trades, transactions, kyc, compliance, admin, beneficiaries
+from backend.routes import quotes, history, offers, trades, transactions, kyc, compliance, admin, beneficiaries, retailers
 
 app.include_router(quotes.router)
+app.include_router(retailers.router)
 app.include_router(history.router)
 app.include_router(offers.router)
 app.include_router(trades.router)
