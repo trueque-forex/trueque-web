@@ -1,1 +1,16 @@
-{"projectId":"prj_Vt0WgBwwzRxz0RwBmPKhq0WjuosR","orgId":"team_WvNbMvtN2WgFqUEIMI5Seb9U","projectName":"trueque-web"}
+{
+  "projectId": "prj_Vt0WgBwwzRxz0RwBmPKhq0WjuosR",
+  "orgId": "team_WvNbMvtN2WgFqUEIMI5Seb9U",
+  "projectName": "trueque-web",
+  "settings": {
+    "createdAt": 1759719957950,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "22.x"
+  }
+}
