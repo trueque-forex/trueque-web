@@ -12,7 +12,7 @@ class Transaction(Base):
     # Restored proper UUID constraints
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     created_at = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
-    user_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
     amount = Column(Numeric(precision=20, scale=4), nullable=False)
     source_currency = Column(String, nullable=False)
     status = Column(String, default="pending")
@@ -42,7 +42,7 @@ class Beneficiary(Base):
     __table_args__ = {'extend_existing': True}
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
     name = Column(Text, nullable=False, index=True)
     account_type = Column(String, nullable=False, default="bank")
     account_identifier = Column(Text, nullable=False)

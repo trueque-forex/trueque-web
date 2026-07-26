@@ -1,5 +1,5 @@
-// src/lib/truequeId.checksum.test.ts
-import { computeChecksum } from './truequeId';
+// src/lib/symmetriId.checksum.test.ts
+import { computeChecksum } from './symmetriId';
 
 describe('computeChecksum', () => {
   test('is deterministic for same payload', () => {

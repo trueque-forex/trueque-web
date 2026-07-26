@@ -35,7 +35,7 @@ async def check_kyc_requirement(
             # Create initial KYC record
             kyc_record = UserKYC(
                 user_id=user_id,
-                trueque_id=get_user_trueque_id(user_id, db),
+                symmetri_id=get_user_trueque_id(user_id, db),
                 kyc_status='not_required',
                 transaction_count=0,
                 total_transaction_value_usd=0
@@ -115,7 +115,7 @@ async def submit_kyc(
         if not kyc_record:
             kyc_record = UserKYC(
                 user_id=user_id,
-                trueque_id=get_user_trueque_id(user_id, db)
+                symmetri_id=get_user_trueque_id(user_id, db)
             )
             db.add(kyc_record)
         
@@ -256,7 +256,7 @@ async def update_transaction_count(
         if not kyc_record:
             kyc_record = UserKYC(
                 user_id=user_id,
-                trueque_id=get_user_trueque_id(user_id, db),
+                symmetri_id=get_user_trueque_id(user_id, db),
                 transaction_count=0,
                 total_transaction_value_usd=0
             )
@@ -282,4 +282,4 @@ async def update_transaction_count(
 def get_user_trueque_id(user_id: int, db: Session) -> str:
     """Helper function to get user's Trueque ID"""
     user = db.query(User).filter(User.id == user_id).first()
-    return user.trueque_id if user else ""
+    return user.symmetri_id if user else ""

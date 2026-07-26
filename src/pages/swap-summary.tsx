@@ -228,7 +228,7 @@ export default function SwapSummaryPage() {
                     amountPrincipal: breakdown.principalSource.toFixed(2),
                     amountFees: breakdown.totalFeesSource.toFixed(2),
                     currency: 'EUR',
-                    tid: brandedId,
+                    symmetriId: brandedId,
                     amountReceive: breakdown.grossReceive.toFixed(2),
                     currencyTo: swapIntent?.target_currency || qTo,
                     methodType: methodType || 'RTP',

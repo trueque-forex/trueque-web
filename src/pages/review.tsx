@@ -375,7 +375,7 @@ export default function ReviewPage() {
           amountPrincipal: breakdown.principalSource.toFixed(2),
           amountFees: breakdown.totalFeesSource.toFixed(2),
           currency: 'EUR',
-          tid: brandedId,
+          symmetriId: brandedId,
           amountReceive: breakdown.grossReceive.toFixed(2),
           target_currency: swapIntent?.target_currency || qTo,
           methodType: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',

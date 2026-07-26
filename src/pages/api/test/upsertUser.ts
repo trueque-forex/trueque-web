@@ -30,8 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!newId) throw new Error('failed to create user');
 
       const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-      const tid = `S${date}${country}${String(newId).padStart(4, '0')}-X`;
-      await client.query('UPDATE users SET tid = $1 WHERE id = $2', [tid, newId]);
+      const symmetriId = `S${date}${country}${String(newId).padStart(4, '0')}-X`;
+      await client.query('UPDATE users SET symmetriId = $1 WHERE id = $2', [symmetriId, newId]);
 
       if (beneficiary && beneficiary.name && beneficiary.account) {
         await client.query(
@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         );
       }
 
-      return { tid, userId: newId };
+      return { symmetriId, userId: newId };
     });
 
     return res.status(201).json(result);

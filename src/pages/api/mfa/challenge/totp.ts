@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!mfa_token || !otp) return res.status(400).json({ error: 'missing_fields' });
 
     // Verify pending token exists and is not expired (dev)
-    const entry: any = { userId: "mock", tid: mfa_token };
+    const entry: any = { userId: "mock", symmetriId: mfa_token };
     if (!mfa_token) return res.status(401).json({ error: 'invalid_mfa_token' });
 
     // DEV: We skip real OTP verification here. In a real flow you must verify the OTP against the user's TOTP secret.
@@ -38,14 +38,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!user) return res.status(401).json({ error: 'invalid_user' });
 
-    // Optionally log tid for traceability (dev only)
+    // Optionally log symmetriId for traceability (dev only)
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
-      console.log('MFA DEV VERIFY:', { userId: user.id, tid: entry.tid, mfa_token });
+      console.log('MFA DEV VERIFY:', { userId: user.id, symmetriId: entry.symmetriId, mfa_token });
     }
 
     // On success, respond with session (reuse respondWithSession)
-    return await respondWithSession(req, res, { ...user, tid: entry.tid });
+    return await respondWithSession(req, res, { ...user, symmetriId: entry.symmetriId });
   } catch (err: any) {
     console.error('mfa challenge error', err);
     return res.status(500).json({ error: 'internal_error' });

@@ -64,9 +64,9 @@ export default function Header() {
                         <span className="font-bold" style={{ fontSize: '16px', color: brandConfig.theme.textColor }}>
                             Welcome, {user?.firstName || userName}
                         </span>
-                        {(user?.symmetriId || user?.tid) && (
+                        {(user?.symmetriId || user?.symmetriId) && (
                             <span className="text-xs text-blue-500 font-mono tracking-wider" style={{ opacity: 0.7 }}>
-                                ID: {user.symmetriId || user.tid}
+                                ID: {user.symmetriId || user.symmetriId}
                             </span>
                         )}
                     </div>

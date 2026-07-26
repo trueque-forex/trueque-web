@@ -4,7 +4,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import getPool from '../../../lib/db';
-import { generateTruequeId } from '../../../lib/truequeId';
+import { generateSymmetriId } from '../../../lib/symmetriId';
 import { getUtcDate } from '../../../lib/time';
 import { generateMfaToken } from '../../../lib/mfaToken';
 
@@ -22,7 +22,7 @@ function generateToken(user: any): string {
         {
             userId: user.id,
             email: user.email,
-            tid: user.tid
+            symmetriId: user.symmetriId
         },
         secret,
         { expiresIn: '7d' }
@@ -77,18 +77,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
 
         // Generate Trueque ID
         const now = getUtcDate();
-        const truequeId = typeof generateTruequeId === 'function'
-            ? generateTruequeId(now, country || 'CO', Math.floor(Math.random() * 10000))
+        const symmetriId = typeof generateSymmetriId === 'function'
+            ? generateSymmetriId(now, country || 'CO', Math.floor(Math.random() * 10000))
             : `SYM-${Date.now()}`;
 
         // Insert new user
         const insertQuery = `
       INSERT INTO users (
         email, password_hash, first_name, last_name,
-        country, tid, created_at, phone_number, kyc_status, mfa_enabled
+        country, symmetriId, created_at, phone_number, kyc_status, mfa_enabled
       )
       VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, 'EMPTY', true)
-      RETURNING id, email, first_name, last_name, country, tid, created_at
+      RETURNING id, email, first_name, last_name, country, symmetriId, created_at
     `;
 
         const result = await pool.query(insertQuery, [
@@ -97,7 +97,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             firstName,
             lastName,
             country || 'US',
-            truequeId,
+            symmetriId,
             phone
         ]);
 
@@ -106,8 +106,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         // Format user object for mobile app
         const userResponse = {
             id: String(newUser.id),
-            tid: newUser.tid,
-            symmetriId: newUser.tid,
+            symmetriId: newUser.symmetriId,
+            symmetriId: newUser.symmetriId,
             email: newUser.email,
             country: newUser.country,
             first_name: newUser.first_name,
@@ -118,7 +118,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             is_admin: false // Not in DB yet
         };
 
-        console.log('[MOBILE SIGNUP] Created new user:', newUser.tid);
+        console.log('[MOBILE SIGNUP] Created new user:', newUser.symmetriId);
 
         // Always require MFA on signup
         await generateMfaToken(newUser.email);

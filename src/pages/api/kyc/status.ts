@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getSession, getSessionById } from '../../../lib/session';
-import { issueTruequeIdForUser as issueTruequeIdServer } from '@/server/kyc/issueTruequeId';
+import { issueSymmetriIdForUser as issueSymmetriIdServer } from '@/server/kyc/issueSymmetriId';
 import knexClient from '@/lib/knexClient';
 import crypto from 'crypto';
 import cookie from 'cookie';
@@ -68,14 +68,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('🔐 Resolved session', { userId, kycStatus });
 
-    let trueque_id: string | null = null;
+    let symmetri_id: string | null = null;
     let kyc_verified_at: string | null = null;
 
     if (userId && db) {
       try {
         const user = await db('users').where({ id: userId }).first();
         if (user) {
-          trueque_id = user.tid ?? null;
+          symmetri_id = user.symmetriId ?? null;
           kyc_verified_at = user.kyc_verified_at ?? null;
         }
       } catch (err) {
@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Issue SID if PENDING (provisional $200 swap needs Trade Room anonymity)
     // or APPROVED (full swap access). Acts as a safety net if submit endpoint
     // failed to issue. The SID is permanent once issued — never regenerated.
-    if ((kycStatus === 'pending' || kycStatus === 'approved') && !trueque_id && userId) {
+    if ((kycStatus === 'pending' || kycStatus === 'approved') && !symmetri_id && userId) {
       let countryHint = session.country ?? session.user?.country ?? null;
 
       if (!countryHint && db) {
@@ -100,20 +100,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       try {
 
-        // The issuer's signature is issueTruequeId(userId, countryCode)
-        const issuance = await issueTruequeIdServer(userId, countryHint || 'XX');
-        // issuance is { trueque_id: string }
-        if (issuance?.trueque_id) {
+        // The issuer's signature is issueSymmetriId(userId, countryCode)
+        const issuance = await issueSymmetriIdServer(userId, countryHint || 'XX');
+        // issuance is { symmetri_id: string }
+        if (issuance?.symmetri_id) {
           // success path: issuer already persists changes inside its DB transaction
         }
-        console.log('✅ Issuance result', { userId, trueque_id: issuance?.trueque_id ?? null });
+        console.log('✅ Issuance result', { userId, symmetri_id: issuance?.symmetri_id ?? null });
 
       } catch (err) {
-        console.error('❌ issueTruequeIdServer failed:', err);
+        console.error('❌ issueSymmetriIdServer failed:', err);
         return res.status(200).json({
           kycStatus,
           userId,
-          trueque_id,
+          symmetri_id,
           kyc_verified_at,
           warning: 'trueque_id_issue_failed',
         });
@@ -125,7 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({
       kycStatus,
       userId,
-      trueque_id,
+      symmetri_id,
       kyc_verified_at,
     });
   } catch (err) {

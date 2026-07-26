@@ -42,8 +42,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(404).json({ ok: false, error: 'user_not_found' });
         }
 
-        if (user.tid && !user.tid.startsWith('TRQ-PENDING') && !user.tid.startsWith('TDEV')) {
-            return res.status(200).json({ ok: true, tid: user.tid, alreadyExists: true });
+        if (user.symmetriId && !user.symmetriId.startsWith('TRQ-PENDING') && !user.symmetriId.startsWith('TDEV')) {
+            return res.status(200).json({ ok: true, symmetriId: user.symmetriId, alreadyExists: true });
         }
 
         // --- IMMUTABLE ANCHOR VALIDATION ---
@@ -69,11 +69,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const finalTid = await db.transaction(async (trx: any) => {
-            const tid = await buildTidAndReserve(trx, getUtcDate(), country);
+            const symmetriId = await buildTidAndReserve(trx, getUtcDate(), country);
 
             // Update User Profile with "Truth" data from KYC
             await trx('users').where({ id: targetId }).update({
-                tid: tid,
+                symmetriId: symmetriId,
                 kyc_status: 'PENDING',
                 first_name: firstName,
                 last_name: lastName,
@@ -81,10 +81,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 updated_at: getUtcDate()
             });
 
-            return tid;
+            return symmetriId;
         });
 
-        return res.status(200).json({ ok: true, tid: finalTid });
+        return res.status(200).json({ ok: true, symmetriId: finalTid });
 
     } catch (err: any) {
         console.error('KYC Complete Error:', err);

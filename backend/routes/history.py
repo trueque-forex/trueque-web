@@ -69,13 +69,13 @@ def get_my_history(
 # ── Legacy endpoints (kept for backward-compatibility) ────────────────────────
 
 @router.get("/history/{uuid}")
-def get_user_history_uuid(uuid: str, db: Session = Depends(get_db_local())):
+def get_user_history_uuid(uuid: str, db: Session = Depends(get_db_local)):
     # Legacy/By-Transaction endpoint
     offers = db.query(Offer).filter(Offer.uuid == uuid).all()
     return [offer.__dict__ for offer in offers]
 
 
 @router.get("/history/user/{user_id}")
-def get_user_history(user_id: int, db: Session = Depends(get_db_local())):
+def get_user_history(user_id: int, db: Session = Depends(get_db_local)):
     offers = db.query(Offer).filter(Offer.user_id == user_id).order_by(Offer.timestamp.desc()).all()
     return [offer for offer in offers]

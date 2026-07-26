@@ -58,9 +58,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const dobMatch = userDob === dob;
 
         // Verify Trueque ID (Optional High Trust Factor)
-        const { tid } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-        const tidProvided = !!tid;
-        const tidMatch = tidProvided && (user.tid === tid);
+        const { symmetriId } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+        const tidProvided = !!symmetriId;
+        const tidMatch = tidProvided && (user.symmetriId === symmetriId);
 
         if ((idMatch && dobMatch) || (tidMatch && (idMatch || dobMatch))) {
             // Logic: Phone+DOB is Standard. TID + (Phone OR DOB) is High Trust.
@@ -76,7 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ...user,
                 mfaResetAllowed: true, // State Transition
                 recoveryTrustLevel: tidMatch ? 'HIGH' : 'STANDARD',
-                tid: user.tid || 'FRESH_RECOVERY'
+                symmetriId: user.symmetriId || 'FRESH_RECOVERY'
             });
         } else {
             return res.status(401).json({ error: 'challenge_failed', message: 'Verification failed. Phone digits or Date of Birth does not match.' });

@@ -32,7 +32,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     // Normalize User Data
     const sessionUser = session.user || {};
     const user = {
-        userId: sessionUser.id || sessionUser.tid || 'UNKNOWN_ID',
+        userId: sessionUser.id || sessionUser.symmetriId || 'UNKNOWN_ID',
         email: sessionUser.email || 'unknown@example.com',
         firstName: sessionUser.firstName || 'Symmetri',
         lastName: sessionUser.lastName || 'User',

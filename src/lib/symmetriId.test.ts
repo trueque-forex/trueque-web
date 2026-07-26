@@ -1,8 +1,8 @@
-import { generateTruequeId, parseTruequeId, validateTruequeId } from './truequeId';
+import { generateSymmetriId, parseTruequeId, validateTruequeId } from './symmetriId';
 
 test('generate and validate TruequeId happy path', () => {
   const date = new Date(Date.UTC(2025, 10, 5)); // 2025-11-05 UTC
-  const id = generateTruequeId(date, 'US', 42);
+  const id = generateSymmetriId(date, 'US', 42);
   expect(typeof id).toBe('string');
   expect(id.startsWith('T20251105US0042')).toBe(true);
   expect(validateTruequeId(id)).toBe(true);

@@ -20,7 +20,7 @@ function generateToken(user: any): string {
         {
             userId: user.id,
             email: user.email,
-            truequeId: user.tid
+            symmetriId: user.symmetriId
         },
         secret,
         { expiresIn: '7d' }
@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         if (!pool) throw new Error('DB pool not available');
 
         const query = `
-      SELECT id, password_hash, email, tid, first_name, last_name, country, phone_number, created_at, kyc_status, mfa_enabled
+      SELECT id, password_hash, email, symmetriId, first_name, last_name, country, phone_number, created_at, kyc_status, mfa_enabled
       FROM users
       WHERE email = $1
       LIMIT 1
@@ -67,8 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         // Format user object for mobile app
         const userResponse = {
             id: String(user.id),
-            tid: user.tid || `TRQ-${user.id}`,
-            symmetriId: user.tid || `TRQ-${user.id}`,
+            symmetriId: user.symmetriId || `TRQ-${user.id}`,
+            symmetriId: user.symmetriId || `TRQ-${user.id}`,
             email: user.email,
             country: user.country || 'US',
             first_name: user.first_name,

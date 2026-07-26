@@ -4,7 +4,7 @@ import apiFetch from '../../lib/apiFetch';
 
 export default function MFAPage() {
     const router = useRouter();
-    const { mfa_token, tid, email } = router.query;
+    const { mfa_token, symmetriId, email } = router.query;
     const [code, setCode] = useState(['', '', '', '', '', '']);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -51,7 +51,7 @@ export default function MFAPage() {
                 method: 'POST',
                 body: JSON.stringify({
                     mfa_token,
-                    tid,
+                    symmetriId,
                     code: fullCode,
                     email
                 })

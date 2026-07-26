@@ -8,7 +8,7 @@ class AuditLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     offer_id = Column(Integer, nullable=False)
     matched_offer_id = Column(Integer, nullable=True)
-    user_id = Column(Integer, nullable=False)
+    owner_id = Column(Integer, nullable=False)
     counterparty_id = Column(Integer, nullable=True)
     market_rate = Column(Numeric(18, 6), nullable=False)
     amount = Column(Numeric(18, 6), nullable=False)

@@ -82,7 +82,7 @@ export async function createSession(user: any, mfaVerified = false) {
     // Map snake_case (DB) to camelCase (Session) if needed, but prefer explicit inputs.
     kycStatus: user.kyc_status || user.kycStatus || 'NONE',
     userType: (user.user_type === 'MERCHANT' || user.userType === 'MERCHANT') ? 'MERCHANT' : 'PEER',
-    tid: user.tid,
+    symmetriId: user.symmetriId,
     firstName: user.first_name || user.firstName,
     lastName: user.last_name || user.lastName,
     name: user.name || [user.first_name || user.firstName, user.last_name || user.lastName].filter(Boolean).join(' '),
@@ -146,7 +146,7 @@ async function parseMobileBearerToken(token: string): Promise<TruequeSession | n
       user: {
         id: String(payload.userId),
         email: payload.email || '',
-        tid: payload.tid || payload.truequeId || '',
+        symmetriId: payload.symmetriId || payload.symmetriId || '',
         kycStatus: payload.kyc_status || 'NONE',
         userType: 'PEER',
         firstName: payload.first_name || '',

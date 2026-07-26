@@ -9,12 +9,12 @@ export interface UserDB {
   email: string;
   first_name: string;
   last_name: string;
-  trueque_id: string | null; 
+  symmetri_id: string | null; 
   country: string;
   status: string;           // DB Truth: 'status' (legacy)
   phone_number: string;
   created_at: string;
-  tid?: string;
+  symmetriId?: string;
 }
 
 export function mapUserToUI(row: UserDB) {
@@ -24,7 +24,7 @@ export function mapUserToUI(row: UserDB) {
     email: row.email,
     firstName: row.first_name || "",
     lastName: row.last_name || "",
-    symmetriId: row.trueque_id || row.tid || "NOT_ISSUED",
+    symmetriId: row.symmetri_id || row.symmetriId || "NOT_ISSUED",
     countryCode: row.country || "US",
     // UI expects 'kycStatus', mapped from DB 'status'
     kycStatus: (row.status || "incomplete").toUpperCase(), 

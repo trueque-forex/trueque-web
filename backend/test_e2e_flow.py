@@ -32,7 +32,7 @@ class TestTruequeE2E(unittest.TestCase):
             currency_from='EUR',
             currency_to='ARS',
             mid_market_rate=1000.0,
-            trueque_id=user_id
+            symmetri_id=user_id
         )
         self.assertEqual(quote['corridor'], "ES-AR", "Routing logic failed. Expected ES-AR corridor.")
         print("✅ Identity Routed correctly to Spain Origin.")
@@ -47,7 +47,7 @@ class TestTruequeE2E(unittest.TestCase):
             mid_market_rate=1.0,
             payment_method='bank_transfer',
             outbound_method='bank_rtp',
-            trueque_id='T20251226US0001K'
+            symmetri_id='T20251226US0001K'
         )
         bd = quote['breakdown']
         print(f"RTP Fees: Inbound={bd['inbound_fee']}, Outbound={bd['gateway_outbound_fee']}")
@@ -65,7 +65,7 @@ class TestTruequeE2E(unittest.TestCase):
             mid_market_rate=1200.0,
             payment_method='card',
             outbound_method='card_push',
-            trueque_id='T20251226US0001K'
+            symmetri_id='T20251226US0001K'
         )
         bd = quote['breakdown']
         print(f"Card Fees: Inbound={bd['inbound_fee']}, Liquidity={bd['liquidity_fee']}, Outbound={bd['gateway_outbound_fee']}")
@@ -117,7 +117,7 @@ class TestTruequeE2E(unittest.TestCase):
             mid_market_rate=1200.0,
             payment_method='card', # Needs card for liquidity fee
             outbound_method='bank_rtp',
-            trueque_id='T20251226US0001K',
+            symmetri_id='T20251226US0001K',
         )
         liq_fee_normal = quote_normal['breakdown']['liquidity_fee']
         print(f"Normal Liquidity Fee (AR): {liq_fee_normal}")
@@ -133,7 +133,7 @@ class TestTruequeE2E(unittest.TestCase):
             mid_market_rate=1200.0,
             payment_method='card',
             outbound_method='bank_rtp',
-            trueque_id='T20251226US0001K',
+            symmetri_id='T20251226US0001K',
         )
         liq_fee_holiday = quote_holiday['breakdown']['liquidity_fee']
         print(f"Holiday Liquidity Fee (AR): {liq_fee_holiday}")

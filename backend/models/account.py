@@ -7,7 +7,7 @@ import uuid
 class Account(Base):
     __tablename__ = "accounts"
     account_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
     currency = Column(String)
     account_number = Column(String)
     institution = Column(String)

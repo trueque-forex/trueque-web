@@ -9,14 +9,14 @@ export default function SupportPage() {
   const [email, setEmail] = useState('');
   const [last4, setLast4] = useState('');
   const [dob, setDob] = useState('');
-  const [tid, setTid] = useState('');
+  const [symmetriId, setTid] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
   const [verified, setVerified] = useState(false);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !dob || (!last4 && !tid)) {
+    if (!email || !dob || (!last4 && !symmetriId)) {
       setMessage({ type: 'error', text: 'Please provide Email, Date of Birth, and either Last 4 digits of Phone or Symmetri ID.' });
       return;
     }
@@ -26,7 +26,7 @@ export default function SupportPage() {
     try {
       const { json, res } = await apiFetch('/api/auth/verify-id-challenge', {
         method: 'POST',
-        body: JSON.stringify({ email, last4, dob, tid })
+        body: JSON.stringify({ email, last4, dob, symmetriId })
       });
 
       if (res.ok && json.success) {
@@ -123,7 +123,7 @@ export default function SupportPage() {
                       <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>Symmetri ID (T+YYYYMMDD+CC0000-X)</label>
                       <input
                         type="text"
-                        value={tid}
+                        value={symmetriId}
                         onChange={(e) => setTid(e.target.value.toUpperCase())}
                         placeholder="T20250101US0001-K"
                         style={{ width: '100%', padding: '10px', borderRadius: '4px', border: '1px solid #ddd', fontFamily: 'monospace' }}

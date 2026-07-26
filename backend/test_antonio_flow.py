@@ -31,7 +31,7 @@ class TestAntonioNuevoFlow(unittest.TestCase):
             email="antonio.nuevo@test.com",
             first_name="Antonio",
             last_name="Nuevo",
-            trueque_id="T20251226MX0001K",
+            symmetri_id="T20251226MX0001K",
             country_of_residence="MX",
             tx_count=0
         )

@@ -19,7 +19,7 @@ def test_fee_logic():
         currency_to='ARS',
         mid_market_rate=rate,
         payment_method='bank_transfer',
-        trueque_id='T20251226US0001X'
+        symmetri_id='T20251226US0001X'
     )
     
     bd_rtp = quote_rtp['breakdown']
@@ -42,7 +42,7 @@ def test_fee_logic():
         mid_market_rate=0.92,
         payment_method='card',
         outbound_method='card_push',
-        trueque_id='T20251226US0001X',
+        symmetri_id='T20251226US0001X',
         country_to='ES'
     )
     bd_es = quote_es['breakdown']
@@ -61,7 +61,7 @@ def test_fee_logic():
         mid_market_rate=1200.0,
         payment_method='card',
         outbound_method='card_push',
-        trueque_id='T20251226US0001X',
+        symmetri_id='T20251226US0001X',
         country_to='AR'
     )
     bd_ar = quote_ar['breakdown']

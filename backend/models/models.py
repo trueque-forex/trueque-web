@@ -30,7 +30,7 @@ users = Table(
     "users",
     metadata,
     Column("id", PG_UUID(as_uuid=True), primary_key=True),
-    Column("trueque_id", String, unique=True, nullable=False),
+    Column("symmetri_id", String, unique=True, nullable=False),
     Column("email", String, unique=True, nullable=False),
     Column("password_hash", String),
     Column("first_name", String),

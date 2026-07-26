@@ -20,15 +20,15 @@ class FeeOrchestrator:
             print(f"Error loading corridor config: {e}")
             self.config = {}
 
-    def _parse_country_from_id(self, trueque_id: str) -> str:
+    def _parse_country_from_id(self, symmetri_id: str) -> str:
         """
         Extracts country code from TYYYYMMDDCCSSSSK format.
         """
-        if not trueque_id or len(trueque_id) < 16:
+        if not symmetri_id or len(symmetri_id) < 16:
             return None
         # CC is at index 9:11 (0-indexed) -> T(0) Y4 M2 D2 C2...
         try:
-            cc = trueque_id[9:11]
+            cc = symmetri_id[9:11]
             return cc.upper()
         except:
             return None
@@ -41,7 +41,7 @@ class FeeOrchestrator:
         mid_market_rate: Decimal,
         payment_method: str = 'bank_transfer',
         outbound_method: str = 'bank_rtp',
-        trueque_id: str = None,
+        symmetri_id: str = None,
         tier: str = 'T1',
         country_from: str = None, 
         country_to: str = None
@@ -56,7 +56,7 @@ class FeeOrchestrator:
         d_mid_market_rate = mid_market_rate if mid_market_rate is not None else Decimal('0')
 
         # 1. Determine Corridor / Regions
-        id_country = self._parse_country_from_id(trueque_id)
+        id_country = self._parse_country_from_id(symmetri_id)
         
         def_country_from = "US"
         def_country_to = "ES" if currency_to == "EUR" else ("AR" if currency_to == "ARS" else "US")

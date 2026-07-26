@@ -9,7 +9,7 @@ class Dispute(Base):
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     offer_id = Column(PG_UUID(as_uuid=True), ForeignKey("offers.id"), nullable=False)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     reason = Column(Text, nullable=True)
     status = Column(String, default="open")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

@@ -4,7 +4,7 @@ import formidable from 'formidable';
 import { withAuth } from '@/lib/withAuth';
 import { promises as fs } from 'fs';
 import knexClient from '@/lib/knexClient';
-import { issueTruequeIdForUser } from '@/server/kyc/issueTruequeId';
+import { issueSymmetriIdForUser } from '@/server/kyc/issueSymmetriId';
 
 export const config = {
   api: { bodyParser: false },
@@ -79,11 +79,11 @@ async function handler(
     // ── 2. Issue Trade Room SID immediately ──
     // The user may enter the Trade Room for a provisional $200 swap while
     // waiting for KYC approval. They need a SID NOW for Trade Room anonymity.
-    let trade_mask_sid: string | null = session.user.tid ?? null;
+    let trade_mask_sid: string | null = session.user.symmetriId ?? null;
     if (!trade_mask_sid) {
       try {
-        const issuance = await issueTruequeIdForUser(ownerId, fields.country || 'XX');
-        trade_mask_sid = issuance?.trueque_id ?? null;
+        const issuance = await issueSymmetriIdForUser(ownerId, fields.country || 'XX');
+        trade_mask_sid = issuance?.symmetri_id ?? null;
         console.log('✅ SID issued at KYC submission:', { ownerId, trade_mask_sid });
       } catch (err) {
         // Non-fatal: SID issuance will be retried on /api/kyc/status check

@@ -23,7 +23,7 @@ def run_flow():
         user = User(
             id="antonio-uuid-123",
             email="antonio.nuevo@test.com",
-            trueque_id="T20251226MX0001K",
+            symmetri_id="T20251226MX0001K",
             first_name="Antonio",
             last_name="Nuevo",
             country_of_residence="MX",

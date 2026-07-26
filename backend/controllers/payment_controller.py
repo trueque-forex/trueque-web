@@ -23,7 +23,7 @@ class PaymentController:
         mid_market_rate: Decimal, 
         payment_method: str = 'RTP',
         outbound_method: str = 'bank_rtp',
-        trueque_id: str = None,
+        symmetri_id: str = None,
         tier: str = 'standard'
     ) -> Dict[str, Any]:
         """

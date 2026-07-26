@@ -53,7 +53,7 @@ users = Table(
     "users",
     metadata,
     Column("id", String, primary_key=True),
-    Column("trueque_id", String, unique=True, nullable=False),
+    Column("symmetri_id", String, unique=True, nullable=False),
     Column("email", String, unique=True, nullable=False),
     Column("password_hash", String),
     Column("first_name", String),

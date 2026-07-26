@@ -8,7 +8,7 @@ class Voucher(Base):
     __tablename__ = "vouchers"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     
     # Retailer info (e.g., 'SORIANA', 'OXXO')
     retailer_name = Column(String, nullable=False)

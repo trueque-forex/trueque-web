@@ -227,7 +227,7 @@ export default function KYCPage() {
       try {
         const session = JSON.parse(sessionData);
         setUserName(session.firstName || 'User');
-        setUserTruequeId(session.truequeId || '');
+        setUserTruequeId(session.symmetriId || '');
         if (session.rejectedFields) {
           setRejectedFields(session.rejectedFields);
         }
@@ -530,8 +530,8 @@ export default function KYCPage() {
 
       const responseJson = await res.json();
 
-      if (responseJson.ok && responseJson.tid) {
-        setUserTruequeId(responseJson.tid);
+      if (responseJson.ok && responseJson.symmetriId) {
+        setUserTruequeId(responseJson.symmetriId);
 
         // ACTIVATE LOGIN STATE: Refresh Session from Cookie now that Flow A is done.
         // This ensures Dashboard access is valid.
@@ -541,8 +541,8 @@ export default function KYCPage() {
         const sessionStr = localStorage.getItem('trueque_session');
         if (sessionStr) {
           const session = JSON.parse(sessionStr);
-          session.tid = responseJson.tid;
-          session.truequeId = responseJson.tid; // Handle both keys
+          session.symmetriId = responseJson.symmetriId;
+          session.symmetriId = responseJson.symmetriId; // Handle both keys
           session.kycStatus = 'PENDING'; // Force State Lock
           session.kycTier = 'TIER_1_PENDING'; // Persistence Requirement
           localStorage.setItem('trueque_session', JSON.stringify(session));

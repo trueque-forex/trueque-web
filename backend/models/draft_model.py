@@ -9,7 +9,7 @@ class Draft(Base):
     __tablename__ = "drafts"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
     # Step: 'amount', 'beneficiary', 'review'
     step = Column(String, default="amount")
     # JSON Blob for flexible storage (amount, currency, partial beneficiary data)

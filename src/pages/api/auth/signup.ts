@@ -6,7 +6,7 @@ import { encrypt, computeBlindIndex } from '../../../lib/crypto';
 import { generateMfaToken } from '../../../lib/mfaToken';
 import { respondWithSession } from '../../../lib/authResponse';
 import { getUtcDate } from '../../../lib/time';
-import { generateTruequeId } from '../../../lib/truequeId';
+import { generateSymmetriId } from '../../../lib/symmetriId';
 import { mapUserToUI } from '../../../lib/mappers';
 
 // Helper: safe null
@@ -60,7 +60,7 @@ async function createUserTransaction(db: any, payload: any) {
     // 3. Generate Smart TID (S + YYYYMMDD + CC + RandomSequence)
     const now = getUtcDate();
     const randomSequence = Math.floor(1000 + Math.random() * 8999); // 4 digits
-    const tid = generateTruequeId(now, country || 'US', randomSequence);
+    const symmetriId = generateSymmetriId(now, country || 'US', randomSequence);
 
     // 4. Insert User
     const toInsert = {
@@ -77,7 +77,7 @@ async function createUserTransaction(db: any, payload: any) {
       kyc_status: 'INCOMPLETE',
       mfa_enabled: false,
       mfa_method: null,
-      tid: tid, // AIMED: Included in the initial INSERT
+      symmetriId: symmetriId, // AIMED: Included in the initial INSERT
       created_at: getUtcDate(),
     };
 
@@ -104,7 +104,7 @@ async function createUserTransaction(db: any, payload: any) {
 
     // 6. Return User Row
     const [userRow] = await tx('users')
-      .select('id', 'email', 'first_name', 'last_name', 'tid', 'created_at', 'country', 'kyc_status', 'street_address', 'city', 'state', 'postal_code', 'phone_number') // inclusive select
+      .select('id', 'email', 'first_name', 'last_name', 'symmetriId', 'created_at', 'country', 'kyc_status', 'street_address', 'city', 'state', 'postal_code', 'phone_number') // inclusive select
       .where({ id: newId })
       .limit(1);
 

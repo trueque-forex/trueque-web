@@ -10,7 +10,7 @@ class Offer(Base):
     # Use PG_UUID for IDs in native PostgreSQL
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4) 
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.utcnow)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     swap_type = Column(String, default="SYNTHETIC")
     amount = Column(Numeric(precision=20, scale=4), nullable=False)
     source_currency = Column(String, nullable=False)

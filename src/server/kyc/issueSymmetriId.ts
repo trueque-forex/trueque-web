@@ -1,10 +1,10 @@
-// src/server/kyc/issueTruequeId.ts
+// src/server/kyc/issueSymmetriId.ts
 import { db } from '../db';
-import { generateTruequeId } from './generateTruequeId';
+import { generateSymmetriId } from './generateSymmetriId';
 
 console.error('🧪 [TruequeIssuer] module loaded:', __filename, 'pid=', process.pid);
 
-export async function issueTruequeId(userId: string, countryCode: string): Promise<{ trueque_id: string }> {
+export async function issueSymmetriId(userId: string, countryCode: string): Promise<{ symmetri_id: string }> {
   console.error('🧪 [TruequeIssuer] enter:', userId, 'pid=', process.pid, 'time=', new Date().toISOString());
 
   const now = new Date();
@@ -23,10 +23,10 @@ export async function issueTruequeId(userId: string, countryCode: string): Promi
       await client.query('ROLLBACK');
       throw new Error(`User not found: ${userId}`);
     }
-    if (user.tid) {
+    if (user.symmetriId) {
       await client.query('ROLLBACK');
-      console.error('🧪 [TruequeIssuer] already issued:', userId, 'tid=', user.tid);
-      return { trueque_id: user.tid };
+      console.error('🧪 [TruequeIssuer] already issued:', userId, 'symmetriId=', user.symmetriId);
+      return { symmetri_id: user.symmetriId };
     }
 
     const dayKey = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -51,23 +51,23 @@ export async function issueTruequeId(userId: string, countryCode: string): Promi
       );
     }
 
-    // generateTruequeId currently expects no arguments according to TS
-    const tid = generateTruequeId();
+    // generateSymmetriId currently expects no arguments according to TS
+    const symmetriId = generateSymmetriId();
 
-    console.error('🧪 [TruequeIssuer] about to update users row:', userId, 'tid=', tid, 'kyc_now=', now.toISOString());
+    console.error('🧪 [TruequeIssuer] about to update users row:', userId, 'symmetriId=', symmetriId, 'kyc_now=', now.toISOString());
 
     await client.query(
       `UPDATE users
-       SET tid = $1, kyc_verified_at = $2, kyc_status = $3
+       SET symmetriId = $1, kyc_verified_at = $2, kyc_status = $3
        WHERE id = $4`,
-      [tid, now.toISOString(), 'approved', userId]
+      [symmetriId, now.toISOString(), 'approved', userId]
     );
 
     // console.error('🧪 [TruequeIssuer] update executed for:', userId);
     // Note: kyc_audit table is currently missing in DB. Skipping audit log.
 
     await client.query('COMMIT');
-    return { trueque_id: tid };
+    return { symmetri_id: symmetriId };
   } catch (err) {
     try {
       await client.query('ROLLBACK');
@@ -80,5 +80,5 @@ export async function issueTruequeId(userId: string, countryCode: string): Promi
   }
 }
 
-// Backwards-compatible alias: some callers import issueTruequeIdForUser
-export { issueTruequeId as issueTruequeIdForUser };
+// Backwards-compatible alias: some callers import issueSymmetriIdForUser
+export { issueSymmetriId as issueSymmetriIdForUser };

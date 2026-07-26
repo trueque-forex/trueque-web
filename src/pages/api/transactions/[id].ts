@@ -38,7 +38,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             description: 'Settlement confirmed',
             counterparty: {
                 name: 'Carlos Méndez',
-                trueque_id: 'TRQ-MX-123'
+                symmetri_id: 'TRQ-MX-123'
             }
         });
     } catch (err: any) {

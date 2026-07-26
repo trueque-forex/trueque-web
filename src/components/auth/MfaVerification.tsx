@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 
-export default function MfaVerification({ mfaToken, tid }: { mfaToken: string, tid: string }) {
+export default function MfaVerification({ mfaToken, symmetriId }: { mfaToken: string, symmetriId: string }) {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export default function MfaVerification({ mfaToken, tid }: { mfaToken: string, t
       const res = await fetch('/api/auth/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mfa_token: mfaToken, code, tid }),
+        body: JSON.stringify({ mfa_token: mfaToken, code, symmetriId }),
       });
 
       if (res.ok) {

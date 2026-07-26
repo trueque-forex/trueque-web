@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import apiFetch from '../lib/apiFetch';
 
-type SignupSuccessJson = { session?: any; mfa_token?: string; tid?: string;[k: string]: any };
+type SignupSuccessJson = { session?: any; mfa_token?: string; symmetriId?: string;[k: string]: any };
 type SignupErrorJson = { error?: string; code?: string; message?: string;[k: string]: any };
 type SignupResponseJson = SignupSuccessJson | SignupErrorJson | null;
 
@@ -174,7 +174,7 @@ export default function SignupPage(): React.JSX.Element {
           return;
         }
 
-        const mfaRedirect = `/verify-mfa?mfa_token=${encodeURIComponent(parsed?.mfa_token || '')}&tid=${encodeURIComponent(parsed?.tid || '')}`;
+        const mfaRedirect = `/verify-mfa?mfa_token=${encodeURIComponent(parsed?.mfa_token || '')}&symmetriId=${encodeURIComponent(parsed?.symmetriId || '')}`;
         window.location.href = mfaRedirect;
         return;
       }

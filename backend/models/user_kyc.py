@@ -9,8 +9,8 @@ class UserKYC(Base):
     __tablename__ = 'user_kyc'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey('users.id'), unique=True, nullable=False)
-    trueque_id = Column(String(20), nullable=False, index=True)
+    owner_id = Column(PG_UUID(as_uuid=True), ForeignKey('users.id'), unique=True, nullable=False)
+    symmetri_id = Column(String(20), nullable=False, index=True)
     
     # KYC Status
     kyc_status = Column(String(20), default='not_required')  # 'not_required', 'required', 'pending', 'approved', 'rejected'

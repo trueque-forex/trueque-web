@@ -9,7 +9,7 @@ class Advance(Base):
     __tablename__ = "advances"
 
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), nullable=False)
+    owner_id = Column(PG_UUID(as_uuid=True), nullable=False)
     uuid = Column(PG_UUID(as_uuid=True), unique=True, nullable=False)
     country = Column(String, nullable=False)
     currency_from = Column(String, nullable=False)

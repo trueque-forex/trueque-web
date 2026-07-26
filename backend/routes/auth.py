@@ -24,7 +24,7 @@ def web_signup(payload: WebSignupPayload):
     db = SessionLocal()
     try:
         # Check if email exists
-        existing_user_sql = text("SELECT trueque_id FROM users WHERE email = :email")
+        existing_user_sql = text("SELECT symmetri_id FROM users WHERE email = :email")
         res = db.execute(existing_user_sql, {"email": payload.email})
         if res.fetchone():
             return JSONResponse(
@@ -40,18 +40,18 @@ def web_signup(payload: WebSignupPayload):
         password_hash = bcrypt.hashpw(payload.password.encode('utf-8'), salt).decode('utf-8')
 
         # Generate IDs
-        trueque_id = str(uuid.uuid4())
+        symmetri_id = str(uuid.uuid4())
         user_id = str(uuid.uuid4())
 
         insert_sql = text("""
             INSERT INTO users (
-                id, trueque_id, email, password_hash, 
+                id, symmetri_id, email, password_hash, 
                 first_name, last_name, dob, 
                 country_of_residence, country_destiny, address, 
                 created_at
             )
             VALUES (
-                :id, :trueque_id, :email, :password_hash,
+                :id, :symmetri_id, :email, :password_hash,
                 :first_name, :last_name, :dob,
                 :country_of_residence, :country_destiny, :address,
                 :created_at
@@ -60,7 +60,7 @@ def web_signup(payload: WebSignupPayload):
 
         db.execute(insert_sql, {
             "id": user_id,
-            "trueque_id": trueque_id,
+            "symmetri_id": symmetri_id,
             "email": payload.email,
             "password_hash": password_hash,
             "first_name": payload.first_name,
@@ -77,7 +77,7 @@ def web_signup(payload: WebSignupPayload):
             status_code=status.HTTP_201_CREATED,
             content={
                 "status": "ok",
-                "trueque_id": trueque_id,
+                "symmetri_id": symmetri_id,
                 "message": "User created successfully"
             }
         )

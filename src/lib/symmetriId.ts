@@ -1,4 +1,4 @@
-// src/lib/truequeId.ts
+// src/lib/symmetriId.ts
 import crypto from 'crypto';
 
 function base36Encode(n: number): string {
@@ -16,7 +16,7 @@ export function computeChecksum(payload: string): string {
   return base36Encode(mod);
 }
 
-export function generateTruequeId(date: Date, countryCode: string, seq: number): string {
+export function generateSymmetriId(date: Date, countryCode: string, seq: number): string {
   const yyyy = date.getUTCFullYear().toString().padStart(4, '0');
   const mm = (date.getUTCMonth() + 1).toString().padStart(2, '0');
   const dd = date.getUTCDate().toString().padStart(2, '0');
