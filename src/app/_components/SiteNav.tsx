@@ -58,20 +58,12 @@ export default function SiteNav() {
             ))}
           </div>
 
-          {/* Sign In */}
+          {/* Primary CTA (Sign In) */}
           <Link
             href="/signin"
-            className="hidden sm:block text-secondary hover:text-primary text-sm font-medium transition-colors duration-200 px-2"
+            className="hidden sm:block px-4 py-2 bg-brand hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors duration-200 shadow-sm whitespace-nowrap"
           >
             Sign In
-          </Link>
-
-          {/* Primary CTA */}
-          <Link
-            href="/signup"
-            className="px-4 py-2 bg-brand hover:bg-blue-600 active:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors duration-200 shadow-sm whitespace-nowrap"
-          >
-            Get Started
           </Link>
 
           {/* Mobile hamburger */}

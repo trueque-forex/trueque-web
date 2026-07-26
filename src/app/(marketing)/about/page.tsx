@@ -131,7 +131,7 @@ export default function AboutPage() {
           <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm bg-background">
             {CORRIDORS.map((c, i) => (
               <div
-                key={c.to}
+                key={`${c.from}-${c.to}`}
                 className={`flex items-center justify-between px-6 py-4 gap-4 ${
                   i < CORRIDORS.length - 1 ? 'border-b border-gray-200' : ''
                 } hover:bg-white transition-colors`}

@@ -41,11 +41,11 @@ const CORRIDORS = {
 };
 
 // ── How It Works steps ────────────────────────────────────────────────────────
-const STEPS = [
+const getSteps = (originMarket: string) => [
   {
     n: '1',
     title: 'You Pay',
-    desc: 'Choose your amount and pay securely from the US or Spain. Debit card, instant bank transfer, or Zelle — your choice.',
+    desc: `Choose your amount and pay securely from ${originMarket === 'US' ? 'the US' : 'Spain'}. Debit card, instant bank transfer, or Zelle — your choice.`,
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
@@ -181,7 +181,7 @@ export default function HomePage() {
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up-3">
             <Link
-              href="/signup"
+              href="/signin"
               id="hero-cta-primary"
               className="px-8 py-4 bg-brand hover:bg-blue-600 active:bg-blue-700 text-white font-bold text-base rounded-xl shadow-lg shadow-brand/20 transition-all duration-300 w-full sm:w-auto"
             >
@@ -226,14 +226,14 @@ export default function HomePage() {
 
           {/* Steps grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {STEPS.map((step, i) => (
+            {getSteps(originMarket).map((step, i) => (
               <div
                 key={step.n}
                 className="relative group bg-white border border-gray-200 shadow-sm rounded-2xl p-7 hover:border-brand/30 hover:shadow-md transition-all duration-300"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
                 {/* Connector line (desktop) */}
-                {i < STEPS.length - 1 && (
+                {i < getSteps(originMarket).length - 1 && (
                   <div className="hidden lg:block absolute top-10 -right-2.5 w-5 h-px bg-gradient-to-r from-brand/40 to-transparent z-20" />
                 )}
 
