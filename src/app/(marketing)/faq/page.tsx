@@ -16,7 +16,7 @@ const FAQ_ITEMS = [
   {
     category: 'Speed & Process',
     q: 'Can I cancel a voucher after sending it?',
-    a: 'Once a voucher is issued and the code is sent to your family, it cannot be cancelled. This is because the capital has already been committed to the retailer network. Please double-check the amount and store before confirming.',
+    a: 'Once you send the voucher code to your family, it cannot be cancelled. This is because the capital has already been committed to the retailer network. Please double-check the amount and retailer before confirming.',
   },
 
   // ── Your Family ────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ const FAQ_ITEMS = [
   {
     category: 'Fees & Rates',
     q: 'Does Symmetri take a cut from the exchange rate?',
-    a: 'No, never. We always use the mid-market rate — the same rate shown on Google or XE.com. We do not add a spread or markup to the exchange rate. What you see is what your family gets.',
+    a: 'No, never. We always use the live, independent mid-market rate. We do not add a spread or markup to the exchange rate. What you see is what your family gets.',
   },
   {
     category: 'Fees & Rates',
@@ -84,7 +84,7 @@ const FAQ_ITEMS = [
   {
     category: 'Countries & Stores',
     q: 'Which stores does the voucher work at?',
-    a: 'In Mexico: OXXO, Soriana, HEB, Walmart MX, Chedraui, and many more. In Guatemala: La Torre, Farmacias Batres. In Colombia: Grupo Éxito, Jumbo, Carulla. In Dominican Republic: Sirena. More stores are being added regularly.',
+    a: 'We are currently developing partnerships with major retail networks across Mexico, Guatemala, Colombia, and the Dominican Republic. Our official participating retailers will be announced soon.',
   },
 ];
 
@@ -199,7 +199,7 @@ export default function FaqPage() {
               Email Us
             </a>
             <a
-              href="/signup"
+              href="/signin"
               className="px-6 py-3 bg-brand hover:bg-blue-600 text-white font-bold text-sm rounded-xl transition-colors shadow-lg shadow-brand/20"
             >
               Ready to send? Create your free account →

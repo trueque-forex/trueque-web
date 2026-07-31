@@ -13,6 +13,9 @@ class Transaction(Base):
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     created_at = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc))
     owner_id = Column(PG_UUID(as_uuid=True), nullable=False, index=True)
+    # Added idempotency key for webhook double-tap protection
+    idempotency_key = Column(String, unique=True, index=True, nullable=True)
+    
     amount = Column(Numeric(precision=20, scale=4), nullable=False)
     source_currency = Column(String, nullable=False)
     status = Column(String, default="pending")
@@ -35,7 +38,6 @@ class Transaction(Base):
     symmetri_gross_margin = Column(Numeric(precision=20, scale=4), nullable=True, default=0.00)
     retailer_wholesale_margin = Column(Numeric(precision=20, scale=4), nullable=True, default=0.00)
     destination_country_code = Column(String, nullable=True)
-    target_currency = Column(String, nullable=True)
 
 class Beneficiary(Base):
     __tablename__ = "beneficiaries"

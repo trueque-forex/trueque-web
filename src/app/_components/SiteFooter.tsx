@@ -31,8 +31,7 @@ export default function SiteFooter() {
               <span className="text-primary font-bold text-lg">Symmetri</span>
             </Link>
             <p className="text-secondary text-sm leading-relaxed max-w-xs">
-              A technological swap currency platform. We never hold your funds.
-              Symmetri is the digital rail between your hard work and your family's daily needs.
+              A technological swap currency platform. Symmetri is the digital rail between your hard work and your family's daily needs.
             </p>
             <a
               href="mailto:partners@symmetri.org"

@@ -15,6 +15,11 @@ class InventoryVoucher(Base):
     currency = Column(String, nullable=False, default="USD")
     
     is_allocated = Column(Boolean, default=False, index=True)
+    
+    # Quarantine Protocol fields
+    is_voided = Column(Boolean, default=False, index=True)
+    voided_reason = Column(String, nullable=True)
+    
     allocated_to_owner_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     transaction_id = Column(PG_UUID(as_uuid=True), ForeignKey("transactions.id"), nullable=True)
     

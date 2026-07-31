@@ -5,6 +5,14 @@ import { SwapProvider } from '@/context/SwapContext';
 import { PersonaProvider } from '@/context/PersonaContext';
 import { MarketProvider } from '@/context/MarketContext';
 import Head from 'next/head';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+
+const plusJakarta = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700', '800'],
+  variable: '--font-plus-jakarta',
+  display: 'swap',
+});
 
 export default function App({ Component, pageProps }: AppProps) {
   return (
@@ -38,7 +46,9 @@ export default function App({ Component, pageProps }: AppProps) {
         </Head>
         <SwapProvider>
           <PersonaProvider>
-            <Component {...pageProps} />
+            <main className={`${plusJakarta.className} ${plusJakarta.variable} font-sans min-h-screen`}>
+              <Component {...pageProps} />
+            </main>
           </PersonaProvider>
         </SwapProvider>
       </AuthProvider>

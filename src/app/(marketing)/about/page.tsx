@@ -163,7 +163,7 @@ export default function AboutPage() {
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/signup"
+              href="/signin"
               className="px-7 py-3.5 bg-brand hover:bg-blue-600 text-white font-bold text-sm rounded-xl transition-colors shadow-lg shadow-brand/20 w-full sm:w-auto text-center"
             >
               Start Sending Free →

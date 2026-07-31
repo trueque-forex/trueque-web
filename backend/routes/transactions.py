@@ -49,3 +49,22 @@ async def create_voucher(request: VoucherRequest, background_tasks: BackgroundTa
         if hasattr(e, 'status_code'):
             raise HTTPException(status_code=e.status_code, detail=str(e))
         raise HTTPException(status_code=500, detail=str(e))
+
+class VoidRequest(BaseModel):
+    reason: str = Field(..., description="Reason for voiding the voucher (e.g. CHARGEBACK, FRAUD)")
+
+@router.post("/{transaction_id}/void")
+async def void_transaction(transaction_id: str, request: VoidRequest, db: Session = Depends(get_db)):
+    """
+    Quarantine Protocol: Void an allocated voucher if the underlying fiat transaction is reversed.
+    """
+    try:
+        return transaction_controller.quarantine_voucher(
+            db=db,
+            transaction_id=transaction_id,
+            reason=request.reason
+        )
+    except Exception as e:
+        if hasattr(e, 'status_code'):
+            raise HTTPException(status_code=e.status_code, detail=str(e.detail if hasattr(e, 'detail') else e))
+        raise HTTPException(status_code=500, detail=str(e))

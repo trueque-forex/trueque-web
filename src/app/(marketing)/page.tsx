@@ -21,7 +21,7 @@ const CORRIDORS = {
       from: '🇺🇸', fromLabel: 'United States',
       to: '🇩🇴',   toLabel: 'Dominican Republic',
       stores: ['Sirena', 'Farmacia Carol'],
-      rail: 'LBTR Instant',
+      rail: 'LBTR Instant. Family does not pick money up. Family goes with voucher to their chosen store',
     },
   ],
   ES: [
@@ -44,8 +44,8 @@ const CORRIDORS = {
 const getSteps = (originMarket: string) => [
   {
     n: '1',
-    title: 'You Pay',
-    desc: `Choose your amount and pay securely from ${originMarket === 'US' ? 'the US' : 'Spain'}. Debit card, instant bank transfer, or Zelle — your choice.`,
+    title: 'Choose & Pay',
+    desc: `Select the retail your family prefers, choose your amount, and pay securely from ${originMarket === 'US' ? 'the US using instant payment rails. Debit card, FedNow, RTP, or local ACH' : 'Spain using instant payment rails. Debit card, Bizum, or SEPA'} — your choice.`,
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
@@ -55,7 +55,7 @@ const getSteps = (originMarket: string) => [
   {
     n: '2',
     title: 'We Generate a Voucher',
-    desc: 'Symmetri instantly creates a digital voucher for your family\'s nearest participating store. Your money never moves to us.',
+    desc: 'Symmetri instantly creates a digital voucher for the participating store you selected. Your money never moves to us.',
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
@@ -65,8 +65,8 @@ const getSteps = (originMarket: string) => [
   },
   {
     n: '3',
-    title: 'Your Family Gets a Code',
-    desc: 'We send the voucher code directly to your family via SMS or WhatsApp. No smartphone, no bank account, no app required on their end.',
+    title: 'You Send the Code',
+    desc: 'You send the voucher code directly to your family via SMS or WhatsApp with a single tap. No smartphone, no bank account, no app required on their end.',
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
@@ -76,7 +76,7 @@ const getSteps = (originMarket: string) => [
   {
     n: '4',
     title: 'They Shop',
-    desc: 'Your family walks into their local store and shows the code at the register. The cashier scans it. Transaction complete. No waiting.',
+    desc: 'Your family walks into the specific store you chose for them. They do their normal shopping, and at the moment of paying, they simply show the voucher code to the cashier. If they don\'t spend the full amount, the remaining balance stays safely on the voucher for their next visit, until past the expiration date. Transaction complete. No waiting.',
     icon: (
       <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
@@ -89,7 +89,7 @@ const getSteps = (originMarket: string) => [
 const TRUST_PILLARS = [
   {
     title: 'Real exchange rates. Always.',
-    desc: 'We use the same mid-market rate you see on Google. We take zero cut from the exchange. What you see is what your family gets.',
+    desc: 'We use the live, independent mid-market rate. We take zero cut from the exchange. What you see is what your family gets.',
     color: 'emerald',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -99,7 +99,7 @@ const TRUST_PILLARS = [
   },
   {
     title: 'Zero fees for your family.',
-    desc: 'Your family pays absolutely nothing. They walk in, show the code, and shop. The cost is only on your end — and it\'s completely transparent.',
+    desc: 'Your family pays absolutely nothing. They shop for what they need, show the code at checkout, and walk out. The cost is only on your end — and it\'s completely transparent.',
     color: 'amber',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -109,7 +109,7 @@ const TRUST_PILLARS = [
   },
   {
     title: 'No app. No bank account.',
-    desc: 'Your family only needs their phone number. We send a text message. That\'s it. No smartphone app, no bank account, no Venmo required.',
+    desc: 'Your family only needs their phone number. You send them a text or WhatsApp message. That\'s it. No smartphone app or bank account required.',
     color: 'blue',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -119,7 +119,7 @@ const TRUST_PILLARS = [
   },
   {
     title: 'Your money never passes through us.',
-    desc: 'Symmetri is a technology platform, not a bank. We orchestrate the swap. We never hold, store, or custody your funds at any moment.',
+    desc: 'Symmetri is a technology platform, not a bank. We orchestrate the technological currency swap. We never hold, store, or custody your funds at any moment; the secure, licensed banking processor handles the transaction securely.',
     color: 'indigo',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -256,12 +256,13 @@ export default function HomePage() {
       </section>
 
       {/* ══ CORRIDORS ═════════════════════════════════════════════════════════ */}
+      {false && (
       <section className="py-24 px-4 sm:px-6 bg-white border-y border-gray-200">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
             <p className="text-brand text-sm font-bold uppercase tracking-widest mb-3">Available Routes</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-primary mb-4">
-              Where can your family pick up?
+              Where can your family shop?
             </h2>
             <p className="text-secondary text-base max-w-lg mx-auto">
               Your family walks into a store they already know and trust.
@@ -294,7 +295,7 @@ export default function HomePage() {
 
                 {/* Stores */}
                 <div className="space-y-1.5">
-                  <p className="text-gray-500 text-xs uppercase tracking-wide font-semibold mb-2">Pickup stores</p>
+                  <p className="text-gray-500 text-xs uppercase tracking-wide font-semibold mb-2">Participating stores</p>
                   <div className="flex flex-wrap gap-1.5">
                     {corridor.stores.map((store) => (
                       <span key={store} className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-secondary text-xs font-medium group-hover:border-gray-300 transition-colors">
@@ -312,8 +313,18 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          {/* No Cash Pickup Disclaimer */}
+          <div className="mt-10 p-4 sm:p-5 bg-amber-50 border border-amber-200 rounded-xl flex gap-3.5 max-w-4xl mx-auto items-start shadow-sm">
+            <span className="text-xl">⚠️</span>
+            <p className="text-amber-800 text-sm leading-relaxed font-medium">
+              <strong className="text-amber-900 font-bold">Please Note:</strong> Symmetri facilitates a direct technological currency swap for retail value. Vouchers are designed exclusively for purchasing essential goods and cannot be exchanged or redeemed for physical cash at the store.
+            </p>
+          </div>
+
         </div>
       </section>
+      )}
 
       {/* ══ WHY TRUST SYMMETRI ════════════════════════════════════════════════ */}
       <section className="py-28 px-4 sm:px-6">

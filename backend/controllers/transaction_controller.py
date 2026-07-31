@@ -92,6 +92,28 @@ class TransactionController:
         Enforces $20 MOV Floor and Synchronous Lock.
         """
         
+        # 0. THE IDEMPOTENCY CHECK (Double-Tap Protection)
+        if payment_success_token:
+            existing_tx = db.query(Transaction).filter(
+                Transaction.idempotency_key == payment_success_token
+            ).first()
+            if existing_tx:
+                logger.info(f"Idempotency hit for token {payment_success_token}. Returning existing voucher.")
+                existing_voucher = db.query(InventoryVoucher).filter(
+                    InventoryVoucher.transaction_id == existing_tx.id
+                ).first()
+                if not existing_voucher:
+                    raise TruequeError(
+                        ErrorCode.VALIDATION_ERROR,
+                        "Idempotent transaction found but no voucher was allocated.",
+                        500
+                    )
+                return {
+                    "barcode_data": existing_voucher.barcode_data,
+                    "value_amount": float(existing_voucher.value_amount),
+                    "currency": existing_voucher.currency
+                }
+
         # 1. THE $20 FLOOR (Hard Constraint)
         if amount_origin < Decimal('20.00'):
             raise TruequeError(
@@ -125,7 +147,8 @@ class TransactionController:
             vendor_id=retailer_id,
             status="pending_fulfillment",
             type="VOUCHER_CREATION",
-            description=f"Retail Voucher for {retailer_id} in {destination_market} from {origin_market}"
+            description=f"Retail Voucher for {retailer_id} in {destination_market} from {origin_market}",
+            idempotency_key=payment_success_token
         )
 
         try:
@@ -149,16 +172,57 @@ class TransactionController:
             if background_tasks:
                 background_tasks.add_task(check_low_inventory, retailer_id)
 
-            return {
-                "success": True,
-                "transaction_id": str(new_tx.id),
-                "principal": float(amount_origin),
-                "margin_captured": float(wholesale_margin),
-                "status": "fulfilled",
-                "barcode_data": voucher_data["barcode_data"],
-                "value_amount": voucher_data["value_amount"],
-                "currency": voucher_data["currency"]
-            }
+            return voucher_data
+
+        except TruequeError:
+            db.rollback()
+            raise
+        except HTTPException:
+            db.rollback()
+            raise
         except Exception as e:
             db.rollback()
-            raise TruequeError(ErrorCode.INTERNAL_ERROR, f"Transaction failed: {str(e)}", 500)
+            logger.error(f"Voucher creation failed: {str(e)}", exc_info=True)
+            raise TruequeError(
+                ErrorCode.INTERNAL_ERROR,
+                "Failed to fulfill voucher. Please contact support.",
+                500
+            )
+
+    def quarantine_voucher(
+        self,
+        db: Session,
+        transaction_id: str,
+        reason: str
+    ) -> Dict[str, Any]:
+        """
+        The Quarantine Protocol.
+        Voids the voucher if the underlying fiat transaction is reversed (e.g. chargeback).
+        """
+        # 1. Find the transaction
+        tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+        if not tx:
+            raise HTTPException(status_code=404, detail="Transaction not found")
+
+        # 2. Find the associated voucher
+        voucher = db.query(InventoryVoucher).filter(InventoryVoucher.transaction_id == tx.id).first()
+        if not voucher:
+            raise HTTPException(status_code=404, detail="No voucher associated with this transaction")
+
+        if voucher.is_voided:
+            return {"status": "success", "message": "Voucher is already quarantined."}
+
+        # 3. Apply the quarantine locks
+        try:
+            voucher.is_voided = True
+            voucher.voided_reason = reason
+            tx.status = "VOIDED"
+            
+            db.commit()
+            
+            logger.warning(f"QUARANTINE TRIGGERED: Voucher {voucher.id} voided due to {reason}.")
+            return {"status": "success", "message": f"Voucher successfully quarantined for reason: {reason}"}
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to quarantine voucher: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to apply quarantine lock")

@@ -206,19 +206,19 @@ export default function SignupPage(): React.JSX.Element {
   const errorClass = "text-red-500 text-[10px] mt-0.5 absolute -bottom-4 left-0";
 
   return (
-    <div className="flex flex-col md:flex-row h-screen font-sans bg-white overflow-hidden">
+    <div className="flex flex-col md:flex-row h-screen font-sans bg-background text-primary overflow-hidden">
       <Head>
         <title>Create Account - Symmetri</title>
       </Head>
 
-      <div className="hidden md:flex md:w-[25%] bg-gray-50/50 p-8 flex-col justify-between relative border-r border-gray-100">
+      <div className="hidden md:flex md:w-[25%] bg-background p-8 flex-col justify-between relative border-r border-gray-200">
         <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-[#1A73E8]/10 rounded-full blur-[80px] pointer-events-none" />
         <div>
           <Link href="/" className="text-gray-400 hover:text-black transition-colors flex items-center gap-2 font-medium mb-12 text-sm">
             ← Home
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tighter text-gray-900 mb-4">Symmetri</h1>
+            <h1 className="text-3xl font-bold tracking-tighter text-primary mb-4">Symmetri</h1>
             <p className="text-gray-500 text-lg leading-relaxed">Identity first. Swap second.</p>
           </div>
         </div>
@@ -230,10 +230,10 @@ export default function SignupPage(): React.JSX.Element {
         </div>
       </div>
 
-      <div className="flex-1 h-full overflow-y-auto md:overflow-hidden flex items-center justify-center p-6 bg-white relative">
+      <div className="flex-1 h-full overflow-y-auto md:overflow-hidden flex items-center justify-center p-6 bg-background relative">
         <div className="w-full max-w-4xl px-4 md:px-12">
           <div className="md:hidden mb-6 text-center">
-            <h1 className="text-3xl font-bold tracking-tighter text-gray-900 mb-2">Symmetri</h1>
+            <h1 className="text-3xl font-bold tracking-tighter text-primary mb-2">Symmetri</h1>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
@@ -313,9 +313,9 @@ export default function SignupPage(): React.JSX.Element {
       {showTermsModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Important Terms</h2>
+            <h2 className="text-xl font-bold text-primary mb-4">Important Terms</h2>
             <div className="space-y-4 text-gray-600 mb-8 text-sm">
-              <p>By proceeding, you agree that Symmetri is a <strong className="text-gray-900">Non-Custodial</strong> protocol.</p>
+              <p>By proceeding, you agree that Symmetri is a <strong className="text-primary">Non-Custodial</strong> protocol.</p>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowTermsModal(false)} className="px-5 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg text-sm">Cancel</button>

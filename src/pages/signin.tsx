@@ -44,7 +44,7 @@ export default function Signin() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-background text-primary font-sans flex flex-col relative overflow-hidden">
       <Head>
         <title>Sign In - Symmetri</title>
       </Head>
@@ -63,7 +63,7 @@ export default function Signin() {
         <div className="w-full max-w-md">
 
           <div className="text-center mb-10">
-            <Link href="/" className="text-4xl font-bold tracking-tighter text-gray-900 block mb-2">
+            <Link href="/" className="text-4xl font-bold tracking-tighter text-primary block mb-2">
               Symmetri
             </Link>
             <p className="text-gray-500">Welcome back, please sign in.</p>
@@ -79,7 +79,7 @@ export default function Signin() {
               )}
 
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-bold text-primary mb-1">Email</label>
                 <input
                   className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all"
                   type="email"
@@ -92,7 +92,7 @@ export default function Signin() {
 
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-bold text-gray-700">Password</label>
+                  <label className="block text-sm font-bold text-primary">Password</label>
                   <Link href="/forgot-password" className="text-xs text-brand hover:underline font-medium">
                     Forgot Password?
                   </Link>

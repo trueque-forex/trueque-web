@@ -5,7 +5,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "sqlite:///./trueque.db" # This creates trueque.db
+    "postgresql://postgres.kmxzxucfawlhqyglyfjr:SymmetriStart2026@aws-0-us-west-2.pooler.supabase.com:6543/postgres"
 )
 
 connect_args = {}
