@@ -10,3 +10,4 @@ from .draft_model import Draft
 from .advance_model import Advance
 from .dispute_model import Dispute
 from .gateway import InstitutionalGateway
+from .recipient_profile import RecipientProfile

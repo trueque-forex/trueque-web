@@ -132,7 +132,7 @@ export default function HomePage() {
             <Link href="/signin" style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#2c3e50', fontWeight: '600', fontSize: '14px', textDecoration: 'none' }}>
               Sign In
             </Link>
-            <Link href="/signup" style={{ padding: '8px 18px', borderRadius: '8px', backgroundColor: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '14px', textDecoration: 'none', boxShadow: '0 2px 8px rgba(26,115,232,0.3)' }}>
+            <Link href="/signin" style={{ padding: '8px 18px', borderRadius: '8px', backgroundColor: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '14px', textDecoration: 'none', boxShadow: '0 2px 8px rgba(26,115,232,0.3)' }}>
               Get Started
             </Link>
           </div>
@@ -157,14 +157,14 @@ export default function HomePage() {
           </p>
 
           <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap', marginBottom: '20px' }}>
-            <Link href="/signup" id="hero-cta-value" style={{
+            <Link href="/signin" id="hero-cta-value" style={{
               padding: '14px 32px', backgroundColor: '#1A73E8', color: 'white',
               borderRadius: '10px', fontWeight: '800', fontSize: '16px', textDecoration: 'none',
               boxShadow: '0 4px 14px rgba(26,115,232,0.35)',
             }}>
               Send Value Now →
             </Link>
-            <Link href="/signup" id="hero-cta-swap" style={{
+            <Link href="/signin" id="hero-cta-swap" style={{
               padding: '14px 32px', backgroundColor: 'white', color: '#2c3e50',
               borderRadius: '10px', fontWeight: '700', fontSize: '16px', textDecoration: 'none',
               border: '1px solid #e2e8f0', boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
@@ -262,7 +262,7 @@ export default function HomePage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
 
             {/* Phase 1 card */}
-            <Link href="/signup" style={{ textDecoration: 'none' }}>
+            <Link href="/signin" style={{ textDecoration: 'none' }}>
               <ProductCard
                 id="card-send-value"
                 icon="🎟️"
@@ -282,7 +282,7 @@ export default function HomePage() {
               />
             </Link>
 
-            <Link href="/signup" style={{ textDecoration: 'none' }}>
+            <Link href="/signin" style={{ textDecoration: 'none' }}>
               <ProductCard
                 id="card-swap-p2p"
                 icon="💱"

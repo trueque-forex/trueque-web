@@ -21,6 +21,7 @@ export default function TransactionStatusPage() {
         currencyFrom,
         currencyTo,
         beneficiary,
+        beneficiaryName: queryBeneficiaryName,
         timeFrame
     } = router.query;
 
@@ -73,9 +74,13 @@ export default function TransactionStatusPage() {
             setHolidayWarning(`Status: Instant RTP active. Note: Banking support in ${destCountry} is reduced today due to a public holiday.`);
         }
 
-        // Generate/Parse Counterparty ID
+        // Generate/Parse Counterparty ID (Symmetri ID / SID)
+        // Format: S + YYYYMMDD + 4-digit sequence + checksum
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const mockId = `T${date}${destCountry}4829X`;
+        const mockSequence = (transactionId as string)?.substring((transactionId as string).length - 4).replace(/[^0-9]/g, '') || '0001';
+        const paddedSequence = mockSequence.padStart(4, '0').slice(-4);
+        const checksum = 'X';
+        const mockId = `S${date}${paddedSequence}${checksum}`;
         setCounterpartyId(mockId);
 
         if (beneficiary) {
@@ -85,12 +90,13 @@ export default function TransactionStatusPage() {
                 const fullName = `${personal.firstName} ${personal.lastName}`;
                 setBeneficiaryName(fullName);
             } catch (e) {
-                // Fallback if parsing fails
                 setBeneficiaryName('Recipient');
             }
+        } else if (queryBeneficiaryName) {
+            setBeneficiaryName(queryBeneficiaryName as string);
         }
 
-    }, [router.isReady, currencyTo, beneficiary]);
+    }, [router.isReady, currencyTo, beneficiary, queryBeneficiaryName, transactionId]);
 
 
     // Formatting
@@ -104,7 +110,7 @@ export default function TransactionStatusPage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: (active || completed) ? 1 : 0.4, transition: 'all 0.5s' }}>
             <div style={{
                 width: '40px', height: '40px', borderRadius: '50%',
-                backgroundColor: completed ? '#000000' : (active ? '#000000' : '#ecf0f1'),
+                backgroundColor: completed ? '#2c3e50' : (active ? '#2c3e50' : '#ecf0f1'),
                 color: (active || completed) ? 'white' : '#bdc3c7',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 'bold', fontSize: '18px', zIndex: 2,
@@ -204,7 +210,7 @@ export default function TransactionStatusPage() {
 
                     {/* Current State Message */}
                     <div style={{ textAlign: 'center', margin: '30px 0', padding: '20px', backgroundColor: '#f9f9f9', borderRadius: '12px' }}>
-                        <h3 style={{ margin: '0 0 5px 0', color: '#4A90E2' }}>
+                        <h3 style={{ margin: '0 0 5px 0', color: '#1A73E8' }}>
                             {status === 'Awaiting_Funding' && 'Waiting for your payment...'}
                             {status === 'Funding_Verified' && 'Payment Received. Verifying...'}
                             {status === 'Liquidity_Lock' && 'Securing Instant Liquidity...'}
@@ -251,11 +257,22 @@ export default function TransactionStatusPage() {
 
                     <div style={{ marginTop: '30px', textAlign: 'center' }}>
                         <button
-                            onClick={() => router.push(status === 'Completed' ? '/swap' : '/dashboard')}
+                            onClick={() => {
+                                // Clear persistent state so we start fresh
+                                if (typeof window !== 'undefined') {
+                                    localStorage.removeItem('trueque_swap_state_persistent');
+                                    localStorage.removeItem('trueque_secure_swap_session');
+                                    // CRITICAL: Also clear sessionStorage to prevent the Review screen from reviving the ghost session
+                                    sessionStorage.removeItem('trueque_swap_intent');
+                                    sessionStorage.removeItem('trueque_beneficiary_data');
+                                }
+                                // Use replace instead of push so the back button doesn't trap them in the success screen
+                                router.replace('/dashboard');
+                            }}
                             disabled={status !== 'Completed'}
                             style={{
                                 padding: '12px 24px',
-                                backgroundColor: status === 'Completed' ? '#000000' : '#bdc3c7',
+                                backgroundColor: status === 'Completed' ? '#1A73E8' : '#bdc3c7',
                                 color: 'white',
                                 border: 'none',
                                 borderRadius: '8px',

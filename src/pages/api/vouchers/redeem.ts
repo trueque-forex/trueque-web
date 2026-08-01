@@ -3,6 +3,17 @@ import { query } from '../../../lib/db';
 import { withAuth } from '../../../lib/withAuth';
 import retailers from '../../../config/retailers.json';
 
+// =============================================================================
+// TECHNICAL DEBT — Sprint Migration Required
+// -----------------------------------------------------------------------------
+// This Next.js API route directly accesses the PostgreSQL database via
+// src/lib/db.ts. This violates the "FastAPI as Sole Orchestrator" pattern
+// established in GEMINI.md §4 / §5. All direct DB access from Next.js must
+// be migrated to the corresponding FastAPI router (backend/routes/) in a
+// future sprint. Until migrated, this file is the authoritative handler for
+// POST /api/vouchers/redeem.
+// =============================================================================
+
 type RetailerConfig = typeof retailers[0];
 
 /**
@@ -52,7 +63,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         if (new Date(voucher.expires_at) < new Date()) {
-            // Auto-expire
             await query(
                 `UPDATE vouchers SET status = 'EXPIRED', updated_at = NOW() WHERE id = $1`,
                 [voucher.id]
@@ -60,29 +70,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             return res.status(400).json({ error: 'Voucher has expired', status: 'EXPIRED' });
         }
 
-        // 3. Resolve historical_redemption_anchor
+        // 3. Resolve historical_redemption_anchor (GEMINI.md §2.1 — canonical GPS field name)
         //    Priority: (a) lat/lng from request (POS webhook), (b) seeded store location
-        let anchor: { lat: number; lng: number; city?: string } | null = null;
+        let historical_redemption_anchor: { lat: number; lng: number; city?: string } | null = null;
 
         if (lat && lng) {
-            anchor = { lat: parseFloat(lat), lng: parseFloat(lng) };
+            historical_redemption_anchor = { lat: parseFloat(lat), lng: parseFloat(lng) };
         } else if (store_id) {
-            // Match store_id against seeded retailer locations
             const retailer = (retailers as RetailerConfig[]).find(r => r.id === voucher.retailer_id);
             if (retailer?.locations) {
                 const loc = retailer.locations.find((l: any) => l.store_id === store_id);
                 if (loc) {
-                    anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
+                    historical_redemption_anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
                 }
             }
         }
 
         // Fallback: pick first known location for this retailer (passive sorter)
-        if (!anchor) {
+        if (!historical_redemption_anchor) {
             const retailer = (retailers as RetailerConfig[]).find(r => r.id === voucher.retailer_id);
             if (retailer?.locations?.[0]) {
                 const loc = retailer.locations[0] as any;
-                anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
+                historical_redemption_anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
             }
         }
 
@@ -90,26 +99,26 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         const now = new Date();
         await query(
             `UPDATE vouchers
-             SET status                     = 'REDEEMED',
-                 redeemed_at               = $1,
-                 redemption_store_id       = $2,
+             SET status                       = 'REDEEMED',
+                 redeemed_at                 = $1,
+                 redemption_store_id         = $2,
                  historical_redemption_anchor = $3,
-                 updated_at                = $1
+                 updated_at                  = $1
              WHERE id = $4`,
-            [now, store_id || null, anchor ? JSON.stringify(anchor) : null, voucher.id]
+            [now, store_id || null, historical_redemption_anchor ? JSON.stringify(historical_redemption_anchor) : null, voucher.id]
         );
 
         return res.status(200).json({
             success: true,
             message: 'Voucher redeemed successfully',
             voucher: {
-                id:                          voucher.id,
-                status:                      'REDEEMED',
-                beneficiary_name:            voucher.beneficiary_name,
-                amount_local:                Number(voucher.amount_local),
-                local_currency:              voucher.local_currency,
-                redeemed_at:                 now.toISOString(),
-                historical_redemption_anchor: anchor,
+                id:                           voucher.id,
+                status:                       'REDEEMED',
+                beneficiary_name:             voucher.beneficiary_name,
+                amount_local:                 Number(voucher.amount_local),
+                local_currency:               voucher.local_currency,
+                redeemed_at:                  now.toISOString(),
+                historical_redemption_anchor: historical_redemption_anchor,
             },
         });
 

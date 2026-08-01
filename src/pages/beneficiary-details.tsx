@@ -260,8 +260,8 @@ export default function BeneficiaryDetailsPage() {
 
                 {/* Progress Stepper */}
                 <div style={{ display: 'flex', marginBottom: '30px', justifyContent: 'center', gap: '10px' }}>
-                    <div style={{ width: '120px', height: '4px', borderRadius: '2px', backgroundColor: step >= 1 ? '#4A90E2' : '#e1e8ed' }} />
-                    <div style={{ width: '120px', height: '4px', borderRadius: '2px', backgroundColor: step >= 2 ? '#4A90E2' : '#e1e8ed' }} />
+                    <div style={{ width: '120px', height: '4px', borderRadius: '2px', backgroundColor: step >= 1 ? '#1A73E8' : '#e1e8ed' }} />
+                    <div style={{ width: '120px', height: '4px', borderRadius: '2px', backgroundColor: step >= 2 ? '#1A73E8' : '#e1e8ed' }} />
                 </div>
 
                 <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
@@ -324,9 +324,9 @@ export default function BeneficiaryDetailsPage() {
                                                 onClick={() => handleBankingChange('deliveryMethod', method)}
                                                 style={{
                                                     flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
-                                                    borderColor: isSelected ? '#4A90E2' : '#cccccc',
+                                                    borderColor: isSelected ? '#1A73E8' : '#cccccc',
                                                     backgroundColor: isSelected ? '#eef6fc' : 'white',
-                                                    color: isSelected ? '#4A90E2' : '#555555',
+                                                    color: isSelected ? '#1A73E8' : '#555555',
                                                     fontWeight: 'bold', cursor: 'pointer', fontSize: '13px'
                                                 }}>
                                                 {labels[method]}
@@ -348,7 +348,7 @@ export default function BeneficiaryDetailsPage() {
                                             <div style={{ marginBottom: '15px' }}>
                                                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#333333', fontSize: '14px' }}>Account Type</label>
                                                 <div style={{ display: 'flex', gap: '15px', background: '#f8f9fa', padding: '10px', borderRadius: '8px', border: '1px solid #cccccc' }}>
-                                                    <div onClick={() => handleBankingChange('accountType', 'CBU')} style={{ flex: 1, padding: '12px 10px', borderRadius: '8px', border: (contextForm.banking.accountType !== 'CVU') ? '2px solid #4A90E2' : '1px solid #cccccc', backgroundColor: (contextForm.banking.accountType !== 'CVU') ? '#eef6fc' : 'white', color: (contextForm.banking.accountType !== 'CVU') ? '#4A90E2' : '#555555', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center' }}>
+                                                    <div onClick={() => handleBankingChange('accountType', 'CBU')} style={{ flex: 1, padding: '12px 10px', borderRadius: '8px', border: (contextForm.banking.accountType !== 'CVU') ? '2px solid #1A73E8' : '1px solid #cccccc', backgroundColor: (contextForm.banking.accountType !== 'CVU') ? '#eef6fc' : 'white', color: (contextForm.banking.accountType !== 'CVU') ? '#1A73E8' : '#555555', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center' }}>
                                                         🏦 Bank (CBU)
                                                     </div>
                                                     <div onClick={() => handleBankingChange('accountType', 'CVU')} style={{ flex: 1, padding: '12px 10px', borderRadius: '8px', border: (contextForm.banking.accountType === 'CVU') ? '2px solid #9b59b6' : '1px solid #cccccc', backgroundColor: (contextForm.banking.accountType === 'CVU') ? '#f5eef8' : 'white', color: (contextForm.banking.accountType === 'CVU') ? '#9b59b6' : '#555555', cursor: 'pointer', fontWeight: 'bold', textAlign: 'center' }}>
@@ -415,7 +415,7 @@ export default function BeneficiaryDetailsPage() {
                         <button onClick={() => { if (step === 2) setStep(1); else router.back(); }} style={{ flex: 1, padding: '14px', borderRadius: '10px', border: '2px solid #cccccc', backgroundColor: 'transparent', color: '#555555', fontWeight: 'bold', cursor: 'pointer' }}>
                             Back
                         </button>
-                        <button onClick={handleNext} style={{ flex: 2, padding: '14px', borderRadius: '10px', border: 'none', backgroundColor: '#4A90E2', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
+                        <button onClick={handleNext} style={{ flex: 2, padding: '14px', borderRadius: '10px', border: 'none', backgroundColor: '#1A73E8', color: 'white', fontWeight: 'bold', cursor: 'pointer', opacity: loading ? 0.7 : 1 }}>
                             {step === 1 ? 'Next Step' : 'Review & Confirm'}
                         </button>
                     </div>

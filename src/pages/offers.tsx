@@ -122,7 +122,7 @@ function PostOfferModal({
           Post an Offer
         </h2>
         <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '28px' }}>
-          Your offer will be visible to other verified users. Symmetri takes a 1.5% fee at match.
+          Your offer will be visible to other verified users.
         </p>
 
         <form onSubmit={handleSubmit}>
@@ -381,12 +381,6 @@ export default function Offers() {
               onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 4px 12px rgba(37,99,235,0.35)'; }}
             >
               + Post an Offer
-            </button>
-            <button
-              onClick={() => { sessionStorage.removeItem('trueque_swap_state'); router.push('/dashboard'); }}
-              style={{ background: 'none', border: 'none', color: '#ef4444', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
-            >
-              Cancel ✕
             </button>
           </div>
 

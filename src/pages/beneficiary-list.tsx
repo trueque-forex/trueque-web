@@ -156,7 +156,7 @@ export default function BeneficiaryList() {
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                     <div style={{
                                         width: '45px', height: '45px', borderRadius: '50%',
-                                        backgroundColor: '#eef6fc', color: '#4A90E2',
+                                        backgroundColor: '#eef6fc', color: '#1A73E8',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '18px'
                                     }}>
                                         {(b.name || '?')[0].toUpperCase()}

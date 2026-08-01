@@ -10,7 +10,7 @@ export default function VoucherSuccess() {
         ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
         : '30 days from today';
 
-    const qrUrl = code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(code)}&bgcolor=ffffff&color=4f46e5` : '';
+    const qrUrl = code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(code)}&bgcolor=ffffff&color=1A73E8` : '';
 
     const handleShare = () => {
         const text = `Your Symmetri voucher for ${retailer}:\nCode: ${code}\nValue: ${amountLocal} ${currency}\nValid until: ${expiryDate}`;
@@ -24,13 +24,13 @@ export default function VoucherSuccess() {
 
     return (
         <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: "'Inter', sans-serif" }}>
-            <Head><title>Symmetri | Voucher Ready 🎟️</title></Head>
+            <Head><title>Symmetri | Voucher Ready 🛍️</title></Head>
             <Header />
             <main style={{ maxWidth: '520px', margin: '40px auto', padding: '0 20px' }}>
 
                 {/* Success Header */}
                 <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                    <div style={{ fontSize: '64px', marginBottom: '12px' }}>🎟️</div>
+                    <div style={{ fontSize: '64px', marginBottom: '12px' }}>🛍️</div>
                     <h1 style={{ fontSize: '26px', fontWeight: '800', color: '#1e293b', margin: '0 0 8px' }}>Voucher Ready!</h1>
                     <p style={{ color: '#64748b', margin: 0 }}>
                         {beneficiaryName
@@ -51,8 +51,8 @@ export default function VoucherSuccess() {
                 )}
 
                 {/* Voucher Code Card + QR */}
-                <div style={{ background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', borderRadius: '20px', padding: '32px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 10px 40px rgba(124,58,237,0.3)' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '12px' }}>Voucher Code</div>
+                <div style={{ background: '#1A73E8', borderRadius: '20px', padding: '32px', marginBottom: '24px', textAlign: 'center', boxShadow: '0 10px 40px rgba(26,115,232,0.3)' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#e8f0fe', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '12px' }}>Voucher Code</div>
                     <div style={{ fontSize: '20px', fontWeight: '800', color: 'white', fontFamily: 'monospace', letterSpacing: '0.05em', wordBreak: 'break-all', marginBottom: '16px' }}>{code}</div>
                     {qrUrl && (
                         <div style={{ background: 'white', borderRadius: '12px', padding: '12px', display: 'inline-block', marginBottom: '16px' }}>
@@ -63,7 +63,7 @@ export default function VoucherSuccess() {
                     <div style={{ fontSize: '28px', fontWeight: '900', color: 'white', marginBottom: '4px' }}>
                         {parseFloat(amountLocal || '0').toLocaleString('en-US', { minimumFractionDigits: 2 })} {currency}
                     </div>
-                    <div style={{ fontSize: '13px', color: '#c4b5fd' }}>at {retailer} stores in Mexico</div>
+                    <div style={{ fontSize: '13px', color: '#e8f0fe' }}>at {retailer} stores in Mexico</div>
                 </div>
 
                 {/* Details */}
@@ -98,11 +98,11 @@ export default function VoucherSuccess() {
 {id && (
                         <button onClick={() => router.push(`/voucher/track/${id}`)}
                             style={{ padding: '16px', background: '#1e293b', color: 'white', fontWeight: '700', fontSize: '15px', border: 'none', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                            🎟️ View My Voucher
+                            🛍️ View My Voucher
                         </button>
                     )}
                     <button onClick={handleShare}
-                        style={{ padding: '16px', background: '#7c3aed', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
+                        style={{ padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.3)' }}>
                         📤 Share Voucher Code
                     </button>
                     <button onClick={() => router.push('/voucher')}

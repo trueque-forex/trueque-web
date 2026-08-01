@@ -15,7 +15,7 @@ class DraftController:
         Finds the most recent 'active' draft for the user.
         """
         return db.query(Draft).filter(
-            Draft.user_id == user_id,
+            Draft.owner_id == user_id,
             Draft.status == 'active'
         ).order_by(Draft.updated_at.desc()).first()
 
@@ -32,7 +32,7 @@ class DraftController:
         
         # Create New
         new_draft = Draft(
-            user_id=user_id,
+            owner_id=user_id,
             step="initial",
             data=initial_data,
             status="active",
@@ -45,7 +45,7 @@ class DraftController:
         return new_draft
 
     def update_draft(self, draft_id: str, user_id: str, data: Dict[str, Any], step: str, db: Session) -> Optional[Draft]:
-        draft = db.query(Draft).filter(Draft.id == draft_id, Draft.user_id == user_id).first()
+        draft = db.query(Draft).filter(Draft.id == draft_id, Draft.owner_id == user_id).first()
         if not draft:
             return None
         

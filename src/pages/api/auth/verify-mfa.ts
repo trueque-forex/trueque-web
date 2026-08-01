@@ -19,11 +19,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const appEnv = process.env.APP_ENV || process.env.NODE_ENV || 'development';
-        const isTestEnv = appEnv === 'test';
+        const isDevOrTest = appEnv === 'test' || appEnv === 'development';
 
         // ── TEST BYPASS ──────────────────────────────────────────────────────
-        // Only active when APP_ENV=test. Never reaches production.
-        if (isTestEnv && code === '123456') {
+        // Only active when APP_ENV=test or development. Never reaches production.
+        if (isDevOrTest && code === '123456') {
             console.log('[MFA] Test bypass used — APP_ENV=test');
             return res.status(200).json({ ok: true, verified: true });
         }

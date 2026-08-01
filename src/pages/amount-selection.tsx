@@ -81,13 +81,15 @@ export default function AmountSelectionPage() {
     };
 
     useEffect(() => {
+        let sessionFrom = '';
+        let sessionTo = '';
         // 1. Re-hydrate Swap State only
         const savedState = sessionStorage.getItem('trueque_swap_state');
         if (savedState) {
             try {
                 const { currencyFrom: sFrom, currencyTo: sTo, amount: sAmt } = JSON.parse(savedState);
-                if (sFrom) setCurrencyFrom(sFrom);
-                if (sTo) setCurrencyTo(sTo);
+                if (sFrom) { setCurrencyFrom(sFrom); sessionFrom = sFrom; }
+                if (sTo) { setCurrencyTo(sTo); sessionTo = sTo; }
                 if (sAmt) setAmountFrom(sAmt);
             } catch (e) { }
         }
@@ -95,17 +97,31 @@ export default function AmountSelectionPage() {
 
         // 2. Query Params
         const findCurrencyValue = (code: string) => {
+            // Prioritize the main country for shared currencies
+            if (code === 'USD') return 'United States-USD';
+            if (code === 'EUR') return 'Spain-EUR';
+
             const match = CURRENCIES.find(c => c.code === code);
             return match ? `${match.country}-${match.code}` : null;
         };
+        
         if (router.query.amount) setAmountFrom(router.query.amount as string);
+        
         if (router.query.from) {
-            const val = findCurrencyValue(router.query.from as string);
-            if (val) setCurrencyFrom(val);
+            const qFrom = router.query.from as string;
+            // Only override with default if session doesn't already have a valid choice for this currency
+            if (!sessionFrom || !sessionFrom.endsWith(`-${qFrom}`)) {
+                const val = findCurrencyValue(qFrom);
+                if (val) setCurrencyFrom(val);
+            }
         }
+        
         if (router.query.to) {
-            const val = findCurrencyValue(router.query.to as string);
-            if (val) setCurrencyTo(val);
+            const qTo = router.query.to as string;
+            if (!sessionTo || !sessionTo.endsWith(`-${qTo}`)) {
+                const val = findCurrencyValue(qTo);
+                if (val) setCurrencyTo(val);
+            }
         }
 
     }, [router.query]);
@@ -500,10 +516,10 @@ export default function AmountSelectionPage() {
                             style={{
                                 width: '100%',
                                 padding: '18px',
-                                background: 'white',
-                                border: `2px solid ${brandConfig.theme.errorColor}`,
+                                background: 'transparent',
+                                border: '2px solid #e1e8ed',
                                 borderRadius: '12px',
-                                color: brandConfig.theme.errorColor,
+                                color: '#7f8c8d',
                                 fontSize: '18px',
                                 fontWeight: 'bold',
                                 cursor: 'pointer',

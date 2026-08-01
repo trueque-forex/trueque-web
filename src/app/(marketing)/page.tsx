@@ -377,7 +377,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link
-                href="/signup"
+                href="/signin"
                 id="footer-cta-primary"
                 className="px-8 py-4 bg-brand hover:bg-blue-600 active:bg-blue-700 text-white font-bold text-base rounded-xl shadow-lg shadow-brand/20 w-full sm:w-auto text-center transition-colors"
               >

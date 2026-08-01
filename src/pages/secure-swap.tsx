@@ -12,7 +12,7 @@ export default function SecureSwapPage() {
 
     // Transaction Data
     const [txData, setTxData] = useState({
-        total: 119.76, principal: 114.29, fees: 5.47, symmetriId: 'TX-PENDING', currency: 'EUR', methodType: 'RTP', amountReceive: 0
+        total: 119.76, principal: 114.29, fees: 5.47, symmetriId: 'TX-PENDING', currency: 'EUR', methodType: 'RTP', amountReceive: 0, target_currency: 'ARS', beneficiaryName: 'Recipient'
     });
 
     // Timer State
@@ -36,9 +36,9 @@ export default function SecureSwapPage() {
                 // Requirement: "Countdown Timer must remain stopped at the exact second"
                 if (parsed.timeLeft !== undefined) setTimeLeft(parsed.timeLeft);
             } catch (e) { console.error("Session Restore Error", e); }
-        } else {
+        } else if (isInit) {
             // B. Initialize from Query (New Transaction or Forced Init)
-            const { amountTotal, amountPrincipal, amountFees, symmetriId, transactionId, currency, methodType, amountReceive } = router.query;
+            const { amountTotal, amountPrincipal, amountFees, symmetriId, transactionId, currency, methodType, amountReceive, target_currency, beneficiaryName } = router.query;
             const finalId = (transactionId as string) || (symmetriId as string) || 'TX-PENDING';
 
             if (amountTotal) {
@@ -49,7 +49,9 @@ export default function SecureSwapPage() {
                     symmetriId: finalId, // Ensure Branding
                     currency: (currency as string) || 'EUR',
                     methodType: (methodType as string) || 'RTP', // Defaults to RTP
-                    amountReceive: parseFloat(amountReceive as string) || 0
+                    amountReceive: parseFloat(amountReceive as string) || 0,
+                    target_currency: (target_currency as string) || 'ARS',
+                    beneficiaryName: (beneficiaryName as string) || 'Recipient'
                 };
                 setTxData(newData);
                 setFundingStatus('AWAITING_RTP'); // Always start fresh if init
@@ -59,12 +61,14 @@ export default function SecureSwapPage() {
                 // Clear init param from URL so refresh doesn't reset again? 
                 // Actually, if user refreshes "with query params still in bar", it might reset.
                 // Better UX: replace URL to remove 'init'.
-                if (isInit) {
-                    const newQuery = { ...router.query };
-                    delete newQuery.init;
-                    router.replace({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
-                }
+                const newQuery = { ...router.query };
+                delete newQuery.init;
+                router.replace({ pathname: router.pathname, query: newQuery }, undefined, { shallow: true });
             }
+        } else {
+            // No saved session, and not an explicit init request.
+            // This happens if the user clicked "Back" after clearing the session on the success screen.
+            router.replace('/dashboard');
         }
     }, [router.isReady]);
 
@@ -164,7 +168,8 @@ export default function SecureSwapPage() {
                 amountSend: txData.total.toFixed(2), // Principal + Fees
                 amountReceive: txData.amountReceive ? txData.amountReceive.toFixed(2) : '120000.00', // Dynamic or Fallback
                 currencyFrom: txData.currency,
-                currencyTo: 'ARS',
+                currencyTo: txData.target_currency,
+                beneficiaryName: txData.beneficiaryName,
                 status: 'Completed'
             }
         });
@@ -213,10 +218,10 @@ export default function SecureSwapPage() {
                             <>
                                 <h2 style={{ fontSize: '20px', color: '#2c3e50', marginTop: 0 }}>Funding Instructions</h2>
                                 <p style={{ fontSize: '16px', lineHeight: '1.6', color: '#34495e', marginBottom: '25px' }}>
-                                    <span style={{ fontWeight: 'bold' }}>{txData.symmetriId === 'TX-PENDING' ? 'User' : 'Customer'}</span>, please authorize the transfer of <span style={{ fontWeight: '800', color: '#2c3e50' }}>€{txData.total.toFixed(2)}</span> to the secure Adyen gateway in Spain.
+                                    <span style={{ fontWeight: 'bold' }}>{txData.symmetriId === 'TX-PENDING' ? 'User' : 'Customer'}</span>, please authorize the transfer of <span style={{ fontWeight: '800', color: '#2c3e50' }}>{txData.currency} {txData.total.toFixed(2)}</span> to the secure Adyen gateway.
                                 </p>
-                                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #4A90E2', marginBottom: '25px', fontSize: '14px', color: '#57606f' }}>
-                                    This includes your swapped <span style={{ fontWeight: 'bold' }}>€{txData.principal.toFixed(2)}</span> and the <span style={{ fontWeight: 'bold' }}>€{txData.fees.toFixed(2)}</span> in fees.
+                                <div style={{ background: '#f8f9fa', padding: '15px', borderRadius: '8px', borderLeft: '4px solid #1A73E8', marginBottom: '25px', fontSize: '14px', color: '#57606f' }}>
+                                    This includes your swapped <span style={{ fontWeight: 'bold' }}>{txData.currency} {txData.principal.toFixed(2)}</span> and the <span style={{ fontWeight: 'bold' }}>{txData.currency} {txData.fees.toFixed(2)}</span> in fees.
                                 </div>
 
                                 {/* SMART PAYMENT: Only show RTP Tools if Method is RTP */}
@@ -233,7 +238,7 @@ export default function SecureSwapPage() {
                                                         display: 'flex', alignItems: 'center', gap: '15px', padding: '15px', width: '100%',
                                                         background: 'white', border: '2px solid #e1e8ed', borderRadius: '10px',
                                                         cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
-                                                        boxShadow: showQR ? '0 0 0 2px #4A90E2' : 'none'
+                                                        boxShadow: showQR ? '0 0 0 2px #1A73E8' : 'none'
                                                     }}
                                                 >
                                                     <div style={{ width: '40px', height: '40px', background: '#ecf0f1', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2c3e50', fontSize: '20px' }}>⚃</div>
@@ -257,9 +262,9 @@ export default function SecureSwapPage() {
                                             {/* Primary Action - Harmonized Blue */}
                                             <button onClick={handleSimulateSwap} style={{
                                                 display: 'block', width: '100%', padding: '16px',
-                                                backgroundColor: '#4A90E2', // Symmetri Blue
+                                                backgroundColor: '#1A73E8', // Symmetri Blue
                                                 color: 'white', border: 'none', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', textAlign: 'center', fontSize: '16px',
-                                                boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)'
+                                                boxShadow: '0 4px 15px rgba(26, 115, 232, 0.3)'
                                             }}>
                                                 Swap via Bank Portal ↗
                                             </button>
@@ -296,7 +301,7 @@ export default function SecureSwapPage() {
                                         ? 'The Liquidity Provider has successfully locked their funds. Your swap is now fully secured and instant delivery has been initiated.'
                                         : (
                                             <>
-                                                We have receiving your <span style={{ fontWeight: 'bold' }}>€{txData.total.toFixed(2)}</span>.
+                                                We have received your <span style={{ fontWeight: 'bold' }}>{txData.currency} {txData.total.toFixed(2)}</span>.
                                                 Waiting for domestic verification from your peer...
                                             </>
                                         )
@@ -305,9 +310,9 @@ export default function SecureSwapPage() {
 
                                 {fundingStatus === 'PEER_CONFIRMED' && (
                                     <button onClick={handleContinue} style={{
-                                        padding: '16px 32px', backgroundColor: '#4A90E2', color: 'white',
+                                        padding: '16px 32px', backgroundColor: '#1A73E8', color: 'white',
                                         border: 'none', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer',
-                                        boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)', width: '100%'
+                                        boxShadow: '0 4px 15px rgba(26, 115, 232, 0.3)', width: '100%'
                                     }}>
                                         Continue to Tracking
                                     </button>
@@ -340,7 +345,7 @@ export default function SecureSwapPage() {
                                 <div style={{ marginBottom: '25px' }}>
                                     <div style={{
                                         display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold',
-                                        color: fundingStatus === 'AWAITING_RTP' ? '#4A90E2' : '#27ae60'
+                                        color: fundingStatus === 'AWAITING_RTP' ? '#1A73E8' : '#27ae60'
                                     }}>
                                         {/* IDENTIFIER BRANDING: JOAO TID ONLY */}
                                         <span>Your Leg ({txData.symmetriId})</span>
@@ -350,7 +355,7 @@ export default function SecureSwapPage() {
                                         <div style={{
                                             width: fundingStatus === 'AWAITING_RTP' ? '50%' : '100%',
                                             height: '100%',
-                                            background: fundingStatus === 'AWAITING_RTP' ? '#4A90E2' : '#27ae60',
+                                            background: fundingStatus === 'AWAITING_RTP' ? '#1A73E8' : '#27ae60',
                                             borderRadius: '4px',
                                             transition: 'all 0.5s',
                                             animation: fundingStatus === 'AWAITING_RTP' ? 'pulse 2s infinite' : 'none'

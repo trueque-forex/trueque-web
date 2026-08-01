@@ -126,7 +126,7 @@ export default function SiteNav() {
                 Sign In
               </Link>
               <Link
-                href="/signup"
+                href="/signin"
                 onClick={() => setMobileOpen(false)}
                 className="flex-1 text-center py-2.5 bg-brand text-white rounded-lg text-sm font-bold"
               >

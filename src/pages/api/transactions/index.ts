@@ -23,8 +23,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             SELECT
                 id,
                 amount,
-                currency,
-                currency_received,
+                source_currency AS currency,
+                target_currency AS currency_received,
                 amount_received,
                 status,
                 description,

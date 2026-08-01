@@ -99,7 +99,7 @@ export default function BeneficiarySelectionPage() {
                 borderBottom: '1px solid #e1e8ed',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#4A90E2' }}>Trueque</div>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1A73E8' }}>Trueque</div>
                 <div style={{ display: 'flex', gap: '15px' }}>
                     <button onClick={() => router.push('/profile')} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>Profile</button>
                     <button onClick={handleSignOut} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#e74c3c' }}>Sign Out</button>
@@ -117,7 +117,7 @@ export default function BeneficiarySelectionPage() {
                     onClick={() => router.push('/beneficiary')} // Go to Empty Form
                     style={{
                         backgroundColor: 'white',
-                        border: '2px dashed #4A90E2',
+                        border: '2px dashed #1A73E8',
                         borderRadius: '16px',
                         padding: '30px',
                         textAlign: 'center',
@@ -128,8 +128,8 @@ export default function BeneficiarySelectionPage() {
                     onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f0f7ff'}
                     onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
                 >
-                    <div style={{ fontSize: '30px', color: '#4A90E2', marginBottom: '10px' }}>+</div>
-                    <div style={{ fontWeight: '600', color: '#4A90E2' }}>New Recipient</div>
+                    <div style={{ fontSize: '30px', color: '#1A73E8', marginBottom: '10px' }}>+</div>
+                    <div style={{ fontWeight: '600', color: '#1A73E8' }}>New Recipient</div>
                 </div>
 
                 {/* Existing Beneficiaries */}
@@ -173,7 +173,7 @@ export default function BeneficiarySelectionPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ color: '#4A90E2', fontSize: '20px' }}>→</div>
+                                <div style={{ color: '#1A73E8', fontSize: '20px' }}>→</div>
                             </div>
                         ))}
                     </div>

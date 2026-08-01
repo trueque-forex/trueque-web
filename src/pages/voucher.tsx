@@ -219,7 +219,7 @@ export default function VoucherPage() {
 
                 {/* Header */}
                 <div style={{ marginBottom: '32px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#7c3aed', letterSpacing: '0.1em', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', color: '#1A73E8', letterSpacing: '0.1em', marginBottom: '8px' }}>
                         Phase 1 · Closed-Loop Voucher
                     </div>
                     <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#1e293b', margin: '0 0 8px' }}>
@@ -235,7 +235,7 @@ export default function VoucherPage() {
                     {(['1. Choose Retailer', '2. Set Amount', '3. Beneficiary', '4. Confirm']).map((label, i) => (
                         <div key={i} style={{
                             flex: 1, padding: '8px', textAlign: 'center', borderRadius: '8px', fontSize: '12px', fontWeight: '600',
-                            background: step > i + 1 ? '#dcfce7' : step === i + 1 ? '#7c3aed' : '#e2e8f0',
+                            background: step > i + 1 ? '#dcfce7' : step === i + 1 ? '#1A73E8' : '#e2e8f0',
                             color: step > i + 1 ? '#166534' : step === i + 1 ? 'white' : '#94a3b8',
                         }}>{step > i + 1 ? '✓ ' : ''}{label}</div>
                     ))}
@@ -247,7 +247,7 @@ export default function VoucherPage() {
                         {(retailers as Retailer[]).map(r => (
                             <button key={r.id} onClick={() => { setSelectedRetailer(r); setStep(2); }}
                                 style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', background: 'white', border: '2px solid #e2e8f0', borderRadius: '16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s' }}
-                                onMouseEnter={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+                                onMouseEnter={e => (e.currentTarget.style.borderColor = '#1A73E8')}
                                 onMouseLeave={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
                                 <span style={{ fontSize: '36px' }}>{r.logo}</span>
                                 <div>
@@ -264,7 +264,7 @@ export default function VoucherPage() {
                 {/* ── STEP 2: Amount + Payment Method ── */}
                 {step === 2 && selectedRetailer && (
                     <div style={{ background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                        <button onClick={() => setStep(1)} style={{ background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '20px', padding: 0 }}>← Change retailer</button>
+                        <button onClick={() => setStep(1)} style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '20px', padding: 0 }}>← Change retailer</button>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', padding: '16px', background: '#f8fafc', borderRadius: '12px' }}>
                             <span style={{ fontSize: '28px' }}>{selectedRetailer.logo}</span>
@@ -287,7 +287,7 @@ export default function VoucherPage() {
                                 value={amountUSD}
                                 onChange={e => setAmountUSD(e.target.value)}
                                 placeholder={`${effectiveMin} – ${allowedMax}`}
-                                style={{ width: '100%', padding: '14px 16px 14px 36px', fontSize: '24px', fontWeight: '800', border: `2px solid ${exceedsPerTx || exceedsMonthly ? '#ef4444' : '#7c3aed'}`, borderRadius: '12px', outline: 'none', boxSizing: 'border-box' as const, color: '#1e293b' }}
+                                style={{ width: '100%', padding: '14px 16px 14px 36px', fontSize: '24px', fontWeight: '800', border: `2px solid ${exceedsPerTx || exceedsMonthly ? '#ef4444' : '#1A73E8'}`, borderRadius: '12px', outline: 'none', boxSizing: 'border-box' as const, color: '#1e293b' }}
                             />
                         </div>
 
@@ -338,17 +338,17 @@ export default function VoucherPage() {
 
                         {/* Live rate preview — shown once a valid amount is entered */}
                         {amountNum >= effectiveMin && liveRate && (
-                            <div style={{ padding: '16px', background: '#f0fdf4', borderRadius: '12px', marginBottom: '24px', border: '1px solid #bbf7d0' }}>
+                            <div style={{ padding: '16px', background: '#f8fafc', borderRadius: '12px', marginBottom: '24px', border: '1px solid #e2e8f0' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                    <span style={{ color: '#15803d', fontSize: '14px', fontWeight: '600' }}>Beneficiary receives</span>
-                                    <strong style={{ color: '#15803d', fontSize: '18px' }}>{amountLocal.toLocaleString('en-US', { minimumFractionDigits: 2 })} {selectedRetailer.currency}</strong>
+                                    <span style={{ color: '#1e293b', fontSize: '14px', fontWeight: '600' }}>Beneficiary receives</span>
+                                    <strong style={{ color: '#1A73E8', fontSize: '18px' }}>{amountLocal.toLocaleString('en-US', { minimumFractionDigits: 2 })} {selectedRetailer.currency}</strong>
                                 </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#86efac', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', marginBottom: '8px' }}>
                                     <span>Mid-market rate · {rateSource}</span>
                                     <span>1 USD = {liveRate.toFixed(4)} {selectedRetailer.currency}</span>
                                 </div>
                                 {processorFee > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderTop: '1px solid #bbf7d0', marginTop: '6px', color: '#166534' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', borderTop: '1px solid #e2e8f0', marginTop: '6px', color: '#475569' }}>
                                         <span>
                                             {paymentMethod === 'card' ? 'Card issuer fee (Visa/MC/Amex)' : 'RTP rail fee'}
                                         </span>
@@ -356,18 +356,18 @@ export default function VoucherPage() {
                                     </div>
                                 )}
                                 {liquidityFee > 0 && (
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', color: '#166534' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', padding: '6px 0', color: '#475569' }}>
                                         <span>
                                             Liquidity & FX fee
                                         </span>
                                         <span style={{ fontWeight: '700', color: '#dc2626' }}>+ ${liquidityFee.toFixed(2)}</span>
                                     </div>
                                 )}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: processorFee > 0 ? '#fef9c3' : '#dcfce7', borderRadius: '8px', marginTop: '8px', fontSize: '13px', fontWeight: '700' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 10px', background: processorFee > 0 ? '#fef9c3' : '#f1f5f9', borderRadius: '8px', marginTop: '8px', fontSize: '13px', fontWeight: '700' }}>
                                     <span style={{ color: '#1e293b' }}>You pay total</span>
                                     <span style={{ color: '#1e293b', fontSize: '15px' }}>${totalCharged.toFixed(2)} USD</span>
                                 </div>
-                                <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: '600', color: '#166534', textAlign: 'center' }}>
+                                <div style={{ marginTop: '6px', fontSize: '11px', fontWeight: '600', color: '#1A73E8', textAlign: 'center' }}>
                                     ✓ Zero Symmetri fees · Beneficiary gets full ${amountNum.toFixed(2)}
                                 </div>
                             </div>
@@ -382,8 +382,8 @@ export default function VoucherPage() {
                                 <div style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                     padding: '16px 20px', borderRadius: '14px', cursor: 'pointer',
-                                    border: `2px solid ${usingSaved ? '#7c3aed' : '#e2e8f0'}`,
-                                    background: usingSaved ? '#faf5ff' : '#f8fafc',
+                                    border: `2px solid ${usingSaved ? '#1A73E8' : '#e2e8f0'}`,
+                                    background: usingSaved ? '#e8f0fe' : '#f8fafc',
                                     transition: 'border-color 0.15s',
                                 }}
                                     onClick={() => {
@@ -402,7 +402,7 @@ export default function VoucherPage() {
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         {usingSaved && (
-                                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#7c3aed' }}>✓ Selected</span>
+                                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#1A73E8' }}>✓ Selected</span>
                                         )}
                                         <button onClick={(e) => {
                                             e.stopPropagation();
@@ -435,7 +435,7 @@ export default function VoucherPage() {
                             ].map(opt => (
                                 <button key={opt.id}
                                     onClick={() => { setPaymentMethod(opt.id as 'ach' | 'rtp' | 'card' | 'zelle'); setZelleConfirmed(false); setUsingSaved(false); }}
-                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: `2px solid ${paymentMethod === opt.id && !usingSaved ? '#7c3aed' : '#e2e8f0'}`, borderRadius: '12px', background: paymentMethod === opt.id && !usingSaved ? '#faf5ff' : 'white', cursor: 'pointer', textAlign: 'left' }}>
+                                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', border: `2px solid ${paymentMethod === opt.id && !usingSaved ? '#1A73E8' : '#e2e8f0'}`, borderRadius: '12px', background: paymentMethod === opt.id && !usingSaved ? '#e8f0fe' : 'white', cursor: 'pointer', textAlign: 'left' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         <span style={{ fontSize: '24px' }}>{opt.icon}</span>
                                         <div>
@@ -592,7 +592,7 @@ export default function VoucherPage() {
                         <button
                             disabled={!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || monthlyRemaining <= 0 || !paymentReady}
                             onClick={() => setStep(3)}
-                            style={{ width: '100%', padding: '16px', background: '#7c3aed', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: (!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || !paymentReady) ? 0.4 : 1 }}>
+                            style={{ width: '100%', padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: (!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || !paymentReady) ? 0.4 : 1 }}>
                             Add Beneficiary →
                         </button>
                     </div>
@@ -602,12 +602,12 @@ export default function VoucherPage() {
                 {/* ── STEP 3: Beneficiary Info ── */}
                 {step === 3 && (
                     <div style={{ background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                        <button onClick={() => setStep(2)} style={{ background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '20px', padding: 0 }}>← Back</button>
+                        <button onClick={() => setStep(2)} style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '20px', padding: 0 }}>← Back</button>
                         <h2 style={{ margin: '0 0 6px', fontSize: '20px', color: '#1e293b' }}>Who receives this voucher?</h2>
                         <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '24px' }}>They'll get the code on WhatsApp instantly.</p>
 
                         {/* Self Toggle */}
-                        <button onClick={() => setIsSelf(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px', border: `2px solid ${isSelf ? '#7c3aed' : '#e2e8f0'}`, borderRadius: '12px', background: isSelf ? '#faf5ff' : 'white', cursor: 'pointer', marginBottom: '20px', width: '100%', textAlign: 'left' }}>
+                        <button onClick={() => setIsSelf(p => !p)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px', border: `2px solid ${isSelf ? '#1A73E8' : '#e2e8f0'}`, borderRadius: '12px', background: isSelf ? '#e8f0fe' : 'white', cursor: 'pointer', marginBottom: '20px', width: '100%', textAlign: 'left' }}>
                             <span style={{ fontSize: '22px' }}>{isSelf ? '✅' : '👤'}</span>
                             <div>
                                 <div style={{ fontWeight: '700', color: '#1e293b', fontSize: '15px' }}>I am the beneficiary</div>
@@ -640,7 +640,7 @@ export default function VoucherPage() {
                         <button
                             disabled={!isSelf && (!beneficiaryName.trim() || beneficiaryPhone.length < 8)}
                             onClick={() => setStep(4)}
-                            style={{ width: '100%', padding: '16px', background: '#7c3aed', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: (!isSelf && (!beneficiaryName.trim() || beneficiaryPhone.length < 8)) ? 0.4 : 1 }}>
+                            style={{ width: '100%', padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: (!isSelf && (!beneficiaryName.trim() || beneficiaryPhone.length < 8)) ? 0.4 : 1 }}>
                             Review & Confirm →
                         </button>
                     </div>
@@ -649,7 +649,7 @@ export default function VoucherPage() {
                 {/* ── STEP 4: Confirm ── */}
                 {step === 4 && selectedRetailer && (
                     <div style={{ background: 'white', borderRadius: '20px', padding: '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                        <button onClick={() => setStep(3)} style={{ background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '24px', padding: 0 }}>← Edit</button>
+                        <button onClick={() => setStep(3)} style={{ background: 'none', border: 'none', color: '#1A73E8', cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '24px', padding: 0 }}>← Edit</button>
 
                         <h2 style={{ margin: '0 0 20px', fontSize: '20px', color: '#1e293b' }}>Confirm Your Voucher</h2>
 
@@ -689,7 +689,7 @@ export default function VoucherPage() {
                         {error && <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
 
                         <button onClick={handlePurchase} disabled={loading}
-                            style={{ width: '100%', padding: '18px', background: loading ? '#a78bfa' : '#7c3aed', color: 'white', fontWeight: '800', fontSize: '17px', border: 'none', borderRadius: '14px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
+                            style={{ width: '100%', padding: '18px', background: loading ? '#8AB4F8' : '#1A73E8', color: 'white', fontWeight: '800', fontSize: '17px', border: 'none', borderRadius: '14px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.4)' }}>
                             {loading ? 'Generating Voucher...' : `Purchase Voucher — $${totalCharged.toFixed(2)}`}
                         </button>
 

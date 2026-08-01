@@ -6,7 +6,7 @@ export default function SiteFooter() {
   const productLinks = [
     { label: 'How It Works',   href: '/#how-it-works' },
     { label: 'FAQ',            href: '/faq' },
-    { label: 'Create Account', href: '/signup' },
+    { label: 'Create Account', href: '/signin' },
     { label: 'Sign In',        href: '/signin' },
   ];
 
@@ -46,7 +46,7 @@ export default function SiteFooter() {
             <h3 className="text-primary font-semibold text-xs uppercase tracking-widest mb-4">Product</h3>
             <ul className="space-y-3">
               {productLinks.map(({ label, href }) => (
-                <li key={href}>
+                <li key={label}>
                   <Link href={href} className="text-secondary hover:text-primary text-sm transition-colors duration-200">
                     {label}
                   </Link>
@@ -60,7 +60,7 @@ export default function SiteFooter() {
             <h3 className="text-primary font-semibold text-xs uppercase tracking-widest mb-4">Company</h3>
             <ul className="space-y-3">
               {companyLinks.map(({ label, href }) => (
-                <li key={href}>
+                <li key={label}>
                   <Link href={href} className="text-secondary hover:text-primary text-sm transition-colors duration-200">
                     {label}
                   </Link>

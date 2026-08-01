@@ -136,10 +136,6 @@
                 "spei_payout": {
                     "cost": 0.00,
                     "label": "Bank Deposit"
-                },
-                "oxxo_voucher": {
-                    "cost": 0.00,
-                    "label": "OXXO Social Voucher"
                 }
             }
         },

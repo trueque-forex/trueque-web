@@ -109,7 +109,7 @@ class FeeOrchestrator:
         else:
             fee_rate = Decimal('0.015') # 1.5%
             
-        platform_fee = d_amount_send * fee_rate
+        symmetri_swap_fee = d_amount_send * fee_rate
         
         # 6. Gateway Outbound / Payout Fee (Destination Friction)
         outbound_fees = dst_config.get('outbound_rails', {})
@@ -136,7 +136,7 @@ class FeeOrchestrator:
             local_taxes_source = local_taxes / d_mid_market_rate
 
         # TOTAL FRICTION (Source Currency)
-        total_friction = inbound_fee + liquidity_fee + GATEWAY_TECH_FEE + gateway_outbound + platform_fee + local_taxes_source
+        total_friction = inbound_fee + liquidity_fee + GATEWAY_TECH_FEE + gateway_outbound + symmetri_swap_fee + local_taxes_source
         
         # Round logic (FLOOR) - Standardize to 2 decimals for display/charging?
         # Typically internal calc keeps precision, but final fee quote might round.
@@ -161,7 +161,7 @@ class FeeOrchestrator:
             "liquidity_fee": float(liquidity_fee),
             "gateway_tech_fee": float(GATEWAY_TECH_FEE),
             "gateway_outbound_fee": float(gateway_outbound),
-            "trueque_platform_fee": float(platform_fee),
+            "symmetri_swap_fee": float(symmetri_swap_fee),
             "local_taxes_source_equiv": float(local_taxes_source),
             "local_taxes_dest_est": float(local_taxes),
             "total_friction": float(total_friction)

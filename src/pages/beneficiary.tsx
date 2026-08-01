@@ -131,7 +131,7 @@ export default function BeneficiaryPage() {
   const isVoucher = swapIntent?.offerType === 'retail_voucher' || swapIntent?.offerType === 'merchant_voucher';
 
   // 6. Fetch Corridor Config
-  const [corridorOptions, setCorridorOptions] = useState<any[]>([]);
+  const [corridorOptions, setCorridorOptions] = useState<any[] | null>(null);
   useEffect(() => {
     fetch('/api/config/corridors')
       .then(res => res.json())
@@ -149,19 +149,24 @@ export default function BeneficiaryPage() {
             console.warn(`[Beneficiary] No outbound_rails found for ${destCountry}`);
             setCorridorOptions([]);
           }
+        } else {
+          setCorridorOptions([]);
         }
       })
-      .catch(err => console.error("Failed to load corridor options", err));
+      .catch(err => {
+        console.error("Failed to load corridor options", err);
+        setCorridorOptions([]);
+      });
   }, [destCountry]);
 
   // Fallback if config fails
-  const displayOptions = corridorOptions.length > 0
-    ? corridorOptions
-    : [
-      { id: 'bank_rtp', label: 'Bank (RTP)' },
-      { id: 'card_push', label: 'Debit Card' },
-      { id: 'wallet', label: 'Wallet' }
-    ];
+  const displayOptions = corridorOptions !== null
+    ? (corridorOptions.length > 0 ? corridorOptions : [
+        { id: 'bank_rtp', label: 'Bank (RTP)' },
+        { id: 'card_push', label: 'Debit Card' },
+        { id: 'wallet', label: 'Wallet' }
+      ])
+    : []; // Empty array while loading prevents the flicker of default buttons
 
   // Initialize View Mode logic
   useEffect(() => {
@@ -180,10 +185,23 @@ export default function BeneficiaryPage() {
 
   // Handlers
   const handlePersonalChange = (field: keyof typeof contextForm.personal, value: string) => {
-    setBeneficiary(prev => ({
-      ...prev,
-      personal: { ...prev.personal, [field]: value }
-    }));
+    setBeneficiary(prev => {
+      const newPersonal = { ...prev.personal, [field]: value };
+      const newBanking = { ...prev.banking };
+      
+      // Auto-sync the banking name if it matches the old personal name (or is empty)
+      // This prevents the user from having to type it twice
+      const oldFullName = `${prev.personal.firstName} ${prev.personal.lastName}`.trim();
+      if (!newBanking.beneficiaryName || newBanking.beneficiaryName === oldFullName) {
+        newBanking.beneficiaryName = `${newPersonal.firstName} ${newPersonal.lastName}`.trim();
+      }
+
+      return {
+        ...prev,
+        personal: newPersonal,
+        banking: newBanking
+      };
+    });
     if (errors[field]) {
       setErrors(prev => { const n = { ...prev }; delete n[field]; return n; });
     }
@@ -197,10 +215,11 @@ export default function BeneficiaryPage() {
 
     // Logic to determine which fields to clear based on method and country
     // This is called before updating the method
+    // NOTE: Removed 'beneficiaryName' so it doesn't wipe out the auto-synced name
     const allFields = [
       'cbu', 'alias', 'accountType', 'cardNumber', 'cardExpiry', 'cvv',
       'walletProvider', 'walletId', 'iban', 'accountNumber', 'clabe',
-      'routingNumber', 'pixKey', 'taxId', 'mobileNumber', 'idNumber', 'cci', 'beneficiaryName'
+      'routingNumber', 'pixKey', 'taxId', 'mobileNumber', 'idNumber', 'cci'
     ];
 
     allFields.forEach(f => {
@@ -318,6 +337,11 @@ export default function BeneficiaryPage() {
 
   const validateStep2 = () => {
     const newErrors: Record<string, string> = {};
+
+    if (!contextForm.banking.deliveryMethod) {
+      newErrors.deliveryMethod = 'Please select how the beneficiary will receive the funds';
+    }
+
     const {
       deliveryMethod, bankName, cbu, iban, clabe, accountNumber,
       cardNumber, cardExpiry, routingNumber, pixKey, taxId,
@@ -332,7 +356,22 @@ export default function BeneficiaryPage() {
       if (!cleanCard || cleanCard.length < 15) newErrors.cardNumber = 'Valid Card Number required';
       else if (!luhnCheck(cleanCard)) newErrors.cardNumber = 'Invalid Card Number (Luhn check failed)';
 
-      if (!cardExpiry || !/^\d{2}\/\d{2}$/.test(cardExpiry)) newErrors.cardExpiry = 'Expiry MM/YY required';
+      if (!cardExpiry || !/^\d{2}\/\d{2}$/.test(cardExpiry)) {
+        newErrors.cardExpiry = 'Expiry MM/YY required';
+      } else {
+        const [mm, yy] = cardExpiry.split('/');
+        const month = parseInt(mm, 10);
+        const year = parseInt(`20${yy}`, 10);
+        const now = new Date();
+        const currentMonth = now.getMonth() + 1;
+        const currentYear = now.getFullYear();
+
+        if (month < 1 || month > 12) {
+          newErrors.cardExpiry = 'Invalid month';
+        } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+          newErrors.cardExpiry = 'Card has expired';
+        }
+      }
       if (!beneficiaryName) newErrors.beneficiaryName = 'Cardholder name is required';
     }
 
@@ -573,18 +612,6 @@ export default function BeneficiaryPage() {
                 ← Back to Offers
               </button>
 
-              <button
-                onClick={() => {
-                  sessionStorage.removeItem('trueque_swap_state');
-                  router.push('/dashboard');
-                }}
-                style={{
-                  background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
-                  fontWeight: '600', cursor: 'pointer'
-                }}
-              >
-                Cancel ✕
-              </button>
             </div>
 
             <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', textAlign: 'center' }}>Select Beneficiary</h2>
@@ -600,7 +627,9 @@ export default function BeneficiaryPage() {
                 const groups: Record<string, any> = {};
 
                 remoteList.forEach((b: any) => {
-                  const nameKey = `${b.personal.firstName} ${b.personal.lastName}`.trim();
+                  // Normalize: lowercase + collapse spaces to prevent duplicate cards
+                  // e.g. "Maria Perez" and "maria perez " both map to the same group
+                  const nameKey = `${b.personal.firstName} ${b.personal.lastName}`.trim().toLowerCase();
                   if (!groups[nameKey]) {
                     groups[nameKey] = {
                       personal: b.personal,
@@ -642,10 +671,45 @@ export default function BeneficiaryPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ fontSize: '20px', background: '#e1e8ed', width: '40px', height: '40px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
                         <div>
-                          <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '16px' }}>{name}</div>
+                          <div style={{ fontWeight: 'bold', color: '#2c3e50', fontSize: '16px' }}>
+                            {group.personal.firstName} {group.personal.lastName}
+                          </div>
                           <div style={{ fontSize: '13px', color: '#7f8c8d' }}>{group.personal.phone}</div>
                         </div>
                       </div>
+                      <button
+                        onClick={() => {
+                          setTargetBeneficiaryId(group.primaryId);
+                          
+                          // Load the main/primary method's data to edit
+                          const mainMethod = Object.values(group.methods)[0] as any;
+                          const dataToLoad = mainMethod ? mainMethod.full : { personal: group.personal, banking: {} };
+                          
+                          setBeneficiary(dataToLoad);
+                          
+                          const phone = group.personal.phone || '';
+                          const parts = phone.split(' ');
+                          if (parts.length >= 2) {
+                            setPhoneCode(parts[0]);
+                            setPhoneNumber(parts.slice(1).join(''));
+                          } else {
+                            setPhoneNumber(phone);
+                          }
+                          
+                          setEditingIndex(-1); // Or whatever index tracking you prefer
+                          setViewMode('form');
+                          setStep(1); // Start at personal info
+                        }}
+                        style={{
+                          background: 'none', border: '1px solid #bdc3c7', borderRadius: '6px',
+                          padding: '6px 12px', fontSize: '12px', fontWeight: 'bold',
+                          color: '#7f8c8d', cursor: 'pointer', transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#1A73E8'; e.currentTarget.style.color = '#1A73E8'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#bdc3c7'; e.currentTarget.style.color = '#7f8c8d'; }}
+                      >
+                        Edit ✎
+                      </button>
                     </div>
 
                     {/* Rail Switcher */}
@@ -663,10 +727,9 @@ export default function BeneficiaryPage() {
                             key={rail}
                             onClick={() => {
                               if (existing) {
-                                // SELECT EXISTING
-                                setBeneficiary(existing.full); // Populate Context
+                                // SELECT EXISTING — beneficiary has CLABE on file, go straight to Review
+                                setBeneficiary(existing.full);
 
-                                // If nested, we might need to patch the banking details in context
                                 if (existing.isNested) {
                                   setBeneficiary((prev: any) => ({
                                     ...prev,
@@ -674,7 +737,6 @@ export default function BeneficiaryPage() {
                                   }));
                                 }
 
-                                // Hydrate Phone Local State
                                 const phone = group.personal.phone || '';
                                 const parts = phone.split(' ');
                                 if (parts.length >= 2) {
@@ -684,7 +746,6 @@ export default function BeneficiaryPage() {
                                   setPhoneNumber(phone);
                                 }
 
-                                // Direct Proceed Logic (Review)? Or Edit?
                                 const finalObj = existing.isNested
                                   ? { ...existing.full, banking: { ...existing.full.banking, ...existing.data } }
                                   : existing.full;
@@ -694,8 +755,7 @@ export default function BeneficiaryPage() {
                                 router.push('/review');
 
                               } else {
-                                // ADD NEW RAIL (IN-PLACE)
-                                // Pre-fill Personal from Group & Preserve existing Banking if switching
+                                // ADD BANKING INFO for this rail
                                 const existingBanking = group.full?.banking || {};
                                 setBeneficiary({
                                   ...group.full || { personal: group.personal, banking: {} },
@@ -703,7 +763,6 @@ export default function BeneficiaryPage() {
                                   banking: {
                                     ...existingBanking,
                                     deliveryMethod: rail,
-                                    // Only reset fields if not already present in the "carrier" row
                                     bankName: existingBanking.bankName || '',
                                     cbu: existingBanking.cbu || '',
                                     iban: existingBanking.iban || '',
@@ -717,11 +776,9 @@ export default function BeneficiaryPage() {
                                   }
                                 });
 
-                                // Set Update Triggers
-                                setTargetBeneficiaryId(group.primaryId); // Tells handleSubmit to PUT
-                                setEditingIndex(999); // Flag as "Editing"
+                                setTargetBeneficiaryId(group.primaryId);
+                                setEditingIndex(999);
 
-                                // Phone Hydration
                                 const phone = group.personal.phone || '';
                                 const parts = phone.split(' ');
                                 if (parts.length >= 2) {
@@ -735,15 +792,25 @@ export default function BeneficiaryPage() {
                               }
                             }}
                             style={{
-                              flex: 1, padding: '8px 12px', borderRadius: '8px',
-                              border: existing ? '1px solid #4A90E2' : '1px dashed #bdc3c7',
-                              backgroundColor: existing ? '#eef6fc' : 'white',
-                              color: existing ? '#4A90E2' : '#95a5a6',
-                              fontWeight: '600', fontSize: '13px', cursor: 'pointer',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px'
+                              flex: '1',
+                              minWidth: '160px',
+                              padding: '10px 16px',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              fontSize: '13px',
+                              fontWeight: '600',
+                              textAlign: 'center',
+                              transition: 'all 0.15s',
+                              // Solid = has banking info on file. Dashed = needs setup.
+                              background: existing ? '#ffffff' : 'transparent',
+                              border: existing ? '1.5px solid #1A73E8' : '1.5px dashed #bdc3c7',
+                              color: existing ? '#1A73E8' : '#95a5a6',
                             }}
                           >
-                            {existing && <span>✓</span>} {opt.label}
+                            {existing
+                              ? `Send via ${opt.label} →`
+                              : `+ Add ${opt.label}`
+                            }
                           </button>
                         );
                       })}
@@ -823,18 +890,6 @@ export default function BeneficiaryPage() {
                 ← {savedBeneficiaries && savedBeneficiaries.length > 0 ? 'Back to List' : 'Back to Offers'}
               </button>
 
-              <button
-                onClick={() => {
-                  sessionStorage.removeItem('trueque_swap_state');
-                  router.push('/dashboard');
-                }}
-                style={{
-                  background: 'none', border: 'none', color: '#e74c3c', fontSize: '14px',
-                  fontWeight: '600', cursor: 'pointer'
-                }}
-              >
-                Cancel ✕
-              </button>
             </div>
 
             {/* Progress Stepper REMOVED - Single View */}
@@ -847,7 +902,7 @@ export default function BeneficiaryPage() {
             }}>
               {userName && (
                 <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, color: '#4A90E2', fontSize: '18px' }}>
+                  <h3 style={{ margin: 0, color: '#1A73E8', fontSize: '18px' }}>
                     Hello, {userName} 👋
                   </h3>
                   {swapIntent && (
@@ -980,11 +1035,16 @@ export default function BeneficiaryPage() {
                     </div>
                   ) : (
                     <>
-                      {/* Symmetri 1.0: Standardized Method Selector */}
+                      {/* Beneficiary Receiving Method — how the beneficiary receives, NOT how the sender pays */}
                       <div style={{ marginBottom: '25px' }}>
                         <label style={{ display: 'block', marginBottom: '10px', fontWeight: '600', color: '#34495e', fontSize: '14px' }}>
-                          Payment Method
+                          How will {contextForm.personal.firstName || 'the beneficiary'} receive the funds?
                         </label>
+                        {errors.deliveryMethod && (
+                          <div style={{ color: '#e74c3c', fontSize: '13px', marginBottom: '10px', fontWeight: 'bold' }}>
+                            {errors.deliveryMethod}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           <button
                             onClick={() => {
@@ -993,9 +1053,9 @@ export default function BeneficiaryPage() {
                             }}
                             style={{
                               flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
-                              borderColor: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#4A90E2' : '#e1e8ed',
+                              borderColor: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#1A73E8' : '#e1e8ed',
                               backgroundColor: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#eef6fc' : 'white',
-                              color: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#4A90E2' : '#7f8c8d',
+                              color: contextForm.banking.deliveryMethod === 'bank_rtp' ? '#1A73E8' : '#7f8c8d',
                               fontWeight: '600', cursor: 'pointer', fontSize: '13px'
                             }}>
                             {contextForm.banking.deliveryMethod === 'bank_rtp' && <span>🏦 </span>} Bank Deposit
@@ -1025,9 +1085,9 @@ export default function BeneficiaryPage() {
                             }}
                             style={{
                               flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid',
-                              borderColor: contextForm.banking.deliveryMethod === 'card_push' ? '#4A90E2' : '#e1e8ed',
+                              borderColor: contextForm.banking.deliveryMethod === 'card_push' ? '#1A73E8' : '#e1e8ed',
                               backgroundColor: contextForm.banking.deliveryMethod === 'card_push' ? '#eef6fc' : 'white',
-                              color: contextForm.banking.deliveryMethod === 'card_push' ? '#4A90E2' : '#7f8c8d',
+                              color: contextForm.banking.deliveryMethod === 'card_push' ? '#1A73E8' : '#7f8c8d',
                               fontWeight: '600', cursor: 'pointer', fontSize: '13px'
                             }}>
                             {contextForm.banking.deliveryMethod === 'card_push' && <span>💳 </span>} Debit Card
@@ -1244,9 +1304,9 @@ export default function BeneficiaryPage() {
                                     style={{
                                       flex: 1,
                                       padding: '12px 10px', borderRadius: '8px',
-                                      border: (contextForm.banking.accountType !== 'CVU') ? '2px solid #4A90E2' : '1px solid #bdc3c7',
+                                      border: (contextForm.banking.accountType !== 'CVU') ? '2px solid #1A73E8' : '1px solid #bdc3c7',
                                       backgroundColor: (contextForm.banking.accountType !== 'CVU') ? '#eef6fc' : 'white',
-                                      color: (contextForm.banking.accountType !== 'CVU') ? '#4A90E2' : '#7f8c8d',
+                                      color: (contextForm.banking.accountType !== 'CVU') ? '#1A73E8' : '#7f8c8d',
                                       cursor: 'pointer', fontWeight: 'bold', textAlign: 'center', transition: 'all 0.2s',
                                       boxShadow: (contextForm.banking.accountType !== 'CVU') ? '0 2px 5px rgba(74, 144, 226, 0.2)' : 'none'
                                     }}>
@@ -1318,7 +1378,13 @@ export default function BeneficiaryPage() {
               {/* Footer Actions */}
               <div style={{ display: 'flex', gap: '15px', marginTop: '30px', borderTop: '1px solid #e1e8ed', paddingTop: '20px' }}>
                 <button
-                  onClick={() => router.back()}
+                  onClick={() => {
+                    if (savedBeneficiaries.length > 0) {
+                      setViewMode('selection');
+                    } else {
+                      router.push('/dashboard');
+                    }
+                  }}
                   style={{
                     flex: 1, padding: '14px', borderRadius: '10px',
                     border: '2px solid #e1e8ed', backgroundColor: 'transparent',
@@ -1353,7 +1419,7 @@ export default function BeneficiaryPage() {
                   disabled={loading}
                   style={{
                     flex: 2, padding: '14px', borderRadius: '10px',
-                    border: 'none', backgroundColor: '#4A90E2',
+                    border: 'none', backgroundColor: '#1A73E8',
                     color: 'white', fontWeight: 'bold', cursor: 'pointer',
                     opacity: loading ? 0.7 : 1,
                     boxShadow: '0 4px 15px rgba(74, 144, 226, 0.3)'

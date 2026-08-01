@@ -298,7 +298,7 @@ export default function SignupPage(): React.JSX.Element {
             )}
 
             <div className="pt-4">
-              <button disabled={loading} className="w-full py-4 bg-black text-white rounded-xl font-bold text-lg hover:bg-gray-800 transition-colors shadow-lg disabled:opacity-50">
+              <button disabled={loading} className="w-full py-4 bg-[#1A73E8] text-white rounded-xl font-bold text-lg hover:bg-[#357ABD] transition-colors shadow-lg disabled:opacity-50">
                 {loading ? 'Creating Account...' : 'Sign Up'}
               </button>
               <div className="flex items-center justify-center gap-2 mt-4">

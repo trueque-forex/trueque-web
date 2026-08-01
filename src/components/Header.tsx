@@ -65,7 +65,7 @@ export default function Header() {
                             Welcome, {user?.firstName || userName}
                         </span>
                         {(user?.symmetriId || user?.symmetriId) && (
-                            <span className="text-xs text-blue-500 font-mono tracking-wider" style={{ opacity: 0.7 }}>
+                            <span className="text-sm text-blue-500 font-mono tracking-wider" style={{ opacity: 1, marginTop: '2px', fontWeight: '500' }}>
                                 ID: {user.symmetriId || user.symmetriId}
                             </span>
                         )}

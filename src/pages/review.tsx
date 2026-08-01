@@ -25,7 +25,7 @@ interface PaymentMethod {
 }
 
 const MOCK_STORED_METHODS: PaymentMethod[] = [
-  { id: 'method_rtp', type: 'RTP', label: 'Bank Transfer (RTP/ACH)' },
+  { id: 'method_rtp', type: 'RTP', label: 'Bank Transfer (RTP)' },
   { id: 'card_1', type: 'CARD', label: 'Chase Sapphire', last4: '4242', expiry: '12/28', network: 'visa', cardType: 'credit' },
   { id: 'card_2', type: 'CARD', label: 'Citi Double Cash', last4: '8888', expiry: '10/24', network: 'mastercard', isExpired: true, cardType: 'credit' },
   { id: 'card_3', type: 'CARD', label: 'Bank Debit', last4: '1005', expiry: '05/26', network: 'visa', cardType: 'debit' },
@@ -139,7 +139,6 @@ export default function ReviewPage() {
     return null;
   };
   const effectiveBeneficiary = resolveBeneficiary();
-
   // LOCAL OVERRIDE HOOK for Swap Intent
   const resolveSwapIntent = () => {
     if (swapIntent) return swapIntent;
@@ -153,11 +152,23 @@ export default function ReviewPage() {
   };
   const effectiveSwapIntent: any = resolveSwapIntent();
 
+  // GUARD: Prevent ghost sessions if arriving via Back button with no active swap
+  useEffect(() => {
+    if (router.isReady) {
+      const amount = effectiveSwapIntent?.amount || parseFloat(router.query.amountIntent as string) || 0;
+      if (!amount || isNaN(amount)) {
+        // If they managed to get here with no intent, kick them back to the start!
+        router.replace('/dashboard');
+      }
+    }
+  }, [router.isReady, effectiveSwapIntent, router.query.amountIntent]);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [newMethodType, setNewMethodType] = useState<'bank' | 'card' | 'wallet'>('card');
   const [addingMethod, setAddingMethod] = useState(false);
   const [newForm, setNewForm] = useState({
-    holderName: '', iban: '', cardNumber: '', expiry: '', cvv: '', cardType: 'debit' as CardType, walletProvider: '', walletId: ''
+    holderName: '', iban: '', cardNumber: '', expiry: '', cvv: '', cardType: 'debit' as CardType, walletProvider: '', walletId: '',
+    bankName: '', accountType: 'checking', routingNumber: '', accountNumber: '', billingZip: '', rtpSupported: false
   });
 
   const [loading, setLoading] = useState(false);
@@ -169,7 +180,7 @@ export default function ReviewPage() {
       localStorage.removeItem('trueque_swap_state_persistent');
     }
     // Navigation Target: Dashboard (Home)
-    router.push('/');
+    router.push('/dashboard');
   };
 
   // Computed Breakdown
@@ -299,8 +310,8 @@ export default function ReviewPage() {
     setTimeout(() => {
       const id = `new_${Date.now()}`;
       const newMethod: PaymentMethod = newMethodType === 'card'
-        ? { id, type: 'CARD', label: `${newForm.cardType} •• ${newForm.cardNumber.slice(-4)}`, last4: newForm.cardNumber.slice(-4), expiry: newForm.expiry, cardType: newForm.cardType as CardType }
-        : { id, type: 'RTP', label: 'Bank Account' };
+        ? { id, type: 'CARD', label: `${newForm.cardType === 'credit' ? 'Credit' : 'Debit'} Card`, last4: newForm.cardNumber.slice(-4) || '0000', expiry: '12/28', cardType: newForm.cardType as CardType }
+        : { id, type: 'RTP', label: newForm.holderName || 'Linked Bank Account' };
       setPaymentMethods(prev => [...prev, newMethod]);
       setSelectedMethodId(id);
       setShowAddModal(false);
@@ -338,13 +349,16 @@ export default function ReviewPage() {
       const s = JSON.parse(localStorage.getItem('trueque_session') || '{}');
       const name = s.firstName || s.email?.split('@')[0] || 'User';
       const brandedId = `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      
+      const dynamicSourceCurrency = String(effectiveSwapIntent?.source_currency || qFrom || 'USD').toUpperCase();
 
       const payload = {
         amount: breakdown.totalToPaySource,
-        source_currency: 'EUR',
-        target_currency: swapIntent?.target_currency || qTo,
+        currencyFrom: dynamicSourceCurrency,
+        currencyTo: swapIntent?.target_currency || qTo,
         beneficiaryId: effectiveBeneficiary?.id,
-        provider: swapIntent?.provider
+        provider: swapIntent?.provider,
+        payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP'
       };
 
       const res = await fetch('/api/swaps', {
@@ -357,7 +371,7 @@ export default function ReviewPage() {
       if (!res.ok) {
         const err = await res.json();
         if (res.status === 403 && err.error?.code === 'KYC_LIMIT_EXCEEDED') {
-          alert(`⚠️ Limit Exceeded!\n\nYou have reached your Tier limit of €${err.error.metadata.limit}.\nCurrent Volume: €${err.error.metadata.current}\n\nPlease Upgrade to Tier 2 for Unlimited Swaps.`);
+          alert(`⚠️ Limit Exceeded!\n\nYou have reached your Tier limit of ${dynamicSourceCurrency} ${err.error.metadata.limit}.\nCurrent Volume: ${dynamicSourceCurrency} ${err.error.metadata.current}\n\nPlease Upgrade to Tier 2 for Unlimited Swaps.`);
           return;
         }
         throw new Error(err.error?.message || 'Swap failed');
@@ -374,10 +388,11 @@ export default function ReviewPage() {
           amountTotal: breakdown.totalToPaySource.toFixed(2),
           amountPrincipal: breakdown.principalSource.toFixed(2),
           amountFees: breakdown.totalFeesSource.toFixed(2),
-          currency: 'EUR',
+          currency: dynamicSourceCurrency,
           symmetriId: brandedId,
           amountReceive: breakdown.grossReceive.toFixed(2),
           target_currency: swapIntent?.target_currency || qTo,
+          beneficiaryName: effectiveBeneficiary?.first_name ? (effectiveBeneficiary.first_name + ' ' + (effectiveBeneficiary.last_name || '')) : (effectiveBeneficiary?.name || 'Recipient'),
           methodType: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
           init: 'true'
         }
@@ -451,6 +466,8 @@ export default function ReviewPage() {
   // Styles
   const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: '14px', color: '#57606f' };
   const inputStyle: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', backgroundColor: '#fff', fontSize: '14px' };
+  
+  const fromCurr = String(effectiveSwapIntent?.source_currency || qFrom || 'USD').toUpperCase();
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: brandConfig.theme.fontFamily }}>
@@ -481,11 +498,163 @@ export default function ReviewPage() {
             {/* Add New Modal */}
             {showAddModal && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
               <div style={{ background: 'white', padding: 30, borderRadius: 12, width: 400 }}>
-                <h3>Add Method (Mock)</h3>
-                <p>Mock interface for adding a dummy method.</p>
+                <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>Add New Funding Method</h3>
+                
+                <div style={{ marginBottom: 15 }}>
+                  <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Method Type</label>
+                  <select
+                    value={newMethodType}
+                    onChange={(e) => setNewMethodType(e.target.value as any)}
+                    style={inputStyle}
+                  >
+                    <option value="card">Card (Debit/Credit)</option>
+                    <option value="bank">Bank Account (RTP)</option>
+                  </select>
+                </div>
+
+                {newMethodType === 'card' && (
+                  <>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Name on Card</label>
+                      <input
+                        type="text"
+                        placeholder="John Doe"
+                        value={newForm.holderName}
+                        onChange={(e) => setNewForm({ ...newForm, holderName: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Card Type</label>
+                      <select
+                        value={newForm.cardType}
+                        onChange={(e) => setNewForm({ ...newForm, cardType: e.target.value as CardType })}
+                        style={inputStyle}
+                      >
+                        <option value="debit">Debit Card (Lower Fees)</option>
+                        <option value="credit">Credit Card (Higher Fees)</option>
+                      </select>
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Card Number</label>
+                      <input
+                        type="text"
+                        placeholder="•••• •••• •••• 1234"
+                        value={newForm.cardNumber}
+                        onChange={(e) => setNewForm({ ...newForm, cardNumber: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: 15 }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Expiry (MM/YY)</label>
+                        <input
+                          type="text"
+                          placeholder="MM/YY"
+                          value={newForm.expiry}
+                          onChange={(e) => setNewForm({ ...newForm, expiry: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>CVV</label>
+                        <input
+                          type="text"
+                          placeholder="123"
+                          value={newForm.cvv}
+                          onChange={(e) => setNewForm({ ...newForm, cvv: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Billing Zip Code</label>
+                      <input
+                        type="text"
+                        placeholder="90210"
+                        value={newForm.billingZip}
+                        onChange={(e) => setNewForm({ ...newForm, billingZip: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {newMethodType === 'bank' && (
+                  <>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Owner Name</label>
+                      <input
+                        type="text"
+                        placeholder="John Doe"
+                        value={newForm.holderName}
+                        onChange={(e) => setNewForm({ ...newForm, holderName: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Bank Name</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Chase Bank"
+                        value={newForm.bankName}
+                        onChange={(e) => setNewForm({ ...newForm, bankName: e.target.value })}
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 15 }}>
+                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Type</label>
+                      <select
+                        value={newForm.accountType}
+                        onChange={(e) => setNewForm({ ...newForm, accountType: e.target.value })}
+                        style={inputStyle}
+                      >
+                        <option value="checking">Checking Account</option>
+                        <option value="saving">Savings Account</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: 15 }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Routing Number</label>
+                        <input
+                          type="text"
+                          placeholder="012345678"
+                          value={newForm.routingNumber}
+                          onChange={(e) => setNewForm({ ...newForm, routingNumber: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Number</label>
+                        <input
+                          type="text"
+                          placeholder="000123456789"
+                          value={newForm.accountNumber}
+                          onChange={(e) => setNewForm({ ...newForm, accountNumber: e.target.value })}
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <input
+                        type="checkbox"
+                        id="rtpCheckbox"
+                        checked={newForm.rtpSupported}
+                        onChange={(e) => setNewForm({ ...newForm, rtpSupported: e.target.checked })}
+                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="rtpCheckbox" style={{ fontSize: 14, color: '#34495e', cursor: 'pointer' }}>
+                        My bank supports Real-Time Payments (RTP) or FedNow
+                      </label>
+                    </div>
+                  </>
+                )}
+
                 <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                  <button onClick={() => setShowAddModal(false)} style={{ padding: '10px', flex: 1 }}>Cancel</button>
-                  <button onClick={handleAddNewMethod} style={{ padding: '10px', flex: 1, background: '#2c3e50', color: 'white' }}>Save Mock</button>
+                  <button onClick={() => { setShowAddModal(false); setSelectedMethodId('method_rtp'); }} style={{ padding: '12px', flex: 1, borderRadius: '8px', border: '2px solid #e1e8ed', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', color: '#7f8c8d' }}>Cancel</button>
+                  <button onClick={handleAddNewMethod} disabled={addingMethod} style={{ padding: '12px', flex: 1, background: '#1A73E8', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                    {addingMethod ? 'Saving...' : 'Save Method'}
+                  </button>
                 </div>
               </div>
             </div>}
@@ -499,7 +668,7 @@ export default function ReviewPage() {
               {/* SACRED SWAP INTENT */}
               <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '10px' }}>
                 <span>Swap Amount <span style={{ fontSize: '11px', color: '#7f8c8d', background: '#ecf0f1', padding: '2px 6px', borderRadius: '4px' }}>SACRED</span></span>
-                <span style={{ fontWeight: '600', color: '#2c3e50' }}>€{currencyFmt(breakdown.principalSource)}</span>
+                <span style={{ fontWeight: '600', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.principalSource)}</span>
               </div>
 
               {/* SACRED RECEIVE */}
@@ -512,82 +681,93 @@ export default function ReviewPage() {
 
               <div style={{ borderTop: '1px solid #eee', margin: '15px 0' }}></div>
 
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>+ Applicable Fees (Fuel)</h4>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>+ Applicable Fees</h4>
 
               {/* ADDITIVE FEES Breakdown - 5 Core Fees */}
               {/* 1. Inbound (Percentage) */}
               <div style={rowStyle}>
-                <span>Inbound Fuel ({(breakdown as any).inboundFee > 0 ? 'Variable' : 'Free'}) <Tooltip text="The cost your bank or local payment app charges to move your money into the system" /></span>
-                <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.inboundFee)}</span>
+                <span>Inbound Cost ({(breakdown as any).inboundFee > 0 ? 'Variable' : 'Free'}) <Tooltip text="The cost your bank or local payment app charges to move your money into the system" /></span>
+                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.inboundFee)}</span>
               </div>
 
               {/* 2. Card Fixed - NEW */}
               {(breakdown as any).cardFixedFee > 0 && (
                 <div style={rowStyle}>
                   <span>Card Processing (Fixed) <Tooltip text="Network fixed fee" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ €{currencyFmt((breakdown as any).cardFixedFee)}</span>
+                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt((breakdown as any).cardFixedFee)}</span>
                 </div>
               )}
 
               {/* 3. Premium / Liquidity */}
               {breakdown.liquidityFee > 0 && <div style={rowStyle}>
                 <span>Instant Liquidity <Tooltip text="This covers the cost for the independent Gateway institution to advance money to your recipient immediately, even if your bank or card takes days to finish the transfer" /></span>
-                <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.liquidityFee)}</span>
+                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.liquidityFee)}</span>
               </div>}
 
               {/* 4. Gateway */}
               <div style={rowStyle}>
                 <span>Gateway Processing <Tooltip text="A small fee paid to an independent financial institution (the 'Gateway') that handles your money. This institution acts as a buffer to ensure your personal bank details are never shared directly with the recipient or their bank" /></span>
-                <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.gatewayFee)}</span>
+                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.gatewayFee)}</span>
               </div>
 
               {/* 5. Service / Platform */}
               <div style={rowStyle}>
                 <span>Platform Fee <Tooltip text="The cost for using the Symmetri app to find the best market rate and organize your swap from start to finish" /></span>
-                <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.platformFee)}</span>
+                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.platformFee)}</span>
               </div>
 
                 <div style={rowStyle}>
-                  <span>Outbound Fuel (Delivery) <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(breakdown.outboundFee)}</span>
+                  <span>Outbound Cost (Delivery) <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
+                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.outboundFee)}</span>
                 </div>
 
               {/* DYNAMIC COMPLIANCE TAXES */}
               {breakdown.appliedTaxes.map((tax, i) => (
                 <div key={i} style={rowStyle}>
                   <span>{tax.label} <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Symmetri does not receive or handle these funds" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ €{currencyFmt(tax.amountSource)}</span>
+                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(tax.amountSource)}</span>
                 </div>
               ))}
 
               <div style={{ borderTop: '2px solid #e1e8ed', margin: '15px 0' }}></div>
 
               {/* TOTAL COST */}
-              <div style={{ ...rowStyle, color: '#e67e22', fontWeight: 'bold', fontSize: '16px' }}>
+              <div style={{ ...rowStyle, color: '#57606f', fontWeight: 'bold', fontSize: '16px' }}>
                 <span>Total Additional Cost (Friction)</span>
-                <span>+ €{currencyFmt(breakdown.totalFeesSource)}</span>
+                <span>+ {fromCurr} {currencyFmt(breakdown.totalFeesSource)}</span>
               </div>
 
               {/* FRICTION PERCENTAGE - NEW */}
-              <div style={{ ...rowStyle, color: '#e67e22', fontWeight: 'bold', fontSize: '16px', marginTop: '-4px' }}>
+              <div style={{ ...rowStyle, color: '#57606f', fontWeight: 'bold', fontSize: '16px', marginTop: '-4px' }}>
                 <span>Total Additional Cost (%)</span>
                 <span>{(breakdown.principalSource > 0 ? (breakdown.totalFeesSource / breakdown.principalSource * 100).toFixed(2) : '0.00')}%</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>Total Cost to You</span>
-                <span style={{ fontSize: '24px', fontWeight: '800', color: '#2c3e50' }}>€{currencyFmt(breakdown.totalToPaySource)}</span>
+                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>Total You Pay</span>
+                <span style={{ fontSize: '24px', fontWeight: '800', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.totalToPaySource)}</span>
               </div>
             </div>
 
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', fontSize: '1.1rem', fontWeight: '700', color: '#2c3e50', border: '1px solid #dcdde1', textAlign: 'center' }}>
-              Effective Rate: 1 EUR = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(includes all friction)</span>
+            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dcdde1', textAlign: 'center' }}>
+              <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#2c3e50', marginBottom: '6px' }}>
+                Agreed Exchange Rate: 1 {fromCurr} = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.principalSource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(secured via P2P match)</span>
+              </div>
+              <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#34495e' }}>
+                Effective Exchange Rate: 1 {fromCurr} = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#7f8c8d' }}>(After fees)</span>
+              </div>
             </div>
 
             {/* FOOTER ACTIONS - EXACT HARMONY WITH BENEFICIARY.TSX */}
             <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
               <button
-                onClick={() => router.back()}
+                onClick={() => {
+                  if (effectiveBeneficiary?.id) {
+                    router.push(`/beneficiary?beneficiaryId=${effectiveBeneficiary.id}`);
+                  } else {
+                    router.back();
+                  }
+                }}
                 style={{
                   flex: 1, padding: '14px', borderRadius: '10px',
                   border: '2px solid #e1e8ed', backgroundColor: 'transparent',
@@ -608,7 +788,7 @@ export default function ReviewPage() {
                   boxShadow: loading ? 'none' : `0 4px 15px ${brandConfig.theme.actionColor}4D`
                 }}
               >
-                {loading ? 'Processing...' : `Confirm & Swap €${currencyFmt(breakdown.totalToPaySource)}`}
+                {loading ? 'Processing...' : `Confirm & Swap ${fromCurr} ${currencyFmt(breakdown.totalToPaySource)}`}
               </button>
             </div>
 
@@ -617,8 +797,16 @@ export default function ReviewPage() {
               <button
                 onClick={() => setShowCancelLogic(true)}
                 style={{
-                  background: 'none', border: 'none', color: '#e74c3c',
-                  fontSize: '14px', cursor: 'pointer', textDecoration: 'underline'
+                  width: '100%',
+                  padding: '14px',
+                  background: 'transparent',
+                  border: '2px solid #e1e8ed',
+                  borderRadius: '10px',
+                  color: '#7f8c8d',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
                 }}>
                 Cancel Transaction
               </button>

@@ -87,14 +87,14 @@ def update_draft_endpoint(draft_id: str, payload: DraftCreate, db: Session = Dep
 @router.get("/{user_id}")
 def get_user_drafts(user_id: str, db: Session = Depends(get_db)):
     drafts = db.query(Draft).filter(
-        Draft.user_id == user_id, 
+        Draft.owner_id == user_id, 
         Draft.status == "active"
     ).order_by(Draft.updated_at.desc()).all()
     return drafts
 
 @router.post("/promote")
 def promote_draft_to_transaction(payload: DraftPromote, db: Session = Depends(get_db)):
-    draft = db.query(Draft).filter(Draft.id == payload.draft_id, Draft.user_id == payload.user_id).first()
+    draft = db.query(Draft).filter(Draft.id == payload.draft_id, Draft.owner_id == payload.user_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
         

@@ -165,7 +165,7 @@ export default function Dashboard() {
                 const createRes = await fetch('/api/drafts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ step: 'initial', data: {} })
                 });
 
                 if (createRes.ok) {
@@ -176,7 +176,7 @@ export default function Dashboard() {
                     });
                 } else {
                     console.error('Failed to create draft');
-                    alert("System Error: Could not initialization transaction. Please contact support.");
+                    alert("System Error: Could not initialize transaction. Please contact support.");
                 }
             }
         } catch (e) {
@@ -196,17 +196,17 @@ export default function Dashboard() {
                     <div>
                         {/* TWO-PRODUCT SELECTOR */}
                         <div style={{ marginBottom: '30px' }}>
-                            <h2 style={{ color: '#2c3e50', marginTop: 0, marginBottom: '16px' }}>What would you like to do?</h2>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                            <h2 style={{ color: '#2c3e50', marginTop: 0, marginBottom: '20px' }}>What would you like to do?</h2>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
 
                                 {/* PHASE 1 — SEND VALUE */}
                                 <div
-                                    style={{ background: 'white', borderRadius: '16px', padding: '24px', cursor: 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', position: 'relative', overflow: 'hidden' }}
-                                    onClick={() => router.push('/send')}
+                                    style={{ background: 'white', borderRadius: '20px', padding: '32px', cursor: 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', position: 'relative', overflow: 'hidden' }}
+                                    onClick={() => router.push('/voucher')}
                                     onMouseEnter={e => {
                                         const el = e.currentTarget as HTMLDivElement;
                                         el.style.borderColor = '#1A73E8';
-                                        el.style.transform = 'translateY(-2px)';
+                                        el.style.transform = 'translateY(-3px)';
                                         const tip = el.querySelector('.quick-send-tip') as HTMLElement;
                                         if (tip) tip.style.opacity = '1';
                                     }}
@@ -218,22 +218,22 @@ export default function Dashboard() {
                                         if (tip) tip.style.opacity = '0';
                                     }}
                                 >
-                                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎟️</div>
-                                    <div style={{ fontWeight: '800', fontSize: '15px', color: '#1e293b', marginBottom: '6px' }}>Send Value</div>
-                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, marginBottom: '14px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>🛍️</div>
+                                    <div style={{ fontWeight: '800', fontSize: '20px', color: '#1e293b', marginBottom: '8px' }}>Send Value</div>
+                                    <div style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '16px' }}>
                                         Your family receives purchasing power redeemable at their preferred grocery store. Mid-market rate, zero Symmetri fees.
                                     </div>
-                                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#1A73E8', background: '#eff6ff', padding: '4px 10px', borderRadius: '20px', display: 'inline-block' }}>No MTL Required</div>
+                                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#1A73E8', background: '#eff6ff', padding: '6px 12px', borderRadius: '20px', display: 'inline-block' }}>No MTL Required</div>
 
                                     {/* Quick-send hover tooltip for returning users */}
                                     <div
                                         className="quick-send-tip"
                                         onClick={e => { e.stopPropagation(); router.push('/voucher'); }}
                                         style={{
-                                            position: 'absolute', bottom: '12px', right: '12px',
+                                            position: 'absolute', bottom: '16px', right: '16px',
                                             background: '#1A73E8', color: 'white',
-                                            padding: '5px 12px', borderRadius: '20px',
-                                            fontSize: '11px', fontWeight: '700',
+                                            padding: '8px 16px', borderRadius: '20px',
+                                            fontSize: '12px', fontWeight: '700',
                                             opacity: 0, transition: 'opacity 0.15s',
                                             cursor: 'pointer', pointerEvents: 'auto',
                                             boxShadow: '0 2px 8px rgba(26,115,232,0.4)',
@@ -247,38 +247,43 @@ export default function Dashboard() {
                                 {/* PHASE 2 — P2P SWAP */}
                                 <div
                                     onClick={handleStartSwap}
-                                    style={{ background: 'white', borderRadius: '16px', padding: '24px', cursor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'not-allowed' : 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 2px 12px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', opacity: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 0.6 : 1 }}
-                                    onMouseEnter={e => { if ((kycStatus !== 'PENDING') || (user?.txCount || 0) === 0) { (e.currentTarget as HTMLDivElement).style.borderColor = '#0070f3'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'; } }}
+                                    style={{ background: 'white', borderRadius: '20px', padding: '32px', cursor: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 'not-allowed' : 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s', opacity: (kycStatus === 'PENDING' && (user?.txCount || 0) > 0) ? 0.6 : 1 }}
+                                    onMouseEnter={e => { if ((kycStatus !== 'PENDING') || (user?.txCount || 0) === 0) { (e.currentTarget as HTMLDivElement).style.borderColor = '#0070f3'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; } }}
                                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
                                 >
-                                    <div style={{ fontSize: '32px', marginBottom: '12px' }}>💱</div>
-                                    <div style={{ fontWeight: '800', fontSize: '15px', color: '#1e293b', marginBottom: '6px' }}>Swap Currencies</div>
-                                    <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.5, marginBottom: '14px' }}>
+                                    <div style={{ fontSize: '48px', marginBottom: '16px' }}>💱</div>
+                                    <div style={{ fontWeight: '800', fontSize: '20px', color: '#1e293b', marginBottom: '8px' }}>Swap Currencies</div>
+                                    <div style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5, marginBottom: '16px' }}>
                                         Match with someone sending the other way. Both sides settle domestically — no cross-border wire.
                                     </div>
-                                    <div style={{ fontSize: '11px', fontWeight: '700', color: '#0050b3', background: '#e6f7ff', padding: '4px 10px', borderRadius: '20px', display: 'inline-block' }}>Phase 2 · MTL Required</div>
+                                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#0050b3', background: '#e6f7ff', padding: '6px 12px', borderRadius: '20px', display: 'inline-block' }}>Phase 2 · MTL Required</div>
                                 </div>
 
                             </div>
                         </div>
 
-                        {/* SAVED DRAFTS */}
-                        {drafts.length > 0 && (
+
+
+
+
+                    </div>
+
+                    {/* RIGHT COLUMN: ONGOING & RECENT ACTIVITY */}
+                    <div>
+                        {/* SAVED DRAFTS — only shown when the draft has meaningful data (amount entered) */}
+                        {drafts.filter((d: any) => d.data?.amount).length > 0 && (
                             <section style={{ marginBottom: '30px' }}>
-                                <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Your Drafts</h3>
+                                <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Resume Where You Left Off</h3>
                                 <div style={{ display: 'grid', gap: '15px' }}>
-                                    {drafts.map((draft) => (
+                                    {drafts.filter((d: any) => d.data?.amount).map((draft: any) => (
                                         <div key={draft.id} style={{
-                                            backgroundColor: '#fff8e1',
+                                            backgroundColor: '#f0f7ff',
                                             padding: '15px',
                                             borderRadius: '10px',
                                             cursor: 'pointer',
-                                            border: '1px solid #fce8b2',
+                                            border: '1px solid #cce3ff',
                                             display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                         }} onClick={() => {
-                                            // Resume Draft Logic
-                                            // We push to the step saved in draft
-                                            // For now, assume it's "amount_selection" or route to /amount-selection with flags
                                             router.push({
                                                 pathname: '/amount-selection',
                                                 query: {
@@ -289,66 +294,18 @@ export default function Dashboard() {
                                             });
                                         }}>
                                             <div>
-                                                <div style={{ fontWeight: '600', color: '#d35400' }}>Incomplete Swap</div>
-                                                <div style={{ fontSize: '13px', color: '#e67e22' }}>
-                                                    {draft.data.amount} {draft.data.corridor || 'EUR'} to {draft.data.recipient || 'Unknown'}
+                                                <div style={{ fontWeight: '600', color: '#0050b3' }}>Resume Swap</div>
+                                                <div style={{ fontSize: '13px', color: '#1A73E8' }}>
+                                                    {draft.data.amount} {draft.data.source_currency || draft.data.corridor || 'USD'} → {draft.data.target_currency || draft.data.recipient || 'In progress'}
                                                 </div>
                                             </div>
-                                            <span style={{ fontSize: '20px', color: '#f39c12' }}>→</span>
+                                            <span style={{ fontSize: '20px', color: '#1A73E8' }}>→</span>
                                         </div>
                                     ))}
                                 </div>
                             </section>
                         )}
 
-                        {/* SAVED BENEFICIARIES */}
-                        <section>
-
-                            <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Saved Beneficiaries</h3>
-                            {savedBeneficiaries.length > 0 ? (
-                                <div style={{ display: 'grid', gap: '15px' }}>
-                                    {savedBeneficiaries.slice(0, 3).map((ben, idx) => (
-                                        <div key={idx} style={{
-                                            backgroundColor: 'white',
-                                            padding: '15px',
-                                            borderRadius: '10px',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            cursor: 'pointer',
-                                            border: '1px solid #e1e8ed'
-                                        }} onClick={() => {
-                                            sessionStorage.removeItem('trueque_swap_state');
-                                            router.push(`/amount-selection?beneficiaryId=${idx}`);
-                                        }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                <div style={{
-                                                    width: '40px', height: '40px', borderRadius: '50%',
-                                                    backgroundColor: '#e1e8ed', display: 'flex',
-                                                    alignItems: 'center', justifyContent: 'center',
-                                                    fontWeight: 'bold', color: '#7f8c8d'
-                                                }}>
-                                                    {ben.personal.firstName[0]}
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontWeight: '600', color: '#2c3e50' }}>{ben.personal.firstName} {ben.personal.lastName}</div>
-                                                    <div style={{ fontSize: '13px', color: '#95a5a6' }}>{ben.banking.bankName} • {ben.banking.accountNumber?.slice(-4) || '****'}</div>
-                                                </div>
-                                            </div>
-                                            <span style={{ fontSize: '20px', color: '#bdc3c7' }}>→</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ textAlign: 'center', padding: '20px', color: '#95a5a6', backgroundColor: 'white', borderRadius: '10px' }}>
-                                    No saved beneficiaries yet.
-                                </div>
-                            )}
-                        </section>
-                    </div>
-
-                    {/* RIGHT COLUMN: RECENT ACTIVITY */}
-                    <div>
                         <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Recent Swaps</h3>
                         <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 15px rgba(0,0,0,0.05)', marginBottom: '30px' }}>
                             {recentSwaps.map((swap) => (
@@ -407,7 +364,7 @@ export default function Dashboard() {
                                                 <span style={{ color: '#95a5a6' }}>Market Exchange Rate: </span>
                                                 <div style={{ position: 'relative', display: 'inline-block', cursor: 'pointer', marginLeft: '5px' }} title="View Market Rate Policy">
                                                     <a href="/compliance/terms" target="_blank" rel="noopener noreferrer">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4A90E2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A73E8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                             <circle cx="12" cy="12" r="10"></circle>
                                                             <line x1="12" y1="16" x2="12" y2="12"></line>
                                                             <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -435,7 +392,7 @@ export default function Dashboard() {
 
                                 </div>
                             ))}
-                            <div style={{ padding: '15px', textAlign: 'center', backgroundColor: '#fdfefe', cursor: 'pointer', color: '#4A90E2', fontWeight: '500' }} onClick={() => router.push('/history')}>
+                            <div style={{ padding: '15px', textAlign: 'center', backgroundColor: '#fdfefe', cursor: 'pointer', color: '#1A73E8', fontWeight: '500' }} onClick={() => router.push('/history')}>
                                 View All Activity
                             </div>
                         </div>

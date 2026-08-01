@@ -4,24 +4,30 @@ import { withAuth } from '../../../lib/withAuth';
 import { TruequeSession } from '../../../types/auth';
 import retailers from '../../../config/retailers.json';
 
+// =============================================================================
+// TECHNICAL DEBT — Sprint Migration Required
+// -----------------------------------------------------------------------------
+// This Next.js API route directly accesses the PostgreSQL database via
+// src/lib/db.ts. This violates the "FastAPI as Sole Orchestrator" pattern
+// established in GEMINI.md §4 / §5. All direct DB access from Next.js must
+// be migrated to the corresponding FastAPI router (backend/routes/) in a
+// future sprint. Until migrated, this file is the authoritative handler for
+// GET /api/vouchers/redemption-map.
+// =============================================================================
+
 type RetailerConfig = typeof retailers[0];
 
 /**
  * GET /api/vouchers/redemption-map
  *
  * Returns aggregated redemption data for the retailer map.
- * Access:
- *   - VOUCHER_MAP_ACCESS = 'sender' → filters by session user_id (sender sees only their vouchers)
- *   - VOUCHER_MAP_ACCESS = 'admin'  → returns all redemptions (admin sees everyone's)
- *
- * To flip access: change the constant below.
+ * Access: MERCHANT-ONLY (userType === 'MERCHANT'). Regular PEER users → 403.
+ * VOUCHER_MAP_ACCESS controls the data scope:
+ *   'retailer' → merchant sees redemptions at their own stores
+ *   'admin'    → sees all redemptions across all retailers
  */
 
 // ─── ACCESS CONTROL ───────────────────────────────────────────────────────────
-// This endpoint is RETAILER-ONLY. Regular PEER users are blocked at the API level.
-// VOUCHER_MAP_ACCESS controls the data scope:
-//   'retailer' → merchant sees redemptions at their own stores (filter by retailer_id)
-//   'admin'    → sees all redemptions across all retailers
 const VOUCHER_MAP_ACCESS: 'retailer' | 'admin' = 'retailer';
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -30,26 +36,23 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const session = (req as any).session as TruequeSession;
 
-    // MERCHANT-ONLY GUARD — regular PEER users must not access retailer analytics
+    // MERCHANT-ONLY GUARD — regular PEER users must not access retailer analytics (GEMINI.md §3.1)
     if (session.user.userType !== 'MERCHANT') {
         return res.status(403).json({ error: 'Access restricted to retailers.' });
     }
-
-    const ownerId = session.user.id;
 
     try {
         let rows;
 
         if (VOUCHER_MAP_ACCESS === 'retailer') {
             // Retailer view: merchant sees redemptions at their own stores.
-            // Uses symmetri_id (@handle) to match against retailer_id stored at voucher creation.
             const retailerId = session.user.symmetriId || session.user.id;
 
             const result = await query(
                 `SELECT
                     retailer_id,
                     retailer_name,
-                    historical_redemption_anchor AS anchor,
+                    historical_redemption_anchor,
                     redeemed_at,
                     amount_local,
                     local_currency,
@@ -67,18 +70,19 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
         } else {
             // Admin view: all redemptions across all users
+            // NOTE: owner_id is the correct FK — never user_id (GEMINI.md §2.2)
             const result = await query(
                 `SELECT
                     retailer_id,
                     retailer_name,
-                    historical_redemption_anchor AS anchor,
+                    historical_redemption_anchor,
                     redeemed_at,
                     amount_local,
                     local_currency,
                     beneficiary_name,
                     voucher_code,
                     redemption_store_id,
-                    user_id
+                    owner_id
                  FROM vouchers
                  WHERE status = 'REDEEMED'
                    AND historical_redemption_anchor IS NOT NULL
@@ -102,28 +106,28 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         }> = {};
 
         for (const row of rows) {
-            const anchor = typeof row.anchor === 'string'
-                ? JSON.parse(row.anchor)
-                : row.anchor;
+            // Use the canonical field name — no 'anchor' alias (GEMINI.md §2.2)
+            const historical_redemption_anchor = typeof row.historical_redemption_anchor === 'string'
+                ? JSON.parse(row.historical_redemption_anchor)
+                : row.historical_redemption_anchor;
 
-            if (!anchor?.lat || !anchor?.lng) continue;
+            if (!historical_redemption_anchor?.lat || !historical_redemption_anchor?.lng) continue;
 
-            // Key by store_id or lat/lng rounded to 3 decimal places
             const key = row.redemption_store_id
-                || `${anchor.lat.toFixed(3)}_${anchor.lng.toFixed(3)}`;
+                || `${historical_redemption_anchor.lat.toFixed(3)}_${historical_redemption_anchor.lng.toFixed(3)}`;
 
             if (!pinMap[key]) {
                 pinMap[key] = {
-                    retailer_id:   row.retailer_id,
-                    retailer_name: row.retailer_name,
-                    lat:           anchor.lat,
-                    lng:           anchor.lng,
-                    city:          anchor.city || '',
-                    count:         0,
-                    total_local:   0,
+                    retailer_id:    row.retailer_id,
+                    retailer_name:  row.retailer_name,
+                    lat:            historical_redemption_anchor.lat,
+                    lng:            historical_redemption_anchor.lng,
+                    city:           historical_redemption_anchor.city || '',
+                    count:          0,
+                    total_local:    0,
                     local_currency: row.local_currency,
-                    last_redeemed: row.redeemed_at,
-                    redemptions:   [],
+                    last_redeemed:  row.redeemed_at,
+                    redemptions:    [],
                 };
             }
 
@@ -133,7 +137,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
                 pinMap[key].last_redeemed = row.redeemed_at;
             }
             pinMap[key].redemptions.push({
-                code:             row.voucher_code,
+                voucher_code:     row.voucher_code,
                 beneficiary_name: row.beneficiary_name,
                 amount_local:     Number(row.amount_local),
                 redeemed_at:      row.redeemed_at,
@@ -151,7 +155,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
 
         return res.status(200).json({
-            access_mode: VOUCHER_MAP_ACCESS,
+            access_mode:    VOUCHER_MAP_ACCESS,
             pins,
             total_redeemed: pins.reduce((s, p) => s + p.count, 0),
             total_value:    parseFloat(pins.reduce((s, p) => s + p.total_local, 0).toFixed(2)),

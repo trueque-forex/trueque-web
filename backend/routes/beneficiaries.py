@@ -47,8 +47,9 @@ def _serialize_row(row: Any) -> dict:
     """
     Normalises a beneficiaries table row into a stable API shape.
     Handles both native-JSON and double-encoded string metadata.
+    Expects a SQLAlchemy RowMapping (from .mappings().fetchone()).
     """
-    md = row.metadata_ if hasattr(row, "metadata_") else (row["metadata"] if "metadata" in row.keys() else {})
+    md = row.get("metadata") or {}
     if isinstance(md, str):
         try:
             md = json.loads(md)
@@ -83,7 +84,7 @@ def list_beneficiaries(
     rows = db.execute(
         text("SELECT * FROM beneficiaries WHERE owner_id = :uid ORDER BY created_at DESC"),
         {"uid": owner_id},
-    ).fetchall()
+    ).mappings().fetchall()
 
     return [_serialize_row(r) for r in rows]
 
@@ -123,7 +124,7 @@ def create_beneficiary(payload: BeneficiaryCreate, db: Session = Depends(get_db)
     row = db.execute(
         text("SELECT * FROM beneficiaries WHERE id = :id"),
         {"id": str(new_id)},
-    ).fetchone()
+    ).mappings().fetchone()
 
     return _serialize_row(row)
 
@@ -139,13 +140,13 @@ def update_beneficiary(payload: BeneficiaryUpdate, db: Session = Depends(get_db)
     row = db.execute(
         text("SELECT * FROM beneficiaries WHERE id = :id AND owner_id = :owner_id"),
         {"id": payload.id, "owner_id": payload.owner_id},
-    ).fetchone()
+    ).mappings().fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="Beneficiary not found or access denied")
 
     # Parse existing metadata
-    existing_md = row["metadata"] if "metadata" in row.keys() else {}
+    existing_md = row.get("metadata") or {}
     if isinstance(existing_md, str):
         try:
             existing_md = json.loads(existing_md)
@@ -180,6 +181,6 @@ def update_beneficiary(payload: BeneficiaryUpdate, db: Session = Depends(get_db)
     updated_row = db.execute(
         text("SELECT * FROM beneficiaries WHERE id = :id"),
         {"id": payload.id},
-    ).fetchone()
+    ).mappings().fetchone()
 
     return _serialize_row(updated_row)

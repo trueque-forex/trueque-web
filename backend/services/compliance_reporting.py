@@ -105,7 +105,7 @@ class ComplianceReportingService:
         Receiver = aliased(User)
         
         query = self.db.query(Transaction, Sender, Receiver).\
-            join(Sender, Transaction.user_id == Sender.id).\
+            join(Sender, Transaction.owner_id == Sender.id).\
             outerjoin(Receiver, Transaction.beneficiary_id == Receiver.id)
         
         if start_date:
@@ -121,7 +121,7 @@ class ComplianceReportingService:
         # FinCEN-style Headers
         writer.writerow([
             "Timestamp (UTC)", "Sender Name", "Receiver Name", "Destination Country", 
-            "Total Amount (USD Equiv)", "Platform Fee", "Remittance Purpose"
+            "Total Amount (USD Equiv)", "Symmetri Swap Fee", "Remittance Purpose"
         ])
         
         for tx, sender, receiver in results:
@@ -132,8 +132,8 @@ class ComplianceReportingService:
             elif tx.from_currency != 'USD':
                 usd_amount = float(tx.amount) * 0.5 
             
-            # 2. Platform Fee (Placeholder)
-            platform_fee = "0.00" 
+            # 2. Symmetri Swap Fee — §3.2: SYMMETRI_SWAP_FEE_PCT = 0.015 (Phase 2 only). Phase 1 = 0.
+            symmetri_swap_fee = "0.00"
             
             # 3. Receiver Name logic
             receiver_name = receiver.full_name if receiver else "N/A"
@@ -144,7 +144,7 @@ class ComplianceReportingService:
                 receiver_name,
                 sender.country, # Using Sender country as proxy for Origin/Dest logic for now
                 f"{usd_amount:.2f}",
-                platform_fee,
+                symmetri_swap_fee,
                 tx.remittance_purpose or "N/A"
             ])
             

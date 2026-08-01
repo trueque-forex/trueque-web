@@ -1,4 +1,6 @@
 import uuid
+import random
+import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
@@ -8,6 +10,28 @@ import bcrypt
 from backend.database import SessionLocal
 
 router = APIRouter()
+
+
+def _generate_symmetri_id(first_name: str, last_name: str, db) -> str:
+    """
+    Generate a unique @handle in the format @firstlast####.
+    GEMINI.md §2.1 — symmetri_id must start with '@'.
+    Strips non-alpha characters, lowercases, appends 4 random digits.
+    Retries up to 10 times to guarantee uniqueness.
+    """
+    base = re.sub(r"[^a-z]", "", f"{first_name}{last_name}".lower())
+    if not base:
+        base = "user"
+    for _ in range(10):
+        handle = f"@{base}{random.randint(1000, 9999)}"
+        existing = db.execute(
+            text("SELECT 1 FROM users WHERE symmetri_id = :sid"),
+            {"sid": handle}
+        ).fetchone()
+        if not existing:
+            return handle
+    # Final fallback: append uuid4 suffix — guaranteed unique
+    return f"@{base}{str(uuid.uuid4())[:8]}"
 
 class WebSignupPayload(BaseModel):
     first_name: str
@@ -40,20 +64,23 @@ def web_signup(payload: WebSignupPayload):
         password_hash = bcrypt.hashpw(payload.password.encode('utf-8'), salt).decode('utf-8')
 
         # Generate IDs
-        symmetri_id = str(uuid.uuid4())
+        # symmetri_id: @handle per GEMINI.md §2.1 (must start with '@')
+        symmetri_id = _generate_symmetri_id(payload.first_name, payload.last_name, db)
         user_id = str(uuid.uuid4())
 
         insert_sql = text("""
             INSERT INTO users (
-                id, symmetri_id, email, password_hash, 
-                first_name, last_name, dob, 
-                country_of_residence, country_destiny, address, 
+                id, symmetri_id, email, password_hash,
+                first_name, last_name, dob,
+                country_of_residence, country_destiny, address,
+                kyc_status, user_type,
                 created_at
             )
             VALUES (
                 :id, :symmetri_id, :email, :password_hash,
                 :first_name, :last_name, :dob,
                 :country_of_residence, :country_destiny, :address,
+                :kyc_status, :user_type,
                 :created_at
             )
         """)
@@ -69,7 +96,10 @@ def web_signup(payload: WebSignupPayload):
             "country_of_residence": payload.country_of_residence,
             "country_destiny": payload.country_destiny,
             "address": payload.address,
-            "created_at": datetime.now(timezone.utc)
+            # GEMINI.md §2.1 — new users start at EMPTY, not PENDING
+            "kyc_status": "EMPTY",
+            "user_type": "PEER",
+            "created_at": datetime.now(timezone.utc),
         })
         db.commit()
 

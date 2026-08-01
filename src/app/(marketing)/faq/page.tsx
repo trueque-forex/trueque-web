@@ -6,7 +6,7 @@ const FAQ_ITEMS = [
   {
     category: 'Speed & Process',
     q: 'How fast does my family receive the voucher?',
-    a: 'The voucher code is generated and sent to your family via SMS within seconds of your payment being confirmed. For card payments, this is typically under 30 seconds. For bank transfers (RTP/FedNow), it is also near-instant.',
+    a: 'The voucher code is generated within seconds of your payment being confirmed. Once generated, you can send it directly to your family via SMS or WhatsApp. For card payments, this is typically under 30 seconds. For bank transfers (RTP/FedNow), it is also near-instant.',
   },
   {
     category: 'Speed & Process',
