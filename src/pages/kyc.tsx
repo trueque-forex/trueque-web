@@ -6,7 +6,7 @@ type DocumentType = 'passport' | 'drivers_license' | 'national_id';
 
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import { useAuth } from '../context/AuthContext'; // Integration
-import { generateTruequeID } from '@/lib/idGenerator';
+import { generateTradeMaskSid } from '@/lib/idGenerator';
 import brandConfig from '../config/brand_config.json';
 
 export default function KYCPage() {
@@ -16,7 +16,7 @@ export default function KYCPage() {
   const { returnTo, offerId, userId, from, to, amountIntent, expectedReceive, newUser } = router.query;
 
   const [userName, setUserName] = useState('User');
-  const [userTruequeId, setUserTruequeId] = useState('');
+  const [tradeMaskSid, setTradeMaskSid] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [hasMounted, setHasMounted] = useState(false);
@@ -227,7 +227,7 @@ export default function KYCPage() {
       try {
         const session = JSON.parse(sessionData);
         setUserName(session.firstName || 'User');
-        setUserTruequeId(session.symmetriId || '');
+        setTradeMaskSid(session.tradeMaskSid || '');
         if (session.rejectedFields) {
           setRejectedFields(session.rejectedFields);
         }
@@ -444,7 +444,13 @@ export default function KYCPage() {
   const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
     if (!kycData.documentNumber.trim()) newErrors.documentNumber = 'Document Number is required';
-    if (!kycData.documentIssueDate) newErrors.documentIssueDate = 'Issue Date is required';
+    
+    if (!kycData.documentIssueDate) {
+      newErrors.documentIssueDate = 'Issue Date is required';
+    } else if (new Date(kycData.documentIssueDate) > new Date()) {
+      newErrors.documentIssueDate = 'Issue Date cannot be in the future';
+    }
+    
     if (!kycData.documentExpiryDate) newErrors.documentExpiryDate = 'Expiry Date is required';
 
     if (kycData.documentIssueDate && kycData.documentExpiryDate) {
@@ -454,7 +460,9 @@ export default function KYCPage() {
     }
 
     if (!kycData.documentIssuingCountry) newErrors.documentIssuingCountry = 'Issuing Country is required';
-    // ID Document is required for Tier 2+, but let's at least check fields for Tier 1 submission
+    // File uploads are optional for testing
+    // if (!documentFrontFile) newErrors.documentFront = 'Front of document is required';
+    // if (!selfieFile) newErrors.selfie = 'Selfie photo is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -494,9 +502,13 @@ export default function KYCPage() {
     if (isValid) {
       if (currentStep < 2) {
         setCurrentStep(currentStep + 1);
+        window.scrollTo(0, 0);
       } else {
         handleSubmitKYC();
       }
+    } else {
+      window.scrollTo(0, 0);
+      alert('Please correct the highlighted errors before proceeding.');
     }
   };
 
@@ -509,7 +521,7 @@ export default function KYCPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: userId || undefined, // If from query, else rely on session/cookie logic if we had auth header helper? 
+          userId: userId || user?.id || undefined, // Fallback to user from context if not in URL query
           // Wait, apiFetch handles headers usually, but here using raw fetch?
           // kyc.tsx usually relies on `useRequireAuth` which ensures session.
           // But we need to pass the userId explicitly if usage suggests.
@@ -530,8 +542,8 @@ export default function KYCPage() {
 
       const responseJson = await res.json();
 
-      if (responseJson.ok && responseJson.symmetriId) {
-        setUserTruequeId(responseJson.symmetriId);
+      if (res.ok && responseJson.ok && responseJson.tradeMaskSid) {
+        setTradeMaskSid(responseJson.tradeMaskSid);
 
         // ACTIVATE LOGIN STATE: Refresh Session from Cookie now that Flow A is done.
         // This ensures Dashboard access is valid.
@@ -542,7 +554,6 @@ export default function KYCPage() {
         if (sessionStr) {
           const session = JSON.parse(sessionStr);
           session.symmetriId = responseJson.symmetriId;
-          session.symmetriId = responseJson.symmetriId; // Handle both keys
           session.kycStatus = 'PENDING'; // Force State Lock
           session.kycTier = 'TIER_1_PENDING'; // Persistence Requirement
           localStorage.setItem('trueque_session', JSON.stringify(session));
@@ -553,17 +564,19 @@ export default function KYCPage() {
             window.dispatchEvent(new Event('storage'));
           }
         }
+
+        // Cleanup sensitive draft data
+        sessionStorage.removeItem('registrationDraft');
+        sessionStorage.removeItem('trueque_kyc_progress');
+        sessionStorage.removeItem('trueque_kyc_step'); // Clear step too
+
+        // Show Completion Screen
+        setCurrentStep(5);
       } else {
         console.warn('KYC Complete did not return TID', responseJson);
+        alert(`Failed to submit KYC: ${responseJson.message || responseJson.error || 'Unknown error'}`);
+        return;
       }
-
-      // Cleanup sensitive draft data
-      sessionStorage.removeItem('registrationDraft');
-      sessionStorage.removeItem('trueque_kyc_progress');
-      sessionStorage.removeItem('trueque_kyc_step'); // Clear step too
-
-      // Show Completion Screen
-      setCurrentStep(5);
 
     } catch (error) {
       console.error('Error submitting KYC:', error);
@@ -1101,7 +1114,7 @@ export default function KYCPage() {
                           letterSpacing: '2px',
                           wordBreak: 'break-all'
                         }}>
-                          {userTruequeId || generateTruequeID(kycData.country || 'ES')}
+                          {tradeMaskSid || generateTradeMaskSid(kycData.country || 'ES')}
                         </div>
                         <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f6f3', borderRadius: '8px', borderLeft: '4px solid #27ae60' }}>
                           <p style={{ margin: 0, fontSize: '14px', color: '#16a085', textAlign: 'left' }}>

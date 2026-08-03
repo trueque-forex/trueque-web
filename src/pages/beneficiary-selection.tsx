@@ -22,7 +22,7 @@ export default function BeneficiarySelectionPage() {
         // 1. ROUTE GUARD (GEMINI CONSTANT 2025)
         // If no offer selected (SwapIntent), bounce to Budget/Amount Selection
         if (!swapIntent || !swapIntent.amount) {
-            router.replace('/amount-selection');
+            router.replace('/offers?from=EUR&to=DOP');
             return;
         }
 
@@ -53,7 +53,16 @@ export default function BeneficiarySelectionPage() {
                     const { json, res } = await apiFetch<Beneficiary[]>('/api/beneficiaries', { method: 'GET' });
                     // 401 is now handled by apiFetch globally, but we can double check
                     if (res.ok && Array.isArray(json)) {
-                        setBeneficiaries(json);
+                        let filtered = json;
+                        const rail = router.query.rail as string;
+                        if (rail === 'RTP') {
+                            filtered = json.filter(b => b.method === 'bank_rtp');
+                        } else if (rail === 'PUSH_TO_CARD') {
+                            filtered = json.filter(b => b.method === 'card_push');
+                        } else if (rail === 'SPEI') {
+                            filtered = json.filter(b => b.method === 'wallet' || b.method === 'spei');
+                        }
+                        setBeneficiaries(filtered);
                     }
                 } catch (e) {
                     console.error("Failed to load beneficiaries", e);
@@ -63,19 +72,21 @@ export default function BeneficiarySelectionPage() {
             };
             fetchBens();
         }
-    }, [router, swapIntent]);
+    }, [router.isReady, router.query, swapIntent]);
 
     const handleSelect = (b: Beneficiary) => {
         // ANCHOR DATA: Persist 'Maria' (or whoever) for the Review Page
         // Using 'selected_beneficiary' as requested
         localStorage.setItem('selected_beneficiary', JSON.stringify(b));
 
-        // Navigate to Validation/Review (Review Page is next?)
-        // Or to Beneficiary Details to confirm?
-        // Usually: Select -> Review (if data complete) OR Select -> Edit (if missing)
-        // For Flow B: "Check logic in beneficiary.tsx" implies we go there.
-        // Navigate to Counterparty Selection
-        router.push('/counterparty-offers');
+        const rail = router.query.rail as string;
+        if (rail) {
+            // Return to review with the selected rail
+            router.push(`/review?rail=${rail}`);
+        } else {
+            // Navigate to Counterparty Selection
+            router.push('/counterparty-offers');
+        }
     };
 
     const handleSignOut = () => {

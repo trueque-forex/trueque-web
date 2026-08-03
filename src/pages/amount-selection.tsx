@@ -287,9 +287,9 @@ export default function AmountSelectionPage() {
         // 1. Update Global Context
         setSwapIntent({
             amount: amt,
-            currencyFrom: getCurrencyCode(currencyFrom || ''),
-            currencyTo: getCurrencyCode(currencyTo || ''),
-            rate: marketRate,
+            source_currency: getCurrencyCode(currencyFrom || ''),
+            target_currency: getCurrencyCode(currencyTo || ''),
+            exchange_rate: marketRate,
             offerType: 'bank'
         });
 
@@ -476,8 +476,11 @@ export default function AmountSelectionPage() {
                                 {loading ? 'Loading...' : (marketRate ? Number(marketRate).toFixed(4) : '---')}
                             </span>
                         </label>
-                        <div style={{ fontSize: '13px', color: '#555555' }}>
-                            1 {getCurrencyCode(currencyFrom || '')} = {marketRate ? Number(marketRate).toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}
+                        <div style={{ fontSize: '13px', color: '#555555', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                            <div>1 {getCurrencyCode(currencyFrom || '')} = {marketRate ? Number(marketRate).toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}</div>
+                            {marketRate && marketRate > 0 ? (
+                                <div>1 {getCurrencyCode(currencyTo || '')} = {(1 / marketRate).toFixed(4)} {getCurrencyCode(currencyFrom || '')}</div>
+                            ) : null}
                         </div>
                     </div>
 

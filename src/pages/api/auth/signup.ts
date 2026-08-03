@@ -77,7 +77,7 @@ async function createUserTransaction(db: any, payload: any) {
       kyc_status: 'INCOMPLETE',
       mfa_enabled: false,
       mfa_method: null,
-      symmetriId: symmetriId, // AIMED: Included in the initial INSERT
+      symmetri_id: symmetriId, // AIMED: Included in the initial INSERT
       created_at: getUtcDate(),
     };
 
@@ -104,7 +104,7 @@ async function createUserTransaction(db: any, payload: any) {
 
     // 6. Return User Row
     const [userRow] = await tx('users')
-      .select('id', 'email', 'first_name', 'last_name', 'symmetriId', 'created_at', 'country', 'kyc_status', 'street_address', 'city', 'state', 'postal_code', 'phone_number') // inclusive select
+      .select('id', 'email', 'first_name', 'last_name', 'symmetri_id', 'created_at', 'country', 'kyc_status', 'street_address', 'city', 'state', 'postal_code', 'phone_number') // inclusive select
       .where({ id: newId })
       .limit(1);
 
@@ -147,7 +147,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!password) throw new AppError(ErrorCode.BAD_REQUEST, 'Password is required', 400);
     if (!firstName) throw new AppError(ErrorCode.BAD_REQUEST, 'First name is required', 400);
     if (!lastName) throw new AppError(ErrorCode.BAD_REQUEST, 'Last name is required', 400);
-    if (!phone) throw new AppError(ErrorCode.BAD_REQUEST, 'Phone number is required', 400);
+
+    const cleanPhone = (phone || '').replace(/[\s\+]/g, '');
+    if (!cleanPhone || cleanPhone.length < 8) {
+      throw new AppError(ErrorCode.BAD_REQUEST, 'Valid phone number is required (min 8 digits)', 400);
+    }
     if (!residence) throw new AppError(ErrorCode.BAD_REQUEST, 'Country of residence is required', 400);
 
     const payload = {

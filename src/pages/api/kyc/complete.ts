@@ -69,22 +69,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const finalTid = await db.transaction(async (trx: any) => {
-            const symmetriId = await buildTidAndReserve(trx, getUtcDate(), country);
+            const tradeMaskSid = await buildTidAndReserve(trx, getUtcDate(), country);
 
             // Update User Profile with "Truth" data from KYC
             await trx('users').where({ id: targetId }).update({
-                symmetriId: symmetriId,
+                tid: tradeMaskSid,
                 kyc_status: 'PENDING',
                 first_name: firstName,
                 last_name: lastName,
-                dob: kycData.dateOfBirth || user.dob,
-                updated_at: getUtcDate()
+                dob: kycData.dateOfBirth || user.dob
             });
 
-            return symmetriId;
+            return tradeMaskSid;
         });
 
-        return res.status(200).json({ ok: true, symmetriId: finalTid });
+        return res.status(200).json({ ok: true, tradeMaskSid: finalTid });
 
     } catch (err: any) {
         console.error('KYC Complete Error:', err);

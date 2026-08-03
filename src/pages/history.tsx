@@ -62,7 +62,7 @@ export default function HistoryPage() {
                                 </button>
 
                                 <button
-                                    onClick={() => router.push('/amount-selection')}
+                                    onClick={() => router.push('/offers?from=EUR&to=DOP')}
                                     style={{
                                         padding: '12px 24px',
                                         border: 'none',

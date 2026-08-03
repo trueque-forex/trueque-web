@@ -1,0 +1,36 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum PayInMethod {
+  SPEI
+  CARD
+}
+
+enum PayOutRail {
+  RTP
+  SPEI
+  PUSH_TO_CARD
+}
+
+model Trade {
+  id                    String       @id @default(uuid())
+  
+  // Taker Logistics Captured at Checkout
+  taker_beneficiary_id  String
+  taker_pay_in_method   PayInMethod
+  taker_pay_out_rail    PayOutRail
+  taker_gross_total     Decimal      @db.Decimal(12, 4) 
+  
+  // Maker Logistics 
+  maker_beneficiary_id  String
+  maker_funding_token   String       
+  maker_gross_total     Decimal      @db.Decimal(12, 4)
+
+  created_at            DateTime     @default(now())
+  updated_at            DateTime     @updatedAt
+}

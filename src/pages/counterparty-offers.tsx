@@ -52,12 +52,24 @@ export default function CounterpartyOffers() {
 
         // Use SwapIntent or defaults
         const amount = swapIntent?.amount || 100000;
-        const cFrom = swapIntent?.currencyFrom || 'EUR';
-        const cTo = swapIntent?.currencyTo || 'ARS';
+        const cFrom = swapIntent?.source_currency || 'EUR';
+        const cTo = swapIntent?.target_currency || 'ARS';
 
         const fetchOffers = async () => {
             try {
-                const res = await fetch(`/api/offers?amount=${amount}&currencyFrom=${cFrom}&currencyTo=${cTo}`);
+                // 1. Explicitly define what the current user is offering and wanting.
+                const currentUserOffers = cFrom; 
+                const currentUserWants = cTo;    
+
+                // 2. Map those to the counterparty's required order book parameters.
+                // The counterparty must OFFER what the current user WANTS.
+                const searchCurrencyFrom = currentUserWants; 
+                // The counterparty must WANT what the current user OFFERS.
+                const searchCurrencyTo = currentUserOffers;  
+
+                // 3. Execute the fetch using the explicit search parameters.
+                const res = await fetch(`/api/offers?amount=${amount}&currencyFrom=${searchCurrencyFrom}&currencyTo=${searchCurrencyTo}`);
+
                 if (res.ok) {
                     const data = await res.json();
                     setOffers(data);
@@ -87,7 +99,7 @@ export default function CounterpartyOffers() {
         setSwapIntent({
             ...swapIntent!,
             provider: offer.provider,
-            rate: offer.marketRate,
+            exchange_rate: offer.marketRate,
             amount: offer.offerAmount // Lock to offer amount if slightly different
         });
 

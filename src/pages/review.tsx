@@ -98,6 +98,7 @@ export default function ReviewPage() {
   // State
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(MOCK_STORED_METHODS);
   const [selectedMethodId, setSelectedMethodId] = useState<string>('method_rtp');
+  const [payOutRail, setPayOutRail] = useState<string>((router.query.rail as string) || 'RTP');
   const [holidayModeCountry, setHolidayModeCountry] = useState<string | null>(null);
 
   // FETCH: Holiday Config
@@ -255,8 +256,12 @@ export default function ReviewPage() {
     const platformFee = principalSource * platformFeeRate;
 
     let outboundFee = 0;
-    if (deliveryMethod === 'card_push') outboundFee = principalSource * 0.015;
-    else if (deliveryMethod === 'wallet') outboundFee = 0.50;
+    const rtpFee = process.env.NEXT_PUBLIC_FEE_RTP ? parseFloat(process.env.NEXT_PUBLIC_FEE_RTP) : 0.50;
+    const speiFee = process.env.NEXT_PUBLIC_FEE_SPEI ? parseFloat(process.env.NEXT_PUBLIC_FEE_SPEI) : 0.05;
+    
+    if (payOutRail === 'PUSH_TO_CARD') outboundFee = principalSource * 0.015;
+    else if (payOutRail === 'SPEI') outboundFee = speiFee;
+    else if (payOutRail === 'RTP') outboundFee = rtpFee;
 
     // D. COMPLIANCE ENGINE (Dynamic Taxes)
     // FORCE UPDATE: Rename and Ensure 0.6% for ARS
@@ -358,7 +363,8 @@ export default function ReviewPage() {
         currencyTo: swapIntent?.target_currency || qTo,
         beneficiaryId: effectiveBeneficiary?.id,
         provider: swapIntent?.provider,
-        payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP'
+        payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
+        payOutRail: payOutRail
       };
 
       const res = await fetch('/api/swaps', {
@@ -417,7 +423,8 @@ export default function ReviewPage() {
     const isApproved = (s.kycStatus || '').toUpperCase() === 'APPROVED';
 
     if (!isApproved) {
-      const guard = validateSwapLimit ? validateSwapLimit(breakdown.totalToPaySource) : { allowed: true };
+      const dynamicSourceCurrency = String(effectiveSwapIntent?.source_currency || qFrom || 'USD').toUpperCase();
+      const guard = validateSwapLimit ? validateSwapLimit(breakdown.totalToPaySource, dynamicSourceCurrency) : { allowed: true };
       if (!guard.allowed) {
         alert(guard.reason || "Transaction limit exceeded.");
         return;
@@ -468,6 +475,21 @@ export default function ReviewPage() {
   const inputStyle: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ccc', backgroundColor: '#fff', fontSize: '14px' };
   
   const fromCurr = String(effectiveSwapIntent?.source_currency || qFrom || 'USD').toUpperCase();
+  const targetCurr = String(effectiveSwapIntent?.target_currency || qTo || 'ARS').toUpperCase();
+
+  const pct = (val: number) => breakdown.principalSource > 0 ? (val / breakdown.principalSource * 100).toFixed(2) + '%' : '0.00%';
+
+  const renderExchangeRate = (rateFromTo: number) => {
+    if (fromCurr === 'USD') {
+      return `1 USD = ${rateFromTo.toFixed(4)} ${targetCurr}`;
+    } else if (targetCurr === 'USD') {
+      return `1 USD = ${(1 / rateFromTo).toFixed(4)} ${fromCurr}`;
+    }
+    return `1 ${fromCurr} = ${rateFromTo.toFixed(4)} ${targetCurr}`;
+  };
+
+  const agreedRate = breakdown.principalSource > 0 ? breakdown.grossReceive / breakdown.principalSource : 0;
+  const effectiveRate = breakdown.totalToPaySource > 0 ? breakdown.grossReceive / breakdown.totalToPaySource : 0;
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: brandConfig.theme.fontFamily }}>
@@ -485,7 +507,8 @@ export default function ReviewPage() {
                 <option value="add_new">+ Add New Funding Method</option>
               </select>
             </div>
-            <div style={{ padding: '20px', borderRadius: '12px', background: 'linear-gradient(135deg, #f6f8f9 0%, #e5ebee 100%)', border: '1px solid #dcdde1', display: 'flex', alignItems: 'center', gap: '15px' }}>
+
+            <div style={{ padding: '15px 20px', borderRadius: '12px', background: 'linear-gradient(135deg, #f6f8f9 0%, #e5ebee 100%)', border: '1px solid #dcdde1', display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px' }}>
               <div style={{ fontSize: '24px' }}>{paymentMethods.find(m => m.id === selectedMethodId)?.type === 'RTP' ? '🏦' : '💳'}</div>
               <div>
                 <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>{paymentMethods.find(m => m.id === selectedMethodId)?.label}</div>
@@ -493,6 +516,15 @@ export default function ReviewPage() {
                   {paymentMethods.find(m => m.id === selectedMethodId)?.type === 'RTP' ? 'Linked Bank Account' : `${(paymentMethods.find(m => m.id === selectedMethodId)?.cardType || 'debit').toUpperCase()} ending in ${paymentMethods.find(m => m.id === selectedMethodId)?.last4}`}
                 </div>
               </div>
+            </div>
+
+            <div style={{ marginBottom: '25px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#34495e', fontSize: '14px' }}>Delivery Method (Pay-Out Rail)</label>
+              <select value={payOutRail} onChange={(e) => setPayOutRail(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #bdc3c7', fontSize: '16px', backgroundColor: 'white' }}>
+                <option value="RTP">Bank Transfer (RTP) - $0.50</option>
+                <option value="SPEI">SPEI (Mexico Transfer) - $0.05</option>
+                <option value="PUSH_TO_CARD">Push-to-Card - 1.5%</option>
+              </select>
             </div>
 
             {/* Add New Modal */}
@@ -665,18 +697,19 @@ export default function ReviewPage() {
             <div style={{ backgroundColor: '#fdfdfd', border: '1px solid #e1e8ed', borderRadius: '16px', padding: '24px' }}>
               <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#2c3e50' }}>Transaction Breakdown</h3>
 
-              {/* SACRED SWAP INTENT */}
+              {/* NON-SACRED SWAP INTENT */}
               <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '10px' }}>
-                <span>Swap Amount <span style={{ fontSize: '11px', color: '#7f8c8d', background: '#ecf0f1', padding: '2px 6px', borderRadius: '4px' }}>SACRED</span></span>
+                <span>Swap Amount</span>
                 <span style={{ fontWeight: '600', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.principalSource)}</span>
               </div>
 
               {/* SACRED RECEIVE */}
               <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '20px', color: '#27ae60' }}>
-                <span style={{ fontWeight: '600' }}>
-                  Beneficiary Receives (Sacred)
+                <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center' }}>
+                  Beneficiary Receives
+                  <span style={{ fontSize: '11px', color: '#27ae60', background: '#e8f8f5', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>SACRED</span>
                 </span>
-                <span style={{ fontWeight: '800' }}>{currencyFmt(breakdown.grossReceive)} {swapIntent?.target_currency || qTo || 'ARS'}</span>
+                <span style={{ fontWeight: '800' }}>{targetCurr} {currencyFmt(breakdown.grossReceive)}</span>
               </div>
 
               <div style={{ borderTop: '1px solid #eee', margin: '15px 0' }}></div>
@@ -686,7 +719,7 @@ export default function ReviewPage() {
               {/* ADDITIVE FEES Breakdown - 5 Core Fees */}
               {/* 1. Inbound (Percentage) */}
               <div style={rowStyle}>
-                <span>Inbound Cost ({(breakdown as any).inboundFee > 0 ? 'Variable' : 'Free'}) <Tooltip text="The cost your bank or local payment app charges to move your money into the system" /></span>
+                <span>Inbound Cost ({(breakdown as any).inboundFee > 0 ? 'Variable' : 'Free'}) <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.inboundFee)}</span> <Tooltip text="The cost your bank or local payment app charges to move your money into the system" /></span>
                 <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.inboundFee)}</span>
               </div>
 
@@ -700,31 +733,31 @@ export default function ReviewPage() {
 
               {/* 3. Premium / Liquidity */}
               {breakdown.liquidityFee > 0 && <div style={rowStyle}>
-                <span>Instant Liquidity <Tooltip text="This covers the cost for the independent Gateway institution to advance money to your recipient immediately, even if your bank or card takes days to finish the transfer" /></span>
+                <span>Instant Liquidity <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.liquidityFee)}</span> <Tooltip text="This covers the cost for the independent Gateway institution to advance money to your recipient immediately, even if your bank or card takes days to finish the transfer" /></span>
                 <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.liquidityFee)}</span>
               </div>}
 
               {/* 4. Gateway */}
               <div style={rowStyle}>
-                <span>Gateway Processing <Tooltip text="A small fee paid to an independent financial institution (the 'Gateway') that handles your money. This institution acts as a buffer to ensure your personal bank details are never shared directly with the recipient or their bank" /></span>
+                <span>Gateway Processing <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.gatewayFee)}</span> <Tooltip text="A small fee paid to an independent financial institution (the 'Gateway') that handles your money. This institution acts as a buffer to ensure your personal bank details are never shared directly with the recipient or their bank" /></span>
                 <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.gatewayFee)}</span>
               </div>
 
               {/* 5. Service / Platform */}
               <div style={rowStyle}>
-                <span>Platform Fee <Tooltip text="The cost for using the Symmetri app to find the best market rate and organize your swap from start to finish" /></span>
+                <span>Platform Fee <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.platformFee)}</span> <Tooltip text="The cost for using the Symmetri app to find the best market rate and organize your swap from start to finish" /></span>
                 <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.platformFee)}</span>
               </div>
 
                 <div style={rowStyle}>
-                  <span>Outbound Cost (Delivery) <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
+                  <span>Outbound Cost (Delivery) <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.outboundFee)}</span> <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
                   <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.outboundFee)}</span>
                 </div>
 
               {/* DYNAMIC COMPLIANCE TAXES */}
               {breakdown.appliedTaxes.map((tax, i) => (
                 <div key={i} style={rowStyle}>
-                  <span>{tax.label} <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Symmetri does not receive or handle these funds" /></span>
+                  <span>{tax.label} <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(tax.amountSource)}</span> <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Symmetri does not receive or handle these funds" /></span>
                   <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(tax.amountSource)}</span>
                 </div>
               ))}
@@ -747,14 +780,32 @@ export default function ReviewPage() {
                 <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>Total You Pay</span>
                 <span style={{ fontSize: '24px', fontWeight: '800', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.totalToPaySource)}</span>
               </div>
-            </div>
 
-            <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #dcdde1', textAlign: 'center' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: '700', color: '#2c3e50', marginBottom: '6px' }}>
-                Agreed Exchange Rate: 1 {fromCurr} = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.principalSource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '13px', fontWeight: 'normal', color: '#7f8c8d' }}>(secured via P2P match)</span>
-              </div>
-              <div style={{ fontSize: '0.95rem', fontWeight: '600', color: '#34495e' }}>
-                Effective Exchange Rate: 1 {fromCurr} = {(breakdown.principalSource > 0 ? (breakdown.grossReceive / breakdown.totalToPaySource).toFixed(2) : '0.00')} {swapIntent?.target_currency || qTo || 'ARS'} <span style={{ fontSize: '12px', fontWeight: 'normal', color: '#7f8c8d' }}>(After fees)</span>
+              {/* EXCHANGE RATES */}
+              <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
+                    Agreed Exchange Rate 
+                    <Tooltip text="The base rate secured via P2P match before fees" />
+                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
+                      {renderExchangeRate(agreedRate)}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#475569' }}>
+                    Effective Exchange Rate 
+                    <Tooltip text="The true rate you are getting when all friction and fees are accounted for" />
+                  </span>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>
+                      {renderExchangeRate(effectiveRate)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -777,19 +828,32 @@ export default function ReviewPage() {
               >
                 Back
               </button>
-              <button
-                onClick={handleConfirm}
-                disabled={loading}
-                style={{
-                  flex: 2, padding: '14px', borderRadius: '10px',
-                  border: 'none', backgroundColor: brandConfig.theme.actionColor, // Symmetri Blue
-                  color: 'white', fontWeight: 'bold', cursor: 'pointer',
-                  opacity: loading ? 0.7 : 1, fontSize: '16px',
-                  boxShadow: loading ? 'none' : `0 4px 15px ${brandConfig.theme.actionColor}4D`
-                }}
-              >
-                {loading ? 'Processing...' : `Confirm & Swap ${fromCurr} ${currencyFmt(breakdown.totalToPaySource)}`}
-              </button>
+              {effectiveBeneficiary?.id ? (
+                <button
+                  onClick={handleConfirm}
+                  disabled={loading}
+                  style={{
+                    flex: 2, padding: '14px', borderRadius: '10px',
+                    backgroundColor: brandConfig.theme.actionColor,
+                    color: 'white', fontWeight: 'bold', cursor: loading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s', border: 'none', fontSize: '16px'
+                  }}
+                >
+                  {loading ? 'Processing...' : 'Confirm'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push(`/beneficiary-selection?rail=${payOutRail}`)}
+                  style={{
+                    flex: 2, padding: '14px', borderRadius: '10px',
+                    backgroundColor: brandConfig.theme.actionColor,
+                    color: 'white', fontWeight: 'bold', cursor: 'pointer',
+                    transition: 'all 0.2s', border: 'none', fontSize: '16px'
+                  }}
+                >
+                  Proceed to Beneficiary →
+                </button>
+              )}
             </div>
 
             {/* Cancel Transaction Link */}

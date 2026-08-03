@@ -4,7 +4,7 @@ import { generateSymmetriId } from './generateSymmetriId';
 
 console.error('🧪 [TruequeIssuer] module loaded:', __filename, 'pid=', process.pid);
 
-export async function issueSymmetriId(userId: string, countryCode: string): Promise<{ symmetri_id: string }> {
+export async function issueSymmetriId(userId: string, countryCode: string): Promise<{ trade_mask_sid: string }> {
   console.error('🧪 [TruequeIssuer] enter:', userId, 'pid=', process.pid, 'time=', new Date().toISOString());
 
   const now = new Date();
@@ -23,10 +23,10 @@ export async function issueSymmetriId(userId: string, countryCode: string): Prom
       await client.query('ROLLBACK');
       throw new Error(`User not found: ${userId}`);
     }
-    if (user.symmetriId) {
+    if (user.tid) {
       await client.query('ROLLBACK');
-      console.error('🧪 [TruequeIssuer] already issued:', userId, 'symmetriId=', user.symmetriId);
-      return { symmetri_id: user.symmetriId };
+      console.error('🧪 [TruequeIssuer] already issued:', userId, 'tradeMaskSid=', user.tid);
+      return { trade_mask_sid: user.tid };
     }
 
     const dayKey = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -52,22 +52,22 @@ export async function issueSymmetriId(userId: string, countryCode: string): Prom
     }
 
     // generateSymmetriId currently expects no arguments according to TS
-    const symmetriId = generateSymmetriId();
+    const tradeMaskSid = generateSymmetriId();
 
-    console.error('🧪 [TruequeIssuer] about to update users row:', userId, 'symmetriId=', symmetriId, 'kyc_now=', now.toISOString());
+    console.error('🧪 [TruequeIssuer] about to update users row:', userId, 'tradeMaskSid=', tradeMaskSid, 'kyc_now=', now.toISOString());
 
     await client.query(
       `UPDATE users
-       SET symmetriId = $1, kyc_verified_at = $2, kyc_status = $3
+       SET tid = $1, kyc_verified_at = $2, kyc_status = $3
        WHERE id = $4`,
-      [symmetriId, now.toISOString(), 'approved', userId]
+      [tradeMaskSid, now.toISOString(), 'approved', userId]
     );
 
     // console.error('🧪 [TruequeIssuer] update executed for:', userId);
     // Note: kyc_audit table is currently missing in DB. Skipping audit log.
 
     await client.query('COMMIT');
-    return { symmetri_id: symmetriId };
+    return { trade_mask_sid: tradeMaskSid };
   } catch (err) {
     try {
       await client.query('ROLLBACK');

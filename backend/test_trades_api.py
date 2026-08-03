@@ -6,7 +6,8 @@ from backend.main import app
 from backend.database import Base, get_db
 from backend.models.transaction import Transaction, Beneficiary
 from backend.models.offer_model import Offer
-from backend.models.user_model import User
+from backend.models.user import User
+from backend.models.gateway import InstitutionalGateway
 import uuid
 from datetime import datetime, timezone
 
@@ -34,14 +35,28 @@ def db_session():
     db.close()
 
 def test_get_trade_details_offer(db_session):
+    # 0. Create mock gateway
+    gw = InstitutionalGateway(
+        id=uuid.uuid4(),
+        currency="EUR",
+        is_active=True,
+        payment_details={"bank": "Test Bank"},
+        instruction_template="Send to {{bank}} with ref {{reference}}",
+        rail_type="SPEI"
+    )
+    db_session.add(gw)
+
     # 1. Create a mock offer
-    offer_uuid = str(uuid.uuid4())
+    offer_uuid = uuid.uuid4()
+    owner_uuid = uuid.uuid4()
     new_offer = Offer(
-        uuid=offer_uuid,
-        owner_id="test-user-id",
-        amount_offered="100.00",
-        currency_from="EUR",
-        currency_to="ARS",
+        id=offer_uuid,
+        owner_id=owner_uuid,
+        amount="100.00",
+        source_currency="EUR",
+        target_currency="ARS",
+        amount_received="100000.00",
+        exchange_rate="1000.0",
         status="PENDING"
     )
     db_session.add(new_offer)
@@ -51,26 +66,29 @@ def test_get_trade_details_offer(db_session):
     response = client.get(f"/api/trades/details/{offer_uuid}")
     assert response.status_code == 200
     data = response.json()
-    assert data["id"] == offer_uuid
+    assert data["id"] == str(offer_uuid)
     assert data["type"] == "SYNTHETIC"
     assert data["status"] == "PENDING"
 
 def test_signal_funding_offer(db_session):
     # 1. Create a mock offer
-    offer_uuid = str(uuid.uuid4())
+    offer_uuid = uuid.uuid4()
+    owner_uuid = uuid.uuid4()
     new_offer = Offer(
-        uuid=offer_uuid,
-        owner_id="test-user-id",
-        amount_offered="100.00",
-        currency_from="EUR",
-        currency_to="ARS",
+        id=offer_uuid,
+        owner_id=owner_uuid,
+        amount="100.00",
+        source_currency="EUR",
+        target_currency="ARS",
+        amount_received="100000.00",
+        exchange_rate="1000.0",
         status="PENDING"
     )
     db_session.add(new_offer)
     db_session.commit()
 
     # 2. Signal funding
-    response = client.post("/api/trades/signal-funding", json={"trade_id": offer_uuid})
+    response = client.post("/api/trades/signal-funding", json={"trade_id": str(offer_uuid)})
     assert response.status_code == 200
     assert response.json()["success"] is True
     assert response.json()["status"] == "FUNDING_SIGNALED"

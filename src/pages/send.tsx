@@ -21,23 +21,8 @@ export default function SendPage() {
         }
         sessionStorage.removeItem('trueque_swap_state');
         sessionStorage.removeItem('smart_intent');
-        try {
-            const res = await fetch('/api/drafts');
-            const data = await res.json();
-            const drafts = Array.isArray(data) ? data : (data.drafts || []);
-            const activeDraft = drafts.find((d: any) => d.status === 'DRAFT');
-            if (activeDraft) {
-                router.push({ pathname: '/amount-selection', query: { draftId: activeDraft.id } });
-            } else {
-                const createRes = await fetch('/api/drafts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
-                if (createRes.ok) {
-                    const createData = await createRes.json();
-                    router.push({ pathname: '/amount-selection', query: { draftId: createData.id || createData.draft_id } });
-                }
-            }
-        } catch {
-            router.push('/amount-selection');
-        }
+        
+        router.push('/offers?from=EUR&to=DOP');
     };
 
     return (

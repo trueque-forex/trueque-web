@@ -14,7 +14,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = (req as any).session as TruequeSession;
   const takerId = session.user.id; // taker identity from JWT — never from req.body
 
-  const { offer_id } = req.body;
+  const { offer_id, taker_beneficiary_id, taker_pay_in_method, taker_pay_out_rail, taker_gross_total } = req.body;
   if (!offer_id) {
     return res.status(400).json({ error: 'Missing offer_id' });
   }
@@ -22,10 +22,18 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const { match, trade } = await transaction(async (client) => {
       // 1. Lock the offer row — prevents race conditions
-      const offerRes = await client.query(
-        `SELECT * FROM offers WHERE id = $1 FOR UPDATE`,
-        [offer_id]
-      );
+      let offerRes;
+      try {
+        offerRes = await client.query(
+          `SELECT * FROM offers WHERE id = $1 FOR UPDATE NOWAIT`,
+          [offer_id]
+        );
+      } catch (err: any) {
+        if (err.code === '55P03' || err.message.includes('could not obtain lock')) {
+          throw new Error('Offer is currently being matched by another user');
+        }
+        throw err;
+      }
       const offer = offerRes.rows[0];
 
       if (!offer) throw new Error('Offer not found');
@@ -64,7 +72,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       await client.query(`UPDATE offers SET status = 'MATCHED', updated_at = NOW() WHERE id = $1`, [offer_id]);
 
       // 5. Create the Trade record (the settled view used by Trade Room)
-      const totalToPay = parseFloat(offer.amount_wanted) + symmetriSwapFee;
+      const totalToPay = taker_gross_total ? parseFloat(taker_gross_total) : (parseFloat(offer.amount_wanted) + symmetriSwapFee);
+      const totalFees = taker_gross_total ? (totalToPay - parseFloat(offer.amount_wanted)) : symmetriSwapFee;
+      
       const tradeRes = await client.query(
         `INSERT INTO trades (
           match_id, maker_id, taker_id,
@@ -72,9 +82,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           received_amount, received_currency,
           final_rate, symmetri_swap_fee,
           total_fees, total_to_pay,
-          payment_instructions, type, status
+          payment_instructions, type, status,
+          taker_beneficiary_id, taker_pay_in_method, taker_pay_out_rail, taker_gross_total
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'DIRECT', 'PENDING_SETTLEMENT')
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'DIRECT', 'PENDING_SETTLEMENT', $13, $14, $15, $16)
         RETURNING *`,
         [
           newMatch.id,
@@ -86,13 +97,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           offer.currency_offered,            // taker's receive currency
           offer.exchange_rate,
           symmetriSwapFee,
-          symmetriSwapFee,                   // total_fees = symmetri fee (rail fee added by gateway later)
-          totalToPay.toFixed(4),
+          totalFees,                         // total_fees = computed total fees
+          totalToPay.toFixed(4),             // total_to_pay = computed gross total
           JSON.stringify({
-            rail: 'RTP',
+            rail: taker_pay_out_rail || 'RTP',
             concept_code: `TRQ-${newMatch.id.slice(0, 8).toUpperCase()}`,
             reference: `Symmetri swap ${newMatch.id}`,
           }),
+          taker_beneficiary_id || null,
+          taker_pay_in_method || null,
+          taker_pay_out_rail || null,
+          totalToPay.toFixed(4)
         ]
       );
 

@@ -139,50 +139,9 @@ export default function Dashboard() {
         sessionStorage.removeItem('trueque_swap_state');
         sessionStorage.removeItem('smart_intent');
 
-        // --- 2. DRAFT LOGIC (Priority 2: Intent Tracking) ---
-        // "Once the user passes the Empty Profile Block..."
-
-        try {
-            // A. Check Active Draft
-            const res = await fetch('/api/drafts');
-            const data = await res.json();
-
-            // Handle array response from proximal API
-            const drafts = Array.isArray(data) ? data : (data.drafts || []);
-            const activeDraft = drafts.find((d: any) => d.status === 'DRAFT');
-
-            if (activeDraft) {
-                // RESUME
-                console.log('[Draft Logic] Resuming active draft:', activeDraft.id);
-                // Redirect to wizard with draft ID
-                router.push({
-                    pathname: '/amount-selection',
-                    query: { draftId: activeDraft.id }
-                });
-            } else {
-                // NEW DRAFT
-                console.log('[Draft Logic] Creating new draft');
-                const createRes = await fetch('/api/drafts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ step: 'initial', data: {} })
-                });
-
-                if (createRes.ok) {
-                    const createData = await createRes.json();
-                    router.push({
-                        pathname: '/amount-selection',
-                        query: { draftId: createData.id || createData.draft_id }
-                    });
-                } else {
-                    console.error('Failed to create draft');
-                    alert("System Error: Could not initialize transaction. Please contact support.");
-                }
-            }
-        } catch (e) {
-            console.error('[Draft Logic] Check failed', e);
-            alert("Network Error. Please try again.");
-        }
+        // --- 2. HANDOFF TO MARKET (Discovery Flow) ---
+        console.log('[Routing] Redirecting to market discovery with default corridor.');
+        router.push('/offers?from=EUR&to=DOP');
     };
 
     return (
@@ -270,41 +229,7 @@ export default function Dashboard() {
 
                     {/* RIGHT COLUMN: ONGOING & RECENT ACTIVITY */}
                     <div>
-                        {/* SAVED DRAFTS — only shown when the draft has meaningful data (amount entered) */}
-                        {drafts.filter((d: any) => d.data?.amount).length > 0 && (
-                            <section style={{ marginBottom: '30px' }}>
-                                <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Resume Where You Left Off</h3>
-                                <div style={{ display: 'grid', gap: '15px' }}>
-                                    {drafts.filter((d: any) => d.data?.amount).map((draft: any) => (
-                                        <div key={draft.id} style={{
-                                            backgroundColor: '#f0f7ff',
-                                            padding: '15px',
-                                            borderRadius: '10px',
-                                            cursor: 'pointer',
-                                            border: '1px solid #cce3ff',
-                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                                        }} onClick={() => {
-                                            router.push({
-                                                pathname: '/amount-selection',
-                                                query: {
-                                                    amount: draft.data.amount,
-                                                    recipient: draft.data.recipient,
-                                                    draftId: draft.id
-                                                }
-                                            });
-                                        }}>
-                                            <div>
-                                                <div style={{ fontWeight: '600', color: '#0050b3' }}>Resume Swap</div>
-                                                <div style={{ fontSize: '13px', color: '#1A73E8' }}>
-                                                    {draft.data.amount} {draft.data.source_currency || draft.data.corridor || 'USD'} → {draft.data.target_currency || draft.data.recipient || 'In progress'}
-                                                </div>
-                                            </div>
-                                            <span style={{ fontSize: '20px', color: '#1A73E8' }}>→</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-                        )}
+
 
                         <h3 style={{ color: '#34495e', marginBottom: '15px' }}>Recent Swaps</h3>
                         <div style={{ backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 15px rgba(0,0,0,0.05)', marginBottom: '30px' }}>

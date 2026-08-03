@@ -250,7 +250,8 @@ export default function SwapSummaryPage() {
         const isApproved = (s.kycStatus || '').toUpperCase() === 'APPROVED';
 
         if (!isApproved) {
-            const guard = validateSwapLimit ? validateSwapLimit(breakdown.totalToPaySource) : { allowed: true };
+            const dynamicSourceCurrency = String(swapIntent?.source_currency || 'USD').toUpperCase();
+            const guard = validateSwapLimit ? validateSwapLimit(breakdown.totalToPaySource, dynamicSourceCurrency) : { allowed: true };
             if (!guard.allowed) {
                 alert(guard.reason || "Transaction limit exceeded.");
                 return;

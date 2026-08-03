@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 export default function SignupSuccessPage() {
     const router = useRouter();
-    const [symmetriId, setTruequeId] = useState<string>('');
+    const [symmetriId, setSymmetriId] = useState<string>('');
     const [userName, setUserName] = useState<string>('');
 
     useEffect(() => {
@@ -12,7 +12,7 @@ export default function SignupSuccessPage() {
         if (sessionData) {
             try {
                 const session = JSON.parse(sessionData);
-                setTruequeId(session.symmetriId || session.symmetriId || '');
+                setSymmetriId(session.symmetriId || session.symmetriId || '');
                 setUserName(session.firstName || 'User');
             } catch (e) {
                 console.error('Error parsing session data', e);

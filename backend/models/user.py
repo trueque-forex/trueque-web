@@ -17,7 +17,7 @@ class User(Base):
         # GEMINI.md §2.1 — symmetri_id must start with '@'
         CheckConstraint("symmetri_id LIKE '@%'", name="symmetri_id_at_prefix"),
         # GEMINI.md §3.2 — trade_mask_sid is exactly 16 chars
-        CheckConstraint("trade_mask_sid IS NULL OR LENGTH(trade_mask_sid) = 16", name="trade_mask_sid_length"),
+        CheckConstraint("tid IS NULL OR LENGTH(tid) = 16", name="trade_mask_sid_length"),
         {'extend_existing': True},
     )
 
@@ -28,7 +28,7 @@ class User(Base):
     symmetri_id = Column(String, unique=True, nullable=False, index=True)
 
     # GEMINI.md §3.2 — Trade Room SID, issued at KYC submission (PENDING state)
-    trade_mask_sid = Column(String(16), unique=True, nullable=True, index=True)
+    trade_mask_sid = Column("tid", String(16), unique=True, nullable=True, index=True)
 
     # Auth & identity
     email = Column(String, unique=True, nullable=False, index=True)

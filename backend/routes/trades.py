@@ -19,15 +19,20 @@ def hydrate_instructions(template: str, details: dict, reference: str):
         text = text.replace(f"{{{{{key}}}}}", str(value))
     return text
 
-@router.get("/details")
-def get_trade_details(id: str = Query(...), db: Session = Depends(get_db)):
+@router.get("/details/{id}")
+def get_trade_details(id: str, db: Session = Depends(get_db)):
+    try:
+        uuid_id = uuid.UUID(id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
     # 1. Fetch the Trade (Corrected for REAL schema)
-    trade = db.query(Transaction).filter(Transaction.id == id).first()
+    trade = db.query(Transaction).filter(Transaction.id == uuid_id).first()
     
     is_offer = False
     if not trade:
         # In the real DB, 'id' in 'offers' might be the UUID string
-        trade = db.query(Offer).filter(Offer.id == id).first()
+        trade = db.query(Offer).filter(Offer.id == uuid_id).first()
         is_offer = True
         if not trade:
             raise HTTPException(status_code=404, detail="Trade or Offer not found")
@@ -93,13 +98,18 @@ def signal_funding(
     trade_id: str = Body(..., embed=True), 
     db: Session = Depends(get_db)
 ):
-    tx = db.query(Transaction).filter(Transaction.id == trade_id).first()
+    try:
+        uuid_id = uuid.UUID(trade_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID")
+
+    tx = db.query(Transaction).filter(Transaction.id == uuid_id).first()
     if tx:
         tx.status = 'FUNDING_SIGNALED'
         db.commit()
         return {"success": True, "status": tx.status}
     
-    offer = db.query(Offer).filter(Offer.id == trade_id).first()
+    offer = db.query(Offer).filter(Offer.id == uuid_id).first()
     if offer:
         offer.status = 'FUNDING_SIGNALED'
         db.commit()

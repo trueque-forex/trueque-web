@@ -15,6 +15,7 @@ export interface UserDB {
   phone_number: string;
   created_at: string;
   symmetriId?: string;
+  tid?: string;
 }
 
 export function mapUserToUI(row: UserDB) {
@@ -25,6 +26,7 @@ export function mapUserToUI(row: UserDB) {
     firstName: row.first_name || "",
     lastName: row.last_name || "",
     symmetriId: row.symmetri_id || row.symmetriId || "NOT_ISSUED",
+    tradeMaskSid: row.tid || "NOT_ISSUED",
     countryCode: row.country || "US",
     // UI expects 'kycStatus', mapped from DB 'status'
     kycStatus: (row.status || "incomplete").toUpperCase(), 

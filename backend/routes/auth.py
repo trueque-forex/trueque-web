@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from sqlalchemy import text
 import bcrypt
 from backend.database import SessionLocal
@@ -42,6 +42,22 @@ class WebSignupPayload(BaseModel):
     country_of_residence: str
     country_destiny: str
     address: str | None = None
+
+    @validator("dob")
+    def validate_dob(cls, v):
+        try:
+            dob_date = datetime.strptime(v, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError("Invalid date format, expected YYYY-MM-DD")
+        
+        today = datetime.now(timezone.utc).date()
+        age = today.year - dob_date.year - ((today.month, today.day) < (dob_date.month, dob_date.day))
+        
+        if age > 100:
+            raise ValueError("Age cannot exceed 100 years.")
+        if age < 18:
+            raise ValueError("User must be at least 18 years old.")
+        return v
 
 @router.post("/auth/signup")
 def web_signup(payload: WebSignupPayload):

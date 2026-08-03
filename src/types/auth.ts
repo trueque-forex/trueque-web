@@ -4,7 +4,7 @@ export interface SessionUser {
     kycStatus: string; // Standardized: camelCase (mapped from kyc_status)
     userType: 'PEER' | 'MERCHANT';
     symmetriId?: string;      // Optional: included for traceability
-    symmetriId?: string; // Friendly name for ID display
+    tradeMaskSid?: string; // Friendly name for ID display
     firstName?: string;
     lastName?: string;
     name?: string; // Full name helper

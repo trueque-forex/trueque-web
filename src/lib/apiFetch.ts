@@ -114,7 +114,7 @@ export default async function apiFetch<T = any>(
   try {
     // best-effort logging for local debugging
     // eslint-disable-next-line no-console
-    console.error('apiFetch throwing', JSON.stringify(apiErr, null, 2));
+    console.warn('apiFetch throwing', JSON.stringify(apiErr, null, 2));
   } catch { }
 
   throw err;

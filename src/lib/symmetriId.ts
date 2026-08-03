@@ -27,7 +27,7 @@ export function generateSymmetriId(date: Date, countryCode: string, seq: number)
   return `${payload}${checksum}`;
 }
 
-export function parseTruequeId(id: string): { countryCode: string; seq: number } | null {
+export function parseTradeMaskSid(id: string): { countryCode: string; seq: number } | null {
   if (!id || id.length !== 16 || !id.startsWith('S')) {
     return null;
   }
@@ -42,8 +42,8 @@ export function parseTruequeId(id: string): { countryCode: string; seq: number }
   return { countryCode: cc, seq };
 }
 
-export function validateTruequeId(id: string): boolean {
-  if (!parseTruequeId(id)) {
+export function validateTradeMaskSid(id: string): boolean {
+  if (!parseTradeMaskSid(id)) {
     return false;
   }
   const payload = id.slice(0, 15);

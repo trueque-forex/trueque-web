@@ -83,7 +83,7 @@ async function handler(
     if (!trade_mask_sid) {
       try {
         const issuance = await issueSymmetriIdForUser(ownerId, fields.country || 'XX');
-        trade_mask_sid = issuance?.symmetri_id ?? null;
+        trade_mask_sid = issuance?.trade_mask_sid ?? null;
         console.log('✅ SID issued at KYC submission:', { ownerId, trade_mask_sid });
       } catch (err) {
         // Non-fatal: SID issuance will be retried on /api/kyc/status check

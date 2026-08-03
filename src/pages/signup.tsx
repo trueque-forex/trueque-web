@@ -111,7 +111,7 @@ export default function SignupPage(): React.JSX.Element {
     if (!form.email) errors.email = 'Email required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) errors.email = 'Invalid email';
 
-    if (!phoneNumber || phoneNumber.length < 8) errors.phone = 'Phone required';
+    if (!phoneNumber || phoneNumber.trim().length < 8) errors.phone = 'Phone required (min 8 digits)';
 
     const passwordRegex = /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
     if (!form.password) errors.password = 'Password required';

@@ -166,7 +166,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
                             localStorage.setItem('trueque_saved_beneficiaries', JSON.stringify(mapped));
                         }
                     })
-                    .catch(err => console.error("Failed to fetch beneficiaries", err)); // apiFetch throws on error
+                    .catch(err => console.warn("Failed to fetch beneficiaries", err)); // apiFetch throws on error
             });
         }
     }, [user]);

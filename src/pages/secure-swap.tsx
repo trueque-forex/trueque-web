@@ -294,15 +294,15 @@ export default function SecureSwapPage() {
                             <div style={{ textAlign: 'center', padding: '20px 0' }}>
                                 <div style={{ fontSize: '50px', marginBottom: '20px', color: '#27ae60' }}>🛡️</div>
                                 <h2 style={{ color: '#2c3e50', marginBottom: '15px' }}>
-                                    {fundingStatus === 'PEER_CONFIRMED' ? 'Peer Match Secured!' : 'Swap Secured! Locking Liquidity...'}
+                                    {fundingStatus === 'PEER_CONFIRMED' ? 'Liquidity Secured!' : 'Swap Secured! Locking Liquidity...'}
                                 </h2>
                                 <p style={{ fontSize: '16px', lineHeight: '1.6', color: '#34495e', marginBottom: '30px' }}>
                                     {fundingStatus === 'PEER_CONFIRMED'
-                                        ? 'The Liquidity Provider has successfully locked their funds. Your swap is now fully secured and instant delivery has been initiated.'
+                                        ? 'The automated Gateway has successfully secured the Maker\'s pre-authorized liquidity. Your swap is now fully secured and instant delivery has been initiated.'
                                         : (
                                             <>
                                                 We have received your <span style={{ fontWeight: 'bold' }}>{txData.currency} {txData.total.toFixed(2)}</span>.
-                                                Waiting for domestic verification from your peer...
+                                                The Gateway is verifying the Maker's pre-funded liquidity...
                                             </>
                                         )
                                     }
@@ -325,8 +325,8 @@ export default function SecureSwapPage() {
                                 <div style={{ fontSize: '50px', marginBottom: '20px' }}>🚫</div>
                                 <h2 style={{ color: '#e74c3c', marginBottom: '15px' }}>Swap Timed Out</h2>
                                 <p style={{ fontSize: '16px', lineHeight: '1.6', color: '#34495e' }}>
-                                    The Peer failed to match in time.
-                                    Your <strong>€{txData.total.toFixed(2)}</strong> is being instantly returned to your Source Account.
+                                    The Gateway was unable to secure the Maker's pre-authorized liquidity in time.
+                                    Your <strong>{txData.currency} {txData.total.toFixed(2)}</strong> is being instantly returned to your Source Account.
                                 </p>
                             </div>
                         )}
@@ -369,10 +369,10 @@ export default function SecureSwapPage() {
                                         display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold',
                                         color: (fundingStatus === 'VERIFIED' || fundingStatus === 'PEER_CONFIRMED') ? ((fundingStatus === 'PEER_CONFIRMED') ? '#27ae60' : '#f39c12') : '#bdc3c7'
                                     }}>
-                                        <span>Peer's Leg (LP)</span>
+                                        <span>Maker's Leg (LP)</span>
                                         <span>
-                                            {fundingStatus === 'VERIFIED' && 'Awaiting Peer...'}
-                                            {fundingStatus === 'PEER_CONFIRMED' && 'Peer Verified ✓'}
+                                            {fundingStatus === 'VERIFIED' && 'Verifying Liquidity...'}
+                                            {fundingStatus === 'PEER_CONFIRMED' && 'Liquidity Secured ✓'}
                                             {fundingStatus === 'AWAITING_RTP' && 'Waiting Secure'}
                                         </span>
                                     </div>
@@ -387,8 +387,8 @@ export default function SecureSwapPage() {
                             <div style={{ marginTop: '25px', padding: '15px', background: '#f0f2f5', borderRadius: '10px', fontSize: '12px', color: '#7f8c8d', lineHeight: '1.5' }}>
                                 <strong>Safety Note:</strong> {
                                     (fundingStatus === 'VERIFIED' || fundingStatus === 'PEER_CONFIRMED')
-                                        ? `Your funds are safely locked in escrow. If the peer does not complete their leg before the timer expires, your €${txData.total.toFixed(2)} will be instantly returned to your bank account.`
-                                        : "Your funds are held in the secure gateway until the Peer (LP) proves liquidity. If the match fails, you are instantly refunded."
+                                        ? `Your funds are safely locked in escrow. If the Gateway cannot secure the Maker's automated leg, your ${txData.currency} ${txData.total.toFixed(2)} will be instantly returned to your bank account.`
+                                        : "Your funds are held in the secure gateway while we verify the Maker's pre-authorized liquidity. If the match fails, you are instantly refunded."
                                 }
                             </div>
                         </div>

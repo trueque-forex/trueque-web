@@ -20,5 +20,14 @@ class Offer(Base):
     fee_total = Column(Numeric(precision=20, scale=4), nullable=True)
     fee_details = Column(JSON, nullable=True)
     expires_at = Column(TIMESTAMP(timezone=True), nullable=True)
-    status = Column(String, default="open")
+    status = Column(String, default="DRAFT")
     is_public = Column(Boolean, default=True)
+
+    # Step 2: The Destination
+    destination_id = Column(Integer, ForeignKey("recipient_profiles.id"), nullable=True)
+
+    # Step 3: The Funding & Tokenization
+    funding_account_id = Column(PG_UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=True)
+    adyen_stored_payment_id = Column(String, nullable=True)
+    adyen_psp_reference = Column(String, nullable=True)
+    funding_status = Column(String, default="pending") # e.g. pending, authorized, failed

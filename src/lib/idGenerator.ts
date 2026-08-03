@@ -6,7 +6,7 @@
  * @param countryCode - The 2-letter ISO country code (e.g., 'ES', 'MX')
  * @returns The formatted Trueque ID string
  */
-export const generateTruequeID = (countryCode: string = 'XX'): string => {
+export const generateTradeMaskSid = (countryCode: string = 'XX'): string => {
     const date = new Date();
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
