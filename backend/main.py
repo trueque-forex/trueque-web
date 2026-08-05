@@ -49,3 +49,6 @@ app.include_router(kyc.router)
 app.include_router(compliance.router)
 app.include_router(admin.router)
 app.include_router(beneficiaries.router)
+from backend.routes import merchants
+app.include_router(merchants.router)
+

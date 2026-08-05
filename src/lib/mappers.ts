@@ -14,6 +14,7 @@ export interface UserDB {
   status: string;           // DB Truth: 'status' (legacy)
   phone_number: string;
   created_at: string;
+  user_type: string;
   symmetriId?: string;
   tid?: string;
 }
@@ -30,6 +31,7 @@ export function mapUserToUI(row: UserDB) {
     countryCode: row.country || "US",
     // UI expects 'kycStatus', mapped from DB 'status'
     kycStatus: (row.status || "incomplete").toUpperCase(), 
+    userType: (row.user_type || 'PEER') as 'PEER' | 'MERCHANT' | 'ADMIN',
     phone: row.phone_number || "",
     joinedAt: new Date(row.created_at).toISOString(),
   };

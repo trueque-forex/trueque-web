@@ -81,7 +81,7 @@ export async function createSession(user: any, mfaVerified = false) {
     email: user.email,
     // Map snake_case (DB) to camelCase (Session) if needed, but prefer explicit inputs.
     kycStatus: user.kyc_status || user.kycStatus || 'NONE',
-    userType: (user.user_type === 'MERCHANT' || user.userType === 'MERCHANT') ? 'MERCHANT' : 'PEER',
+    userType: user.userType || user.user_type || 'PEER',
     symmetriId: user.symmetriId,
     firstName: user.first_name || user.firstName,
     lastName: user.last_name || user.lastName,

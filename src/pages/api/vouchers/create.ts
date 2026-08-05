@@ -52,7 +52,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         destination_currency: destCurrency,
         amount_origin: amountNum,
         retailer_id: retailer_id,
-        payment_success_token: "tok_simulated_success", // Simulated token for Synchronous Lock
+        payment_success_token: `tok_simulated_success_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         beneficiary_id: null
     };
 

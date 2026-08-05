@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from ..services.fx_consensus import FXConsensusService
@@ -10,7 +10,11 @@ import os
 import json
 from datetime import datetime
 
-router = APIRouter(prefix="/api/admin", tags=["Admin"])
+async def verify_internal_key(x_symmetri_internal_key: str = Header(None)):
+    if x_symmetri_internal_key != "SECRET_ADMIN_KEY":
+        raise HTTPException(status_code=403, detail="Forbidden: Admin access required")
+
+router = APIRouter(prefix="/api/admin", tags=["Admin"], dependencies=[Depends(verify_internal_key)])
 
 @router.get("/fx-live")
 async def get_fx_live(base: str = "EUR", target: str = "USD"):
@@ -104,3 +108,33 @@ async def get_investor_report():
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+from pydantic import BaseModel
+from sqlalchemy import text
+
+class LiquidityFundRequest(BaseModel):
+    retailer_id: str
+    amount: float
+    currency: str
+
+@router.post('/liquidity/fund')
+async def fund_liquidity(req: LiquidityFundRequest, db: Session = Depends(get_db)):
+    try:
+        # Check if row exists
+        existing = db.execute(text('SELECT id FROM synthetic_liquidity WHERE retailer_id = :r'), {'r': req.retailer_id}).fetchone()
+        if existing:
+            db.execute(
+                text('UPDATE synthetic_liquidity SET available_balance = available_balance + :amt, currency = :cur, updated_at = NOW() WHERE retailer_id = :r'),
+                {'amt': req.amount, 'cur': req.currency, 'r': req.retailer_id}
+            )
+        else:
+            db.execute(
+                text('INSERT INTO synthetic_liquidity (retailer_id, available_balance, currency) VALUES (:r, :amt, :cur)'),
+                {'amt': req.amount, 'cur': req.currency, 'r': req.retailer_id}
+            )
+        db.commit()
+        return {'success': True, 'message': 'Liquidity funded successfully'}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

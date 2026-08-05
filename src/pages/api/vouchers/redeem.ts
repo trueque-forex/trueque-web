@@ -1,37 +1,21 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { query } from '../../../lib/db';
 import { withAuth } from '../../../lib/withAuth';
-import retailers from '../../../config/retailers.json';
-
-// =============================================================================
-// TECHNICAL DEBT — Sprint Migration Required
-// -----------------------------------------------------------------------------
-// This Next.js API route directly accesses the PostgreSQL database via
-// src/lib/db.ts. This violates the "FastAPI as Sole Orchestrator" pattern
-// established in GEMINI.md §4 / §5. All direct DB access from Next.js must
-// be migrated to the corresponding FastAPI router (backend/routes/) in a
-// future sprint. Until migrated, this file is the authoritative handler for
-// POST /api/vouchers/redeem.
-// =============================================================================
-
-type RetailerConfig = typeof retailers[0];
+import { TruequeSession } from '../../../types/auth';
 
 /**
  * POST /api/vouchers/redeem
  *
- * Phase 1 — Voucher redemption endpoint.
- * Called by retailer POS systems (or in Phase 1, the beneficiary / simulated POS).
- *
- * Body: { voucher_code, store_id?, lat?, lng? }
- *
- * Captures:
- *   - redeemed_at timestamp
- *   - redemption_store_id
- *   - historical_redemption_anchor { lat, lng, city } — from store seed coordinates
- *     if not provided directly. No browser GPS per GEMINI.md §3.1.
+ * Refactored to proxy to FastAPI.
  */
 async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') return res.status(405).end();
+
+    const session = (req as any).session as TruequeSession;
+    
+    // In Phase 1, the merchant must be authenticated and their userType === 'MERCHANT'
+    if (session.user.userType !== 'MERCHANT') {
+        return res.status(403).json({ error: 'Only merchants can redeem vouchers.' });
+    }
 
     const { voucher_code, store_id, lat, lng } = req.body;
 
@@ -40,92 +24,37 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     try {
-        // 1. Lookup the voucher
-        const lookup = await query(
-            `SELECT id, status, retailer_id, expires_at, beneficiary_name, amount_local, local_currency
-             FROM vouchers
-             WHERE voucher_code = $1`,
-            [voucher_code]
-        );
+        const payload = {
+            voucher_code,
+            store_id,
+            lat,
+            lng,
+            merchant_id: session.user.id
+        };
 
-        if (lookup.rows.length === 0) {
-            return res.status(404).json({ error: 'Voucher not found' });
-        }
-
-        const voucher = lookup.rows[0];
-
-        // 2. Validate state
-        if (voucher.status !== 'ACTIVE') {
-            return res.status(400).json({
-                error: `Voucher cannot be redeemed. Current status: ${voucher.status}`,
-                status: voucher.status,
-            });
-        }
-
-        if (new Date(voucher.expires_at) < new Date()) {
-            await query(
-                `UPDATE vouchers SET status = 'EXPIRED', updated_at = NOW() WHERE id = $1`,
-                [voucher.id]
-            );
-            return res.status(400).json({ error: 'Voucher has expired', status: 'EXPIRED' });
-        }
-
-        // 3. Resolve historical_redemption_anchor (GEMINI.md §2.1 — canonical GPS field name)
-        //    Priority: (a) lat/lng from request (POS webhook), (b) seeded store location
-        let historical_redemption_anchor: { lat: number; lng: number; city?: string } | null = null;
-
-        if (lat && lng) {
-            historical_redemption_anchor = { lat: parseFloat(lat), lng: parseFloat(lng) };
-        } else if (store_id) {
-            const retailer = (retailers as RetailerConfig[]).find(r => r.id === voucher.retailer_id);
-            if (retailer?.locations) {
-                const loc = retailer.locations.find((l: any) => l.store_id === store_id);
-                if (loc) {
-                    historical_redemption_anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
-                }
-            }
-        }
-
-        // Fallback: pick first known location for this retailer (passive sorter)
-        if (!historical_redemption_anchor) {
-            const retailer = (retailers as RetailerConfig[]).find(r => r.id === voucher.retailer_id);
-            if (retailer?.locations?.[0]) {
-                const loc = retailer.locations[0] as any;
-                historical_redemption_anchor = { lat: loc.lat, lng: loc.lng, city: loc.city };
-            }
-        }
-
-        // 4. Mark REDEEMED
-        const now = new Date();
-        await query(
-            `UPDATE vouchers
-             SET status                       = 'REDEEMED',
-                 redeemed_at                 = $1,
-                 redemption_store_id         = $2,
-                 historical_redemption_anchor = $3,
-                 updated_at                  = $1
-             WHERE id = $4`,
-            [now, store_id || null, historical_redemption_anchor ? JSON.stringify(historical_redemption_anchor) : null, voucher.id]
-        );
-
-        return res.status(200).json({
-            success: true,
-            message: 'Voucher redeemed successfully',
-            voucher: {
-                id:                           voucher.id,
-                status:                       'REDEEMED',
-                beneficiary_name:             voucher.beneficiary_name,
-                amount_local:                 Number(voucher.amount_local),
-                local_currency:               voucher.local_currency,
-                redeemed_at:                  now.toISOString(),
-                historical_redemption_anchor: historical_redemption_anchor,
+        const fastApiRes = await fetch('http://127.0.0.1:8000/api/merchants/redeem', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Symmetri-Internal-Key': 'SECRET_ADMIN_KEY'
             },
+            body: JSON.stringify(payload)
         });
 
+        const data = await fastApiRes.json();
+
+        if (!fastApiRes.ok) {
+            console.error('[vouchers/redeem] FastAPI rejected payload:', data);
+            return res.status(fastApiRes.status).json({ error: data.detail || 'FastAPI Error' });
+        }
+
+        return res.status(200).json(data);
+
     } catch (err: any) {
-        console.error('[vouchers/redeem] Error:', err);
+        console.error('[vouchers/redeem] Proxy Error:', err);
         return res.status(500).json({ error: err.message || 'Internal Server Error' });
     }
 }
 
 export default withAuth(handler);
+

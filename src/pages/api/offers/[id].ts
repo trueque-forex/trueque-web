@@ -20,12 +20,21 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { destination_id, adyen_stored_payment_id, status } = req.body;
 
   try {
-    // 1. Verify ownership of the offer
-    const verifySql = `SELECT id FROM offers WHERE id = $1 AND owner_id = $2;`;
-    const verifyResult = await query(verifySql, [id, ownerId]);
+    // 1. Verify offer exists and check permissions
+    const verifySql = `SELECT id, owner_id, status FROM offers WHERE id = $1;`;
+    const verifyResult = await query(verifySql, [id]);
 
     if (verifyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Offer not found or unauthorized' });
+      return res.status(404).json({ error: 'Offer not found' });
+    }
+
+    const offer = verifyResult.rows[0];
+    
+    // If caller is not the owner, they can ONLY transition an OPEN offer to MATCHED
+    if (offer.owner_id !== ownerId) {
+      if (offer.status !== 'OPEN' || status !== 'MATCHED') {
+        return res.status(403).json({ error: 'Unauthorized to modify this offer' });
+      }
     }
 
     // 2. Build dynamic update query based on provided fields

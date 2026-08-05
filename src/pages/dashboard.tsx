@@ -111,6 +111,21 @@ export default function Dashboard() {
                         <h1 style={{ color: '#2c3e50', margin: 0 }}>Business Portal: {userName}</h1>
                         <p style={{ color: '#7f8c8d' }}>Manage settlements and view voucher activity.</p>
                     </div>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+                        <div
+                            style={{ background: 'white', borderRadius: '20px', padding: '32px', cursor: 'pointer', border: '2px solid #e2e8f0', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', transition: 'border-color 0.2s, transform 0.15s' }}
+                            onClick={() => router.push('/merchant/pos')}
+                            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#1A73E8'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-3px)'; }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = '#e2e8f0'; (e.currentTarget as HTMLDivElement).style.transform = 'none'; }}
+                        >
+                            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🏪</div>
+                            <div style={{ fontWeight: '800', fontSize: '20px', color: '#1e293b', marginBottom: '8px' }}>Point of Sale</div>
+                            <div style={{ fontSize: '14px', color: '#64748b', lineHeight: 1.5 }}>
+                                Redeem customer vouchers at checkout.
+                            </div>
+                        </div>
+                    </div>
                 </main>
             </div>
         );

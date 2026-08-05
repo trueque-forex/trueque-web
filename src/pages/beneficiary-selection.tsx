@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import apiFetch from '../lib/apiFetch';
 import { useSwap } from '../context/SwapContext';
+import { useAuth } from '../context/AuthContext';
+import Header from '../components/Header';
 
 type Beneficiary = {
     id: string;
@@ -14,9 +16,11 @@ type Beneficiary = {
 export default function BeneficiarySelectionPage() {
     const router = useRouter();
     const { swapIntent } = useSwap(); // Access Global State
+    const { user, loading: isAuthLoading } = useAuth(); // Access Global Auth State
     const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
     const [loading, setLoading] = useState(true);
-    const [userName, setUserName] = useState('Guest');
+
+    const userName = user?.firstName || user?.full_name?.split(' ')[0] || 'Guest';
 
     useEffect(() => {
         // 1. ROUTE GUARD (GEMINI CONSTANT 2025)
@@ -26,43 +30,21 @@ export default function BeneficiarySelectionPage() {
             return;
         }
 
-        let activeSession = false;
-        // Load Session User Name
-        const sessionData = localStorage.getItem('trueque_session');
-        if (sessionData) {
-            try {
-                const session = JSON.parse(sessionData);
-                // Smart Name Logic: Try firstName, then first part of full_name
-                const name = session.firstName || session.full_name?.split(' ')[0] || 'Guest';
-                setUserName(name);
-                activeSession = true;
-            } catch (e) {
-                router.replace('/signin');
-                return;
-            }
-        } else {
+        if (!isAuthLoading && !user) {
             router.replace('/signin');
             return;
         }
 
         // Fetch Beneficiaries ONLY if session is valid
-        if (activeSession) {
+        if (!isAuthLoading && user) {
             const fetchBens = async () => {
                 try {
-                    // Mock fallback if API fails or is empty for dev
                     const { json, res } = await apiFetch<Beneficiary[]>('/api/beneficiaries', { method: 'GET' });
-                    // 401 is now handled by apiFetch globally, but we can double check
+                    console.log("FETCH BENS RESPONSE:", res.status, JSON.stringify(json));
                     if (res.ok && Array.isArray(json)) {
-                        let filtered = json;
-                        const rail = router.query.rail as string;
-                        if (rail === 'RTP') {
-                            filtered = json.filter(b => b.method === 'bank_rtp');
-                        } else if (rail === 'PUSH_TO_CARD') {
-                            filtered = json.filter(b => b.method === 'card_push');
-                        } else if (rail === 'SPEI') {
-                            filtered = json.filter(b => b.method === 'wallet' || b.method === 'spei');
-                        }
-                        setBeneficiaries(filtered);
+                        // Do not filter by rail here. Show all saved beneficiaries so the user knows they exist.
+                        // The beneficiary page will handle adding a new rail if needed.
+                        setBeneficiaries(json);
                     }
                 } catch (e) {
                     console.error("Failed to load beneficiaries", e);
@@ -72,11 +54,10 @@ export default function BeneficiarySelectionPage() {
             };
             fetchBens();
         }
-    }, [router.isReady, router.query, swapIntent]);
+    }, [router.isReady, router.query, swapIntent, isAuthLoading, user]);
 
     const handleSelect = (b: Beneficiary) => {
-        // ANCHOR DATA: Persist 'Maria' (or whoever) for the Review Page
-        // Using 'selected_beneficiary' as requested
+        // Persist for the Review Page
         localStorage.setItem('selected_beneficiary', JSON.stringify(b));
 
         const rail = router.query.rail as string;
@@ -89,12 +70,10 @@ export default function BeneficiarySelectionPage() {
         }
     };
 
-    const handleSignOut = () => {
-        // Strict Kill Logic (G3 Requirement)
-        sessionStorage.clear();
-        localStorage.removeItem('token');
-        localStorage.removeItem('trueque_session');
-        router.push('/');
+    const handleNewRecipient = () => {
+        // CLEAR any previous draft so we don't accidentally load Maria!
+        localStorage.removeItem('selected_beneficiary');
+        router.push('/beneficiary');
     };
 
     return (
@@ -103,19 +82,7 @@ export default function BeneficiarySelectionPage() {
             backgroundColor: '#f5f7fa',
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
         }}>
-            {/* Header */}
-            <header style={{
-                background: 'white',
-                padding: '20px 40px',
-                borderBottom: '1px solid #e1e8ed',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-            }}>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#1A73E8' }}>Trueque</div>
-                <div style={{ display: 'flex', gap: '15px' }}>
-                    <button onClick={() => router.push('/profile')} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>Profile</button>
-                    <button onClick={handleSignOut} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#e74c3c' }}>Sign Out</button>
-                </div>
-            </header>
+            <Header />
 
             <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 40px' }}>
                 <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#2c3e50', marginBottom: '10px' }}>
@@ -125,7 +92,7 @@ export default function BeneficiarySelectionPage() {
 
                 {/* New Transfer Button */}
                 <div
-                    onClick={() => router.push('/beneficiary')} // Go to Empty Form
+                    onClick={handleNewRecipient}
                     style={{
                         backgroundColor: 'white',
                         border: '2px dashed #1A73E8',
@@ -175,10 +142,10 @@ export default function BeneficiarySelectionPage() {
                                         backgroundColor: '#ecf0f1', display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         fontWeight: 'bold', color: '#7f8c8d'
                                     }}>
-                                        {b.name.charAt(0)}
+                                        {(b.name || 'U').charAt(0)}
                                     </div>
                                     <div>
-                                        <div style={{ fontWeight: '600', color: '#2c3e50' }}>{b.name}</div>
+                                        <div style={{ fontWeight: '600', color: '#2c3e50' }}>{b.name || 'Unknown Beneficiary'}</div>
                                         <div style={{ fontSize: '13px', color: '#7f8c8d' }}>
                                             {b.method === 'bank_rtp' ? 'Bank Transfer' : b.method === 'card_push' ? 'Debit Card' : 'Wallet'} • {b.country}
                                         </div>

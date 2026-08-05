@@ -21,6 +21,8 @@ export default function CreateOfferWizard() {
   const [sourceCurrency, setSourceCurrency] = useState('USD');
   const [amountReceived, setAmountReceived] = useState('2000');
   const [targetCurrency, setTargetCurrency] = useState('MXN');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [cadence, setCadence] = useState('MONTHLY');
   const exchangeRate = '20.00'; // mocked exchange rate for simplicity
   
   // Step 2 State: Beneficiaries
@@ -42,10 +44,8 @@ export default function CreateOfferWizard() {
           const res = await fetch('/api/beneficiaries');
           if (res.ok) {
             const data = await res.json();
-            setBeneficiaries(data.beneficiaries || []);
-            if (data.beneficiaries?.length > 0) {
-              setSelectedDestinationId(data.beneficiaries[0].id);
-            }
+            const bens = Array.isArray(data) ? data : (data.beneficiaries || []);
+            setBeneficiaries(bens);
           }
         } catch (err) {
           console.error("Failed to load beneficiaries", err);
@@ -55,7 +55,22 @@ export default function CreateOfferWizard() {
       };
       fetchBens();
     }
-  }, [currentStep, beneficiaries.length]);
+  }, [currentStep]);
+
+  const validBeneficiaries = beneficiaries.filter(b => {
+    console.log("Filtering:", b.name, b.identifiers?.currency, targetCurrency, b.identifiers?.currency === targetCurrency);
+    if (b.identifiers?.currency) return b.identifiers.currency === targetCurrency;
+    const countryToCurr: Record<string, string> = { 'MX': 'MXN', 'ES': 'EUR', 'US': 'USD', 'GT': 'GTQ' };
+    if (b.country && countryToCurr[b.country]) return countryToCurr[b.country] === targetCurrency;
+    return false;
+  });
+  console.log("VALID BENS:", validBeneficiaries.length, validBeneficiaries);
+
+  useEffect(() => {
+    if (currentStep === 2 && validBeneficiaries.length > 0 && !selectedDestinationId) {
+      setSelectedDestinationId(validBeneficiaries[0].id);
+    }
+  }, [currentStep, validBeneficiaries, selectedDestinationId]);
 
   // Actions
   const handleStep1Submit = async () => {
@@ -72,7 +87,9 @@ export default function CreateOfferWizard() {
           source_currency: sourceCurrency,
           amount_received: amountReceived,
           target_currency: targetCurrency,
-          exchange_rate: exchangeRate
+          exchange_rate: exchangeRate,
+          is_recurring: isRecurring,
+          cadence: isRecurring ? cadence : null
         })
       });
       const data = await res.json();
@@ -220,6 +237,34 @@ export default function CreateOfferWizard() {
                   </div>
                 </div>
                 
+                
+                <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                  <div>
+                    <label className="text-sm font-semibold text-gray-900">Recurring Swap</label>
+                    <p className="text-xs text-gray-500">Automatically post this offer again</p>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    {isRecurring && (
+                      <select
+                        value={cadence}
+                        onChange={(e) => setCadence(e.target.value)}
+                        className="text-sm border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="BI-WEEKLY">Bi-Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setIsRecurring(!isRecurring)}
+                      className={`${isRecurring ? 'bg-blue-600' : 'bg-gray-200'} relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none`}
+                    >
+                      <span className={`${isRecurring ? 'translate-x-5' : 'translate-x-0'} pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`} />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="bg-blue-50/50 rounded-xl p-4 flex justify-between items-center border border-blue-100">
                   <span className="text-sm text-blue-800 font-medium">Implied Exchange Rate</span>
                   <span className="text-sm text-blue-900 font-bold">1 {sourceCurrency} = {exchangeRate} {targetCurrency}</span>
@@ -266,14 +311,14 @@ export default function CreateOfferWizard() {
                   
                   {isLoadingBeneficiaries ? (
                     <div className="py-8 text-center text-gray-500">Loading beneficiaries...</div>
-                  ) : beneficiaries.length === 0 ? (
+                  ) : validBeneficiaries.length === 0 ? (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
-                      <p className="text-yellow-800 font-medium mb-3">You don't have any saved beneficiaries yet.</p>
-                      <button className="text-blue-600 font-semibold hover:underline">Add a new beneficiary</button>
+                      <p className="text-yellow-800 font-medium mb-3">You don't have any saved beneficiaries for {targetCurrency}.</p>
+                      <button className="text-blue-600 font-semibold hover:underline">Add a new {targetCurrency} beneficiary</button>
                     </div>
                   ) : (
                     <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
-                      {beneficiaries.map(ben => (
+                      {validBeneficiaries.map(ben => (
                         <div 
                           key={ben.id} 
                           onClick={() => setSelectedDestinationId(ben.id)}
@@ -282,11 +327,11 @@ export default function CreateOfferWizard() {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
                               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                                {ben.first_name?.[0] || <AccountBalanceWalletIcon fontSize="small" />}
+                                {ben.name?.[0] || <AccountBalanceWalletIcon fontSize="small" />}
                               </div>
                               <div>
-                                <p className="font-semibold text-gray-900">{ben.first_name} {ben.last_name}</p>
-                                <p className="text-xs text-gray-500 uppercase">{ben.bank_name || 'Bank Transfer'} • {ben.country_code}</p>
+                                <p className="font-semibold text-gray-900">{ben.name}</p>
+                                <p className="text-xs text-gray-500 uppercase">{ben.identifiers?.bank_name || ben.identifiers?.swift || 'Bank Transfer'} • {ben.country}</p>
                               </div>
                             </div>
                             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedDestinationId === ben.id ? 'border-blue-500' : 'border-gray-300'}`}>
@@ -314,7 +359,7 @@ export default function CreateOfferWizard() {
             {/* Step 2 Summary (when collapsed) */}
             {currentStep > 2 && (
               <div className="px-6 py-4 bg-gray-50/50 flex items-center justify-between text-sm">
-                <span className="font-medium text-gray-700">Sending to <span className="font-bold text-gray-900">{beneficiaries.find(b => b.id === selectedDestinationId)?.first_name || 'Selected Beneficiary'}</span></span>
+                <span className="font-medium text-gray-700">Sending to <span className="font-bold text-gray-900">{validBeneficiaries.find(b => b.id === selectedDestinationId)?.name || 'Selected Beneficiary'}</span></span>
               </div>
             )}
           </div>
@@ -342,9 +387,13 @@ export default function CreateOfferWizard() {
                     <span>Platform Fee (1.5%)</span>
                     <span className="font-medium text-gray-900">${symmetriFee} {sourceCurrency}</span>
                   </div>
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Effective Rate</span>
+                    <span className="font-medium text-gray-900">1 {sourceCurrency} = {exchangeRate} {targetCurrency}</span>
+                  </div>
                   <div className="flex justify-between text-sm text-gray-600 pb-2 border-b">
-                    <span>Outbound Rail Fee</span>
-                    <span className="font-medium text-green-600 text-right">Waived<br/><span className="text-xs text-gray-400">Included in Match</span></span>
+                    <span>Total Fees</span>
+                    <span className="font-medium text-gray-900">${symmetriFee} {sourceCurrency}</span>
                   </div>
                   <div className="flex justify-between items-center pt-1">
                     <span className="text-base font-bold text-gray-900">Gross Total</span>

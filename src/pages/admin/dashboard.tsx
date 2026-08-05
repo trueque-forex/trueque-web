@@ -1,6 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { withAuth } from '../../lib/withAuth';
 
 // Types
 interface FXData {
@@ -36,22 +37,22 @@ export default function AdminDashboard() {
     const fetchData = async () => {
         try {
             // 1. FX
-            const fxRes = await fetch('http://localhost:8000/api/admin/fx-live');
+            const fxRes = await fetch('/api/admin/fx-live');
             const fxJson = await fxRes.json();
             if (fxJson.success) setFxData(fxJson.data);
 
             // 2. Audit
-            const auditRes = await fetch('http://localhost:8000/api/admin/audit-feed');
+            const auditRes = await fetch('/api/admin/audit-feed');
             const auditJson = await auditRes.json();
             if (auditJson.success) setAuditFeed(auditJson.feed);
 
             // 3. Vitals
-            const vitalsRes = await fetch('http://localhost:8000/api/admin/security-status');
+            const vitalsRes = await fetch('/api/admin/security-status');
             const vitalsJson = await vitalsRes.json();
             if (vitalsJson.success) setVitals(vitalsJson.vitals);
 
             // 4. Subsidy
-            const subRes = await fetch('http://localhost:8000/api/admin/social-subsidy');
+            const subRes = await fetch('/api/admin/social-subsidy');
             const subJson = await subRes.json();
             if (subJson.success) setSubsidy(subJson.fund_total);
 
@@ -198,3 +199,16 @@ function VitalRow({ label, active }: { label: string, active?: boolean }) {
         </div>
     );
 }
+
+export const getServerSideProps = withAuth(async (ctx: any) => {
+    console.log("[SSR DASHBOARD] Session UserType:", ctx.session?.user?.userType);
+    if (ctx.session?.user?.userType !== 'ADMIN') {
+        return {
+            redirect: {
+                destination: '/dashboard',
+                permanent: false,
+            },
+        };
+    }
+    return { props: {} };
+});

@@ -57,6 +57,11 @@ export function withAuth(handler: any): any {
       }
     } 
     */
+    if (isApiRoute && session.mfaVerified === false) {
+      console.warn('[WITHAUTH] Guard Blocked Request: MFA not verified', { id: session.user.id });
+      res.status(403).json({ error: 'mfa_required', message: 'MFA verification required to access this resource.' });
+      return;
+    }
 
     if (isApiRoute) {
       (req as any).session = session as TruequeSession;

@@ -2,7 +2,7 @@ export interface SessionUser {
     id: string;        // Strict: ONLY "id", no "userId"
     email: string;
     kycStatus: string; // Standardized: camelCase (mapped from kyc_status)
-    userType: 'PEER' | 'MERCHANT';
+    userType: 'PEER' | 'MERCHANT' | 'ADMIN';
     symmetriId?: string;      // Optional: included for traceability
     tradeMaskSid?: string; // Friendly name for ID display
     firstName?: string;

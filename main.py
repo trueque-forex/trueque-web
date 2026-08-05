@@ -37,6 +37,7 @@ from backend.routes.pin import router as pin_router                           # 
 from backend.routes.rates import router as rates_router                       # → /api/rates
 from backend.routes.recipients import router as recipients_router             # → /api/recipients
 from backend.routes.settlement import router as settlement_router             # → /api/settle
+from backend.routes.merchants import router as merchants_router               # /api/merchants (self-prefixed)
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -103,6 +104,7 @@ app.include_router(quotes_router)                                   # /api/quote
 app.include_router(retailers_router)                                # /api/retailers
 app.include_router(trades_router)                                   # /api/trades
 app.include_router(transactions_router)                             # /api/transactions
+app.include_router(merchants_router)                                # /api/merchants
 
 # ── Mount routers — prefixed here ─────────────────────────────────────────────
 app.include_router(admin_dashboard_router, prefix="/api", tags=["Admin"])

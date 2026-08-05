@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Header from '../components/Header';
 import { useSwap } from '../context/SwapContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
@@ -132,21 +132,31 @@ export default function ReviewPage() {
   }, [contextBeneficiary]);
 
   // LOCAL OVERRIDE HOOK for Calculation
-  const resolveBeneficiary = () => {
-    if (contextBeneficiary) return contextBeneficiary;
+  const resolveBeneficiary = useCallback(() => {
     if (typeof window !== 'undefined') {
-      try { return JSON.parse(localStorage.getItem('selected_beneficiary') || 'null'); } catch { }
+      try {
+        const stored = localStorage.getItem('selected_beneficiary');
+        if (stored) {
+          return JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error("resolveBeneficiary error", e);
+      }
+    }
+    if (contextBeneficiary && (contextBeneficiary.id || contextBeneficiary.personal?.firstName)) {
+      return contextBeneficiary;
     }
     return null;
-  };
-  const effectiveBeneficiary = resolveBeneficiary();
+  }, [contextBeneficiary]);
+
+  const effectiveBeneficiary = useMemo(() => resolveBeneficiary(), [resolveBeneficiary]);
   // LOCAL OVERRIDE HOOK for Swap Intent
   const resolveSwapIntent = () => {
     if (swapIntent) return swapIntent;
     if (typeof window !== 'undefined') {
       try {
         const s = JSON.parse(localStorage.getItem('trueque_swap_state_persistent') || 'null');
-        if (s) return { amount: parseFloat(s.amount), target_currency: (s.target_currency || '').split('-')[1] }; // Partial map
+        if (s) return { ...s, amount: parseFloat(s.amount), target_currency: (s.target_currency || '').split('-')[1] }; // Full map
       } catch { }
     }
     return {};
@@ -204,7 +214,7 @@ export default function ReviewPage() {
   useEffect(() => {
     // 1. Resolve Principal
     const amount = effectiveSwapIntent?.amount || parseFloat(router.query.amountIntent as string) || 0;
-    const rate = effectiveSwapIntent?.exchange_rate || parseFloat(router.query.rate as string) || 1050.00;
+    const rate = effectiveSwapIntent?.rateIntent || effectiveSwapIntent?.exchange_rate || parseFloat(router.query.rateIntent as string) || parseFloat(router.query.rate as string) || 1050.00;
     const toCurrency = (effectiveSwapIntent?.target_currency || qTo || 'ARS') as string;
 
     if (!amount || !rate) return;
@@ -357,22 +367,39 @@ export default function ReviewPage() {
       
       const dynamicSourceCurrency = String(effectiveSwapIntent?.source_currency || qFrom || 'USD').toUpperCase();
 
-      const payload = {
-        amount: breakdown.totalToPaySource,
-        currencyFrom: dynamicSourceCurrency,
-        currencyTo: swapIntent?.target_currency || qTo,
-        beneficiaryId: effectiveBeneficiary?.id,
-        provider: swapIntent?.provider,
-        payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
-        payOutRail: payOutRail
-      };
+      const type = effectiveSwapIntent?.type || 'MAKER';
+      let res;
 
-      const res = await fetch('/api/swaps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
-      });
+      if (type === 'TAKER') {
+        const offerId = effectiveSwapIntent?.counterpartyOfferId;
+        res = await fetch(`/api/offers/${offerId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            status: 'MATCHED',
+            adyen_stored_payment_id: "mock_adyen_token_taker_999", // Mock funding
+            destination_id: effectiveBeneficiary?.id // Ensure Taker beneficiary is passed
+          })
+        });
+      } else {
+        const payload = {
+          amount: breakdown.totalToPaySource,
+          currencyFrom: dynamicSourceCurrency,
+          currencyTo: swapIntent?.target_currency || qTo,
+          beneficiaryId: effectiveBeneficiary?.id,
+          provider: swapIntent?.provider,
+          payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
+          payOutRail: payOutRail
+        };
+
+        res = await fetch('/api/swaps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!res.ok) {
         const err = await res.json();
@@ -434,12 +461,14 @@ export default function ReviewPage() {
     // 2. MFA CHECK (Flow A vs B Logic)
     // Flow A: Low Value (< 200 EUR) -> Skip Second Factor (Frictionless) - DISABLED FOR SECURITY
     // Flow B: High Value (>= 200 EUR) -> Force Identity Verification - NOW UNIVERSAL
-    // if (breakdown.totalToPaySource < 200) {
-    //   console.log('Flow A: Skipping MFA for low value swap');
-    //   processSwap();
-    // } else {
-    setShowMFA(true);
-    // }
+    
+    // Check if MFA is disabled for test accounts
+    if (s.mfa_enabled === false) {
+      console.log('Skipping MFA (mfa_enabled is false in session)');
+      processSwap();
+    } else {
+      setShowMFA(true);
+    }
   };
 
   const handleVerifyMFA = async () => {
@@ -490,6 +519,18 @@ export default function ReviewPage() {
 
   const agreedRate = breakdown.principalSource > 0 ? breakdown.grossReceive / breakdown.principalSource : 0;
   const effectiveRate = breakdown.totalToPaySource > 0 ? breakdown.grossReceive / breakdown.totalToPaySource : 0;
+
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  // Wait for router to be ready and mounted to avoid hydration mismatch (Server vs Client)
+  if (!mounted || !router.isReady) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div>Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f5f7fa', fontFamily: brandConfig.theme.fontFamily }}>
@@ -828,7 +869,7 @@ export default function ReviewPage() {
               >
                 Back
               </button>
-              {effectiveBeneficiary?.id ? (
+              {effectiveBeneficiary ? (
                 <button
                   onClick={handleConfirm}
                   disabled={loading}

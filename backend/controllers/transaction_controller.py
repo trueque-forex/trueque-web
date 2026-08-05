@@ -131,6 +131,26 @@ class TransactionController:
                 402
             )
 
+        # 2.5 SYNTHETIC LIQUIDITY CHECK
+        from sqlalchemy import text
+        liq_row = db.execute(
+            text("SELECT available_balance, currency FROM synthetic_liquidity WHERE retailer_id = :r FOR UPDATE"),
+            {"r": retailer_id}
+        ).fetchone()
+
+        if not liq_row or liq_row[0] < float(amount_origin):
+            raise TruequeError(
+                ErrorCode.VALIDATION_ERROR,
+                f"Insufficient synthetic liquidity for retailer {retailer_id}.",
+                400
+            )
+
+        # Deduct liquidity
+        db.execute(
+            text("UPDATE synthetic_liquidity SET available_balance = available_balance - :amt WHERE retailer_id = :r"),
+            {"amt": float(amount_origin), "r": retailer_id}
+        )
+
         # 3. MARGIN LOGIC (Hidden 15% B2B Wholesale Discount)
         # Store as absolute Decimal value
         wholesale_margin = (amount_origin * Decimal('0.15')).quantize(Decimal('0.0001'))
@@ -226,3 +246,4 @@ class TransactionController:
             db.rollback()
             logger.error(f"Failed to quarantine voucher: {str(e)}")
             raise HTTPException(status_code=500, detail="Failed to apply quarantine lock")
+

@@ -31,6 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Security: Don't reveal user existence
       return res.status(401).json({ error: 'Invalid login credentials' });
     }
+    console.log("DB USER ROW:", user);
 
     // 3. COMPARE HASH
     const isValid = await bcrypt.compare(password, user.password_hash || '');

@@ -34,6 +34,7 @@ export default function AmountSelectionPage() {
     const [currencyFrom, setCurrencyFrom] = useState<string | null>(null);
     const [currencyTo, setCurrencyTo] = useState<string | null>(null);
     const [amountFrom, setAmountFrom] = useState('');
+    const [amountTo, setAmountTo] = useState('');
     const [isHydrated, setIsHydrated] = useState(false);
     const [marketRate, setMarketRate] = useState<number | null>(null);
     const [loading, setLoading] = useState(false);
@@ -90,7 +91,10 @@ export default function AmountSelectionPage() {
                 const { currencyFrom: sFrom, currencyTo: sTo, amount: sAmt } = JSON.parse(savedState);
                 if (sFrom) { setCurrencyFrom(sFrom); sessionFrom = sFrom; }
                 if (sTo) { setCurrencyTo(sTo); sessionTo = sTo; }
-                if (sAmt) setAmountFrom(sAmt);
+                if (sAmt) {
+                    setAmountFrom(sAmt);
+                    // We let the rate effect calculate amountTo later
+                }
             } catch (e) { }
         }
         setIsHydrated(true);
@@ -144,6 +148,11 @@ export default function AmountSelectionPage() {
                 const rate = await fetchExchangeRate(from, to);
                 setMarketRate(rate);
                 setRateError(null);
+                
+                // Recalculate amountTo based on amountFrom if it exists
+                if (amountFrom) {
+                    setAmountTo((parseFloat(amountFrom) * rate).toFixed(2));
+                }
             } catch (err) {
                 console.error(err);
                 setRateError('Failed to fetch rate');
@@ -200,7 +209,25 @@ export default function AmountSelectionPage() {
 
     }, [router.query.draftId]);
 
-    const amountTo = (amountFrom && marketRate) ? (parseFloat(amountFrom) * marketRate).toFixed(2) : '';
+    const handleAmountFromChange = (val: string) => {
+        setAmountFrom(val);
+        if (val && marketRate) {
+            setAmountTo((parseFloat(val) * marketRate).toFixed(2));
+        } else {
+            setAmountTo('');
+        }
+    };
+
+    const handleAmountToChange = (val: string) => {
+        // Strip commas for internal state if typed
+        const cleanVal = val.replace(/,/g, '');
+        setAmountTo(cleanVal);
+        if (cleanVal && marketRate) {
+            setAmountFrom((parseFloat(cleanVal) / marketRate).toFixed(2));
+        } else {
+            setAmountFrom('');
+        }
+    };
 
     // State for dynamic limit warning
     const [limitRefSource, setLimitRefSource] = useState<string>('');
@@ -375,7 +402,7 @@ export default function AmountSelectionPage() {
                                     <input
                                         type="number"
                                         value={amountFrom}
-                                        onChange={(e) => setAmountFrom(e.target.value)}
+                                        onChange={(e) => handleAmountFromChange(e.target.value)}
                                         placeholder="0.00"
                                         min="0"
                                         step="0.01"
@@ -443,9 +470,9 @@ export default function AmountSelectionPage() {
                                 </label>
                                 <div style={{ position: 'relative' }}>
                                     <input
-                                        type="text"
-                                        value={amountTo ? formatNumber(parseFloat(amountTo.replace(/,/g, ''))) : ''}
-                                        readOnly
+                                        type="number"
+                                        value={amountTo}
+                                        onChange={(e) => handleAmountToChange(e.target.value)}
                                         placeholder="0.00"
                                         style={{
                                             width: '100%', padding: '14px 60px 14px 14px',

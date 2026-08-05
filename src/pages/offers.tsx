@@ -113,11 +113,13 @@ export default function Offers() {
       return;
     }
 
+    const userRate = amountOffered / amountWanted;
+
     setSwapIntent({
-      amount: amountOffered,
-      source_currency: offer.currency_offered,
-      target_currency: offer.currency_wanted,
-      exchange_rate: exchangeRate,
+      amount: amountWanted,
+      source_currency: offer.currency_wanted,
+      target_currency: offer.currency_offered,
+      exchange_rate: userRate,
       timeFrame: 0,
       provider: offer.id,
     });
@@ -125,11 +127,11 @@ export default function Offers() {
     router.push({
       pathname: '/review',
       query: {
-        amountIntent: amountOffered,
-        expectedReceive: amountWanted.toFixed(2),
-        rate: exchangeRate,
-        from: offer.currency_offered,
-        to: offer.currency_wanted,
+        amountIntent: amountWanted,
+        expectedReceive: amountOffered.toFixed(2),
+        rate: userRate,
+        from: offer.currency_wanted,
+        to: offer.currency_offered,
         timeFrame: 0,
         offerId: offer.id,
       },

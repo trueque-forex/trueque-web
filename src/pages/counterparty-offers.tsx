@@ -100,7 +100,7 @@ export default function CounterpartyOffers() {
             ...swapIntent!,
             provider: offer.provider,
             exchange_rate: offer.marketRate,
-            amount: offer.offerAmount // Lock to offer amount if slightly different
+            amount: offer.offerAmount / offer.marketRate // Calculate source amount from target amount
         });
 
         router.push('/review');

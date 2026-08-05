@@ -22,6 +22,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     target_currency,
     exchange_rate,
     fee_details,
+    is_recurring,
+    cadence,
   } = req.body;
 
   if (!swap_type || !amount || !source_currency || !amount_received || !target_currency || !exchange_rate) {
@@ -35,13 +37,27 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Calculate Symmetri swap fee for this offer side
   const symmetriSwapFee = parseFloat((parseFloat(amount) * SYMMETRI_SWAP_FEE_PCT).toFixed(4));
 
+  // Determine next_execution_date if recurring
+  let nextExecutionDate = null;
+  if (is_recurring && cadence) {
+    const now = new Date();
+    if (cadence === 'WEEKLY') {
+      now.setDate(now.getDate() + 7);
+    } else if (cadence === 'BI-WEEKLY') {
+      now.setDate(now.getDate() + 14);
+    } else if (cadence === 'MONTHLY') {
+      now.setMonth(now.getMonth() + 1);
+    }
+    nextExecutionDate = now.toISOString();
+  }
+
   const sql = `
     INSERT INTO offers (
-      owner_id, swap_type, amount, source_currency,
-      amount_received, target_currency, exchange_rate,
-      fee_total, fee_details, updated_at, status
+      owner_id, swap_type, amount_offered, currency_offered,
+      amount_wanted, currency_wanted, exchange_rate,
+      fee_total, fee_details, updated_at, status, is_recurring, cadence, next_execution_date
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), 'DRAFT')
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), 'DRAFT', $10, $11, $12)
     RETURNING *;
   `;
 
@@ -56,6 +72,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       exchange_rate,
       symmetriSwapFee,
       fee_details || { symmetri_swap_fee: symmetriSwapFee },
+      is_recurring ? true : false,
+      is_recurring ? cadence : null,
+      nextExecutionDate
     ]);
     return res.status(201).json({ success: true, offer: result.rows[0] });
   } catch (err: any) {
