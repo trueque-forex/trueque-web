@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
-import retailers from '../config/retailers.json';
 
 const CARD_FEE_PCT  = 0.029;
 const CARD_FIXED_FEE = 0.30;
@@ -25,7 +24,25 @@ const MAX_PER_TX_USD  = 250.00;
 /** Standard (non-KYC) rolling 30-day cap. Covers a family of 3 food budget in Mexico. */
 const MAX_MONTHLY_USD = 750.00;
 
-type Retailer = typeof retailers[0];
+type Retailer = {
+    id: string;
+    name: string;
+    city: string;
+    category: string;
+    logo?: string;
+    description?: string;
+    minUSD: number;
+    maxUSD: number;
+    currency: string;
+};
+
+function getCategoryEmoji(category: string) {
+    if (!category) return '🛒';
+    const c = category.toLowerCase();
+    if (c.includes('farmacia')) return '💊';
+    if (c.includes('conveniencia')) return '🏪';
+    return '🛒';
+}
 
 function isExpiryValid(expiry: string) {
     if (expiry.length !== 5) return false;
@@ -50,11 +67,13 @@ export default function VoucherPage() {
 
     const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // 1=retailer, 2=amount+payment, 3=beneficiary, 4=confirm
     // Saved payment method — masked label stored in localStorage between sessions
-    const [savedPayment, setSavedPayment] = useState<{ type: 'ach' | 'card' | 'zelle'; label: string } | null>(null);
+    const [savedPayment, setSavedPayment] = useState<{ type: 'ach' | 'card' | 'zelle' | 'rtp'; label: string } | null>(null);
     const [usingSaved, setUsingSaved] = useState(false); // true = user is using their saved method
     const [selectedRetailer, setSelectedRetailer] = useState<Retailer | null>(null);
+    const [countries, setCountries] = useState<any>({});
+    const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
     const [amountUSD, setAmountUSD] = useState('');
-    const [paymentMethod, setPaymentMethod] = useState<'rtp' | 'card' | 'zelle' | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<'rtp' | 'card' | 'zelle' | 'ach' | null>(null);
     const [liveRate, setLiveRate] = useState<number | null>(null);
     const [rateSource, setRateSource] = useState('');
     const [loading, setLoading] = useState(false);
@@ -87,6 +106,22 @@ export default function VoucherPage() {
             const saved = localStorage.getItem('symmetri_saved_payment');
             if (saved) setSavedPayment(JSON.parse(saved));
         } catch { /* ignore */ }
+    }, []);
+
+    // Fetch config for countries and retailers
+    useEffect(() => {
+        fetch('/api/config/corridors')
+            .then(res => res.json())
+            .then(data => {
+                setCountries(data);
+                if (data['MX']) {
+                    setSelectedCountry('MX');
+                } else {
+                    const keys = Object.keys(data);
+                    if (keys.length > 0) setSelectedCountry(keys[0]);
+                }
+            })
+            .catch(err => console.error('Failed to load corridors:', err));
     }, []);
 
     // Fetch rolling 30-day usage on mount
@@ -243,21 +278,69 @@ export default function VoucherPage() {
 
                 {/* ── STEP 1: Choose Retailer ── */}
                 {step === 1 && (
-                    <div style={{ display: 'grid', gap: '12px' }}>
-                        {(retailers as Retailer[]).map(r => (
-                            <button key={r.id} onClick={() => { setSelectedRetailer(r); setStep(2); }}
-                                style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', background: 'white', border: '2px solid #e2e8f0', borderRadius: '16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s' }}
-                                onMouseEnter={e => (e.currentTarget.style.borderColor = '#1A73E8')}
-                                onMouseLeave={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
-                                <span style={{ fontSize: '36px' }}>{r.logo}</span>
-                                <div>
-                                    <div style={{ fontWeight: '700', fontSize: '16px', color: '#1e293b' }}>{r.name}</div>
-                                    <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{r.description}</div>
-                                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>${r.minUSD}–${r.maxUSD} USD</div>
+                    <div>
+                        {/* Country Selector (Horizontal Chips) */}
+                        <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '16px', marginBottom: '16px', msOverflowStyle: 'none', scrollbarWidth: 'none' }}>
+                            {Object.entries(countries).map(([code, cData]: [string, any]) => {
+                                if (!cData.retailers || cData.retailers.length === 0) return null;
+                                const isSelected = selectedCountry === code;
+                                return (
+                                    <button
+                                        key={code}
+                                        onClick={() => setSelectedCountry(code)}
+                                        style={{
+                                            padding: '10px 20px',
+                                            borderRadius: '24px',
+                                            border: `2px solid ${isSelected ? '#1A73E8' : '#e2e8f0'}`,
+                                            background: isSelected ? '#e8f0fe' : 'white',
+                                            color: isSelected ? '#1A73E8' : '#64748b',
+                                            fontWeight: '700',
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        {cData.name} ({cData.currency})
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        
+                        <div style={{ display: 'grid', gap: '12px' }}>
+                            {selectedCountry && countries[selectedCountry]?.retailers?.map((rawR: any) => {
+                                const r: Retailer = {
+                                    id: rawR.id,
+                                    name: rawR.name,
+                                    city: rawR.city,
+                                    category: rawR.category,
+                                    logo: getCategoryEmoji(rawR.category),
+                                    description: `${rawR.category} · ${rawR.city}`,
+                                    minUSD: MIN_ORDER_VALUE,
+                                    maxUSD: MAX_PER_TX_USD,
+                                    currency: countries[selectedCountry].currency,
+                                };
+                                return (
+                                    <button key={r.id} onClick={() => { setSelectedRetailer(r); setStep(2); }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '20px', background: 'white', border: '2px solid #e2e8f0', borderRadius: '16px', cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.2s' }}
+                                        onMouseEnter={e => (e.currentTarget.style.borderColor = '#1A73E8')}
+                                        onMouseLeave={e => (e.currentTarget.style.borderColor = '#e2e8f0')}>
+                                        <span style={{ fontSize: '36px' }}>{r.logo}</span>
+                                        <div>
+                                            <div style={{ fontWeight: '700', fontSize: '16px', color: '#1e293b' }}>{r.name}</div>
+                                            <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{r.description}</div>
+                                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>${r.minUSD}–${r.maxUSD} USD</div>
+                                        </div>
+                                        <span style={{ marginLeft: 'auto', color: '#c7d2fe' }}>›</span>
+                                    </button>
+                                );
+                            })}
+                            
+                            {(!selectedCountry || !countries[selectedCountry]?.retailers?.length) && Object.keys(countries).length > 0 && (
+                                <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', background: 'white', border: '2px dashed #e2e8f0', borderRadius: '16px' }}>
+                                    No retailers available for this country.
                                 </div>
-                                <span style={{ marginLeft: 'auto', color: '#c7d2fe' }}>›</span>
-                            </button>
-                        ))}
+                            )}
+                        </div>
                     </div>
                 )}
 

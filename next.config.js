@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 // Force restart 2
 module.exports = {
+  images: {
+    unoptimized: true,
+  },
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
   typescript: {

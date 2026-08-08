@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Symmetri</string>
+    <string name="title_activity_main">Symmetri</string>
+    <string name="package_name">com.symmetri.app</string>
+    <string name="custom_url_scheme">com.symmetri.app</string>
+</resources>

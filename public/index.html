@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Symmetri</title>
+    <style id="safe-area-style">
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sar: env(safe-area-inset-right);
+            --sab: env(safe-area-inset-bottom);
+            --sal: env(safe-area-inset-left);
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+        }
+        .logo {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+        .title {
+            font-size: 24px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+        .status {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">💱</div>
+        <div class="title">Symmetri</div>
+        <div class="status" id="status-text">Connecting to server...</div>
+    </div>
+    <script>
+        // Automatic redirect to Next.js dev server if running locally
+        const targetServer = 'http://localhost:3000';
+        fetch(targetServer, { mode: 'no-cors' })
+            .then(() => {
+                window.location.href = targetServer;
+            })
+            .catch(() => {
+                document.getElementById('status-text').innerText = 'Please ensure Next.js dev server is running on port 3000.';
+            });
+    </script>
+</body>
+</html>

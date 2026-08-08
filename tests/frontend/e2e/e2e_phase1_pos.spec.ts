@@ -34,12 +34,13 @@ test.describe('Phase 1: Synthetic Liquidity & POS Lifecycle', () => {
         const merchantProfileId = mProf.rows[0].id;
 
         // Ensure retailer
-        let ret = await pgClient.query(`SELECT id FROM retailers WHERE merchant_id = $1 LIMIT 1`, [merchantProfileId]);
+        let ret = await pgClient.query(`SELECT id FROM retailers WHERE id = 'soriana' LIMIT 1`);
         if (ret.rows.length === 0) {
-            await pgClient.query(`INSERT INTO retailers (id, merchant_id, name, country, currency) VALUES ('RET-TEST-1', $1, 'Test Retailer', 'US', 'USD')`, [merchantProfileId]);
-            ret = await pgClient.query(`SELECT id FROM retailers WHERE merchant_id = $1 LIMIT 1`, [merchantProfileId]);
+            await pgClient.query(`INSERT INTO retailers (id, merchant_id, name, country, currency) VALUES ('soriana', $1, 'Soriana', 'MX', 'MXN')`, [merchantProfileId]);
+        } else {
+            await pgClient.query(`UPDATE retailers SET merchant_id = $1 WHERE id = 'soriana'`, [merchantProfileId]);
         }
-        retailerId = ret.rows[0].id;
+        retailerId = 'soriana';
 
         // Ensure synthetic liquidity starts fresh
         let liq = await pgClient.query(`SELECT id FROM synthetic_liquidity WHERE retailer_id = $1 LIMIT 1`, [retailerId]);
@@ -78,8 +79,10 @@ test.describe('Phase 1: Synthetic Liquidity & POS Lifecycle', () => {
             page.goto('/voucher')
         ]);
         
-        // Step 1: Select Retailer (Wait for first button)
-        await page.locator('button', { hasText: '›' }).first().click();
+        // Step 1: Select Country & Retailer
+        await page.waitForSelector('text=Mexico', { timeout: 10000 });
+        await page.click('text=Mexico');
+        await page.locator('button', { hasText: 'Soriana' }).first().click();
 
         // Step 2: Amount + Payment
         await page.fill('input[id="voucher-amount-input"]', '20.00');
