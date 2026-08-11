@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Header from '../components/Header';
 import { useAuth } from '../context/AuthContext';
+import { Capacitor } from '@capacitor/core';
+import { Contacts } from '@capacitor-community/contacts';
 
 const CARD_FEE_PCT  = 0.029;
 const CARD_FIXED_FEE = 0.30;
@@ -240,6 +242,34 @@ export default function VoucherPage() {
             setError(err.message || 'Something went wrong');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePickContact = async () => {
+        if (!Capacitor.isNativePlatform()) {
+            console.log('Contacts API is only available natively. Using manual input.');
+            return;
+        }
+        try {
+            const perm = await Contacts.requestPermissions();
+            if (perm.contacts !== 'granted') return;
+            
+            const result = await Contacts.pickContact({
+                projection: { name: true, phones: true }
+            });
+            if (result.contact) {
+                const c = result.contact;
+                const name = `${c.name?.given || ''} ${c.name?.family || ''}`.trim();
+                if (name) setBeneficiaryName(name);
+                
+                if (c.phones && c.phones.length > 0) {
+                    const rawPhone = c.phones[0].number || '';
+                    const clean = rawPhone.replace(/\D/g, '');
+                    setBeneficiaryPhone(clean.slice(-10));
+                }
+            }
+        } catch (err) {
+            console.error('Failed to pick contact:', err);
         }
     };
 
@@ -699,6 +729,10 @@ export default function VoucherPage() {
                         </button>
 
                         {!isSelf && (<>
+                            <button onClick={handlePickContact} style={{ width: '100%', padding: '14px', background: '#f8fafc', color: '#1A73E8', fontWeight: '700', fontSize: '15px', border: '2px solid #e2e8f0', borderRadius: '12px', cursor: 'pointer', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background = '#e8f0fe'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}>
+                                📱 Choose from Contacts
+                            </button>
+                            
                             <label style={{ display: 'block', fontWeight: '600', color: '#374151', marginBottom: '8px' }}>Beneficiary Full Name</label>
                             <input id="beneficiary-name" value={beneficiaryName} onChange={e => setBeneficiaryName(e.target.value)} placeholder="First and Last Name" style={{ width: '100%', padding: '14px 16px', fontSize: '16px', border: '2px solid #e2e8f0', borderRadius: '12px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' }} />
 

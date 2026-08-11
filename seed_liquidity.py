@@ -3,7 +3,7 @@ import sqlite3
 import os
 import requests
 
-RETAILERS = ['walmart_mx', 'oxxo_mx', 'soriana_mx', 'farmacias_similares_mx', 'coppel_mx']
+RETAILERS = ['walmart_mx', 'oxxo_mx', 'soriana_mx', 'farmacias_similares_mx', 'coppel_mx', 'abarrey']
 for r in RETAILERS:
     res = requests.post(
         'http://127.0.0.1:8000/api/admin/liquidity/fund',
