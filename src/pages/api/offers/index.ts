@@ -31,8 +31,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       FROM offers o
       WHERE o.status = 'OPEN'
         AND o.owner_id != $1
-        AND ($2::text IS NULL OR o.currency_offered = $2)
-        AND ($3::text IS NULL OR o.currency_wanted = $3)
+        AND ($2::text IS NULL OR o.currency_wanted = $2)
+        AND ($3::text IS NULL OR o.currency_offered = $3)
       ORDER BY o.exchange_rate DESC, o.created_at ASC
       LIMIT 50;
     `;

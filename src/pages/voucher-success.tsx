@@ -1,9 +1,11 @@
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Header from '../components/Header';
+import { useState } from 'react';
 
 export default function VoucherSuccess() {
     const router = useRouter();
+    const [isCopied, setIsCopied] = useState(false);
     const { code, id, retailer, amountLocal, currency, amountUsd, total, paymentMethod, expiresAt, beneficiaryName, beneficiaryPhone } = router.query as Record<string, string>;
 
     const expiryDate = expiresAt
@@ -12,13 +14,47 @@ export default function VoucherSuccess() {
 
     const qrUrl = code ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(code)}&bgcolor=ffffff&color=1A73E8` : '';
 
+    const getText = () => {
+        const RETAILER_NAMES: Record<string, string> = {
+            "farmacias_guadalajara": "Farmacias Guadalajara",
+            "latorre": "La Torre",
+            "super_selectos": "Super Selectos",
+            "bravo": "Bravo",
+            "soriana": "Soriana",
+            "chedraui": "Chedraui",
+            "walmart": "Walmart",
+            "bodega_aurrera": "Bodega Aurrera",
+            "oxxo": "OXXO"
+        };
+        const retailerStr = typeof retailer === 'string' ? retailer : '';
+        const merchantName = RETAILER_NAMES[retailerStr] || (retailerStr ? retailerStr.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'the selected store');
+
+        const shareUrl = `${window.location.origin}/v/${code}`;
+        return `Your Symmetri voucher for ${merchantName} is ready! Click here to open your scannable code: ${shareUrl}`;
+    };
+
     const handleShare = () => {
-        const text = `Your Symmetri voucher for ${retailer}:\nCode: ${code}\nValue: ${amountLocal} ${currency}\nValid until: ${expiryDate}`;
-        if (navigator.share) {
-            navigator.share({ title: `${retailer} Voucher`, text });
+        const text = getText();
+        if (beneficiaryPhone) {
+            const phoneStr = (beneficiaryPhone as string).replace(/\D/g, '');
+            const waUrl = `https://wa.me/${phoneStr}?text=${encodeURIComponent(text)}`;
+            window.open(waUrl, '_blank');
+        } else if (navigator.share) {
+            navigator.share({ title: `${retailer} Voucher`, text }).catch(console.error);
         } else {
-            navigator.clipboard.writeText(code);
-            alert('Voucher code copied to clipboard!');
+            const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            window.open(waUrl, '_blank');
+        }
+    };
+
+    const handleCopy = async () => {
+        const text = getText();
+        try {
+            await navigator.clipboard.writeText(text);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy', err);
         }
     };
 
@@ -95,16 +131,22 @@ export default function VoucherSuccess() {
 
                 {/* Actions */}
                 <div style={{ display: 'grid', gap: '12px' }}>
-{id && (
+                    {id && (
                         <button onClick={() => router.push(`/voucher/track/${id}`)}
                             style={{ padding: '16px', background: '#1e293b', color: 'white', fontWeight: '700', fontSize: '15px', border: 'none', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                             🛍️ View My Voucher
                         </button>
                     )}
-                    <button onClick={handleShare}
-                        style={{ padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.3)' }}>
-                        📤 Share Voucher Code
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button onClick={handleShare}
+                            style={{ flex: 1, padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.3)' }}>
+                            📤 Share
+                        </button>
+                        <button onClick={handleCopy}
+                            style={{ flex: 1, padding: '16px', background: isCopied ? '#10b981' : '#f1f5f9', color: isCopied ? 'white' : '#475569', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            {isCopied ? '✅ Copied!' : '📋 Copy Link'}
+                        </button>
+                    </div>
                     <button onClick={() => router.push('/voucher')}
                         style={{ padding: '14px', background: '#f1f5f9', color: '#475569', fontWeight: '600', fontSize: '15px', border: 'none', borderRadius: '12px', cursor: 'pointer' }}>
                         Send Another Voucher

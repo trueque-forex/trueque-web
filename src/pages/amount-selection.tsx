@@ -211,23 +211,17 @@ export default function AmountSelectionPage() {
 
     const handleAmountFromChange = (val: string) => {
         setAmountFrom(val);
-        if (val && marketRate) {
-            setAmountTo((parseFloat(val) * marketRate).toFixed(2));
-        } else {
-            setAmountTo('');
-        }
     };
 
     const handleAmountToChange = (val: string) => {
         // Strip commas for internal state if typed
         const cleanVal = val.replace(/,/g, '');
         setAmountTo(cleanVal);
-        if (cleanVal && marketRate) {
-            setAmountFrom((parseFloat(cleanVal) / marketRate).toFixed(2));
-        } else {
-            setAmountFrom('');
-        }
     };
+
+    const impliedRate = (amountFrom && amountTo && parseFloat(amountFrom) > 0)
+        ? parseFloat(amountTo) / parseFloat(amountFrom)
+        : marketRate;
 
     // State for dynamic limit warning
     const [limitRefSource, setLimitRefSource] = useState<string>('');
@@ -316,7 +310,7 @@ export default function AmountSelectionPage() {
             amount: amt,
             source_currency: getCurrencyCode(currencyFrom || ''),
             target_currency: getCurrencyCode(currencyTo || ''),
-            exchange_rate: marketRate,
+            exchange_rate: impliedRate || marketRate,
             offerType: 'bank'
         });
 
@@ -325,7 +319,7 @@ export default function AmountSelectionPage() {
             pathname: '/offers',
             query: {
                 amountIntent: amt,
-                rate: marketRate,
+                rate: impliedRate || marketRate,
                 from: getCurrencyCode(currencyFrom || ''),
                 to: getCurrencyCode(currencyTo || ''),
                 draftId: router.query.draftId // Pass it along!
@@ -498,16 +492,21 @@ export default function AmountSelectionPage() {
                     {/* Rate Display */}
                     <div style={{ marginBottom: '30px', textAlign: 'center', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', border: '1px solid #bdc3c7' }}>
                         <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize: '15px', fontWeight: 'bold', color: '#333333', marginBottom: '5px' }}>
-                            Current Market Rate
+                            Implied Exchange Rate
                             <span style={{ fontSize: '18px', fontWeight: '700', color: loading ? '#95a5a6' : '#27ae60' }}>
-                                {loading ? 'Loading...' : (marketRate ? Number(marketRate).toFixed(4) : '---')}
+                                {loading ? 'Loading...' : (impliedRate ? Number(impliedRate).toFixed(4) : '---')}
                             </span>
                         </label>
                         <div style={{ fontSize: '13px', color: '#555555', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                            <div>1 {getCurrencyCode(currencyFrom || '')} = {marketRate ? Number(marketRate).toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}</div>
-                            {marketRate && marketRate > 0 ? (
-                                <div>1 {getCurrencyCode(currencyTo || '')} = {(1 / marketRate).toFixed(4)} {getCurrencyCode(currencyFrom || '')}</div>
+                            <div>1 {getCurrencyCode(currencyFrom || '')} = {impliedRate ? Number(impliedRate).toFixed(4) : '---'} {getCurrencyCode(currencyTo || '')}</div>
+                            {impliedRate && impliedRate > 0 ? (
+                                <div>1 {getCurrencyCode(currencyTo || '')} = {(1 / impliedRate).toFixed(4)} {getCurrencyCode(currencyFrom || '')}</div>
                             ) : null}
+                            {marketRate && (
+                                <div style={{ marginTop: '8px', fontSize: '12px', color: '#7f8c8d' }}>
+                                    Market Rate: 1 {getCurrencyCode(currencyFrom || '')} = {Number(marketRate).toFixed(4)} {getCurrencyCode(currencyTo || '')}
+                                </div>
+                            )}
                         </div>
                     </div>
 

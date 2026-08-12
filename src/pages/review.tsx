@@ -1,6 +1,8 @@
 import { useRouter } from 'next/router';
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Header from '../components/Header';
+import TransactionSummary from '@/components/shared/TransactionSummary';
+import PaymentMethodForm, { PaymentData } from '@/components/shared/PaymentMethodForm';
 import { useSwap } from '../context/SwapContext';
 import { useRequireAuth } from '../hooks/useRequireAuth';
 import brandConfig from '../config/brand_config.json';
@@ -37,6 +39,7 @@ const MOCK_STORED_METHODS: PaymentMethod[] = [
 interface TaxRule {
   label: string;
   rate: number;
+  base?: 'principal' | 'fees';
 }
 
 interface CountryCompliance {
@@ -48,14 +51,14 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
   'ARS': {
     name: 'Argentina',
     rules: [
-      { label: 'Impuesto Créditos/Débitos', rate: 0.006 },
-      { label: 'Ingresos Brutos (IIBB)', rate: 0.00 }
+      { label: 'Impuesto Créditos/Débitos', rate: 0.006, base: 'principal' },
+      { label: 'Ingresos Brutos (IIBB)', rate: 0.00, base: 'principal' }
     ]
   },
   'BRL': {
     name: 'Brazil',
     rules: [
-      { label: 'IOF (Tax on Financial Ops)', rate: 0.0038 }
+      { label: 'IOF (Tax on Financial Ops)', rate: 0.0038, base: 'principal' }
     ]
   },
   'EUR': { name: 'Eurozone', rules: [] },
@@ -63,8 +66,8 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
   'MXN': {
     name: 'Mexico',
     rules: [
-      { label: 'SPEI Fee (Domestic Rail)', rate: 0.00 }, // Usually flat, mocking rate for agnostic engine
-      { label: 'IVA (On Fees)', rate: 0.16 } // VAT on service fees
+      { label: 'SPEI Fee (Domestic Rail)', rate: 0.00, base: 'principal' }, 
+      { label: 'IVA (On Fees)', rate: 0.16, base: 'fees' } 
     ]
   }
 };
@@ -99,7 +102,11 @@ export default function ReviewPage() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(MOCK_STORED_METHODS);
   const [selectedMethodId, setSelectedMethodId] = useState<string>('method_rtp');
   const [payOutRail, setPayOutRail] = useState<string>((router.query.rail as string) || 'RTP');
-  const [holidayModeCountry, setHolidayModeCountry] = useState<string | null>(null);
+    const [holidayModeCountry, setHolidayModeCountry] = useState<string | null>(null);
+
+  const [useNewMethod, setUseNewMethod] = useState(false);
+  const [isPaymentValid, setIsPaymentValid] = useState(false);
+  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
 
   // FETCH: Holiday Config
   useEffect(() => {
@@ -261,8 +268,8 @@ export default function ReviewPage() {
 
     const gatewayFee = GATEWAY_PROCESSING_COST;
 
-    // 5. Symmetri Platform Fee (Tiered: 1.0% <= 500, 1.5% > 500)
-    const platformFeeRate = principalSource <= 500 ? 0.010 : 0.015;
+    // 5. Symmetri Platform Fee (Flat: 1.5%)
+    const platformFeeRate = 0.015;
     const platformFee = principalSource * platformFeeRate;
 
     let outboundFee = 0;
@@ -277,26 +284,32 @@ export default function ReviewPage() {
     // FORCE UPDATE: Rename and Ensure 0.6% for ARS
     if (toCurrency === 'ARS') {
       COMPLIANCE_REGISTRY['ARS'].rules = [
-        { label: 'ARS Bank Tax (0.6%)', rate: 0.006 },
-        { label: 'Ingresos Brutos (IIBB)', rate: 0.00 }
+        { label: 'ARS Bank Tax (0.6%)', rate: 0.006, base: 'principal' },
+        { label: 'Ingresos Brutos (IIBB)', rate: 0.00, base: 'principal' }
       ];
     }
+
+    const baseFeesSource = inboundPctFee + cardFixedFee + liquidityFee + gatewayFee + outboundFee + platformFee;
 
     const compliance = COMPLIANCE_REGISTRY[toCurrency] || { rules: [] };
     const appliedTaxes = compliance.rules
       .map(rule => {
-        // Tax on Domestic Leg
-        const destTaxAmount = grossReceive * rule.rate;
-        // Convert to Source (Fuel)
-        const sourceTaxAmount = destTaxAmount / rate;
+        let sourceTaxAmount = 0;
+        if (rule.base === 'fees') {
+          sourceTaxAmount = baseFeesSource * rule.rate;
+        } else {
+          // Tax on Domestic Leg Principal
+          const destTaxAmount = grossReceive * rule.rate;
+          sourceTaxAmount = destTaxAmount / rate;
+        }
         return { label: rule.label, amountSource: sourceTaxAmount };
       })
       .filter(t => t.amountSource > 0);
 
     const matchTaxesTotal = appliedTaxes.reduce((acc, t) => acc + t.amountSource, 0);
 
-    // Total Fees = (Inbound % + Card Fixed) + Liquidity + Gateway + Platform + Outbound + Taxes
-    const totalFeesSource = inboundPctFee + cardFixedFee + liquidityFee + gatewayFee + outboundFee + platformFee + matchTaxesTotal;
+    // Total Fees = Base Fees + Taxes
+    const totalFeesSource = baseFeesSource + matchTaxesTotal;
     const totalToPaySource = principalSource + totalFeesSource;
 
     setBreakdown({
@@ -378,7 +391,7 @@ export default function ReviewPage() {
           credentials: 'include',
           body: JSON.stringify({
             status: 'MATCHED',
-            adyen_stored_payment_id: "mock_adyen_token_taker_999", // Mock funding
+            adyen_stored_payment_id: (useNewMethod && paymentData) ? paymentData.token : "mock_adyen_token_taker_999",
             destination_id: effectiveBeneficiary?.id // Ensure Taker beneficiary is passed
           })
         });
@@ -389,7 +402,7 @@ export default function ReviewPage() {
           currencyTo: swapIntent?.target_currency || qTo,
           beneficiaryId: effectiveBeneficiary?.id,
           provider: swapIntent?.provider,
-          payoutMethod: paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP',
+          payoutMethod: useNewMethod ? (paymentData?.methodId || 'card') : (paymentMethods.find(m => m.id === selectedMethodId)?.type || 'RTP'),
           payOutRail: payOutRail
         };
 
@@ -541,25 +554,44 @@ export default function ReviewPage() {
           {/* LEFT: PAYMENT */}
           <div>
             <h2 style={{ fontSize: '22px', color: '#2c3e50', marginBottom: '20px' }}>Select Funding Method</h2>
-            <div style={{ marginBottom: '25px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#34495e', fontSize: '14px' }}>Fund With</label>
-              <select value={selectedMethodId} onChange={(e) => e.target.value === 'add_new' ? setShowAddModal(true) : setSelectedMethodId(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #bdc3c7', fontSize: '16px', backgroundColor: 'white' }}>
-                {paymentMethods.map(renderMethodOption)}
-                <option value="add_new">+ Add New Funding Method</option>
-              </select>
+            
+            <PaymentMethodForm 
+               gateways={[
+                 { id: 'rtp', label: 'Instant Bank (RTP)', pct: 0, fixed: 0.50 },
+                 { id: 'card', label: 'Debit / Credit Card', pct: 0.029, fixed: 0.30 },
+                 { id: 'zelle', label: 'Zelle', pct: 0, fixed: 0 }
+               ]}
+               selectedMethodId={useNewMethod ? (paymentData?.methodId || 'card') : null}
+               onMethodSelect={(id) => {
+                 setUseNewMethod(true);
+                 if (paymentData) {
+                   setPaymentData({ ...paymentData, methodId: id as any });
+                 } else {
+                   setPaymentData({ methodId: id as any } as any);
+                 }
+               }}
+               onDataChange={(valid, data) => {
+                 setIsPaymentValid(valid);
+                 setPaymentData(data);
+               }}
+            />
+
+            {!useNewMethod && (
+               <div style={{ marginTop: '20px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#34495e', fontSize: '14px' }}>Saved Funding Methods</label>
+                  <select value={selectedMethodId} onChange={(e) => setSelectedMethodId(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #bdc3c7', fontSize: '16px', backgroundColor: 'white' }}>
+                    {paymentMethods.map(renderMethodOption)}
+                  </select>
+               </div>
+            )}
+            
+            <div style={{ marginTop: '25px', textAlign: 'center' }}>
+               <button onClick={() => setUseNewMethod(!useNewMethod)} style={{ background: 'none', border: 'none', color: brandConfig.theme.actionColor, textDecoration: 'underline', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}>
+                 {useNewMethod ? 'Use a saved method instead' : '+ Add new payment method'}
+               </button>
             </div>
 
-            <div style={{ padding: '15px 20px', borderRadius: '12px', background: 'linear-gradient(135deg, #f6f8f9 0%, #e5ebee 100%)', border: '1px solid #dcdde1', display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px' }}>
-              <div style={{ fontSize: '24px' }}>{paymentMethods.find(m => m.id === selectedMethodId)?.type === 'RTP' ? '🏦' : '💳'}</div>
-              <div>
-                <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>{paymentMethods.find(m => m.id === selectedMethodId)?.label}</div>
-                <div style={{ fontSize: '13px', color: '#7f8c8d' }}>
-                  {paymentMethods.find(m => m.id === selectedMethodId)?.type === 'RTP' ? 'Linked Bank Account' : `${(paymentMethods.find(m => m.id === selectedMethodId)?.cardType || 'debit').toUpperCase()} ending in ${paymentMethods.find(m => m.id === selectedMethodId)?.last4}`}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '25px' }}>
+            <div style={{ marginTop: '30px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: '#34495e', fontSize: '14px' }}>Delivery Method (Pay-Out Rail)</label>
               <select value={payOutRail} onChange={(e) => setPayOutRail(e.target.value)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: '1px solid #bdc3c7', fontSize: '16px', backgroundColor: 'white' }}>
                 <option value="RTP">Bank Transfer (RTP) - $0.50</option>
@@ -567,288 +599,31 @@ export default function ReviewPage() {
                 <option value="PUSH_TO_CARD">Push-to-Card - 1.5%</option>
               </select>
             </div>
-
-            {/* Add New Modal */}
-            {showAddModal && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-              <div style={{ background: 'white', padding: 30, borderRadius: 12, width: 400 }}>
-                <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#2c3e50' }}>Add New Funding Method</h3>
-                
-                <div style={{ marginBottom: 15 }}>
-                  <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Method Type</label>
-                  <select
-                    value={newMethodType}
-                    onChange={(e) => setNewMethodType(e.target.value as any)}
-                    style={inputStyle}
-                  >
-                    <option value="card">Card (Debit/Credit)</option>
-                    <option value="bank">Bank Account (RTP)</option>
-                  </select>
-                </div>
-
-                {newMethodType === 'card' && (
-                  <>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Name on Card</label>
-                      <input
-                        type="text"
-                        placeholder="John Doe"
-                        value={newForm.holderName}
-                        onChange={(e) => setNewForm({ ...newForm, holderName: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Card Type</label>
-                      <select
-                        value={newForm.cardType}
-                        onChange={(e) => setNewForm({ ...newForm, cardType: e.target.value as CardType })}
-                        style={inputStyle}
-                      >
-                        <option value="debit">Debit Card (Lower Fees)</option>
-                        <option value="credit">Credit Card (Higher Fees)</option>
-                      </select>
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Card Number</label>
-                      <input
-                        type="text"
-                        placeholder="•••• •••• •••• 1234"
-                        value={newForm.cardNumber}
-                        onChange={(e) => setNewForm({ ...newForm, cardNumber: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: 15 }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Expiry (MM/YY)</label>
-                        <input
-                          type="text"
-                          placeholder="MM/YY"
-                          value={newForm.expiry}
-                          onChange={(e) => setNewForm({ ...newForm, expiry: e.target.value })}
-                          style={inputStyle}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>CVV</label>
-                        <input
-                          type="text"
-                          placeholder="123"
-                          value={newForm.cvv}
-                          onChange={(e) => setNewForm({ ...newForm, cvv: e.target.value })}
-                          style={inputStyle}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Billing Zip Code</label>
-                      <input
-                        type="text"
-                        placeholder="90210"
-                        value={newForm.billingZip}
-                        onChange={(e) => setNewForm({ ...newForm, billingZip: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {newMethodType === 'bank' && (
-                  <>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Owner Name</label>
-                      <input
-                        type="text"
-                        placeholder="John Doe"
-                        value={newForm.holderName}
-                        onChange={(e) => setNewForm({ ...newForm, holderName: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Bank Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Chase Bank"
-                        value={newForm.bankName}
-                        onChange={(e) => setNewForm({ ...newForm, bankName: e.target.value })}
-                        style={inputStyle}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 15 }}>
-                      <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Type</label>
-                      <select
-                        value={newForm.accountType}
-                        onChange={(e) => setNewForm({ ...newForm, accountType: e.target.value })}
-                        style={inputStyle}
-                      >
-                        <option value="checking">Checking Account</option>
-                        <option value="saving">Savings Account</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: 15 }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Routing Number</label>
-                        <input
-                          type="text"
-                          placeholder="012345678"
-                          value={newForm.routingNumber}
-                          onChange={(e) => setNewForm({ ...newForm, routingNumber: e.target.value })}
-                          style={inputStyle}
-                        />
-                      </div>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: 5, fontSize: 14, color: '#34495e', fontWeight: 'bold' }}>Account Number</label>
-                        <input
-                          type="text"
-                          placeholder="000123456789"
-                          value={newForm.accountNumber}
-                          onChange={(e) => setNewForm({ ...newForm, accountNumber: e.target.value })}
-                          style={inputStyle}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ marginBottom: 15, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <input
-                        type="checkbox"
-                        id="rtpCheckbox"
-                        checked={newForm.rtpSupported}
-                        onChange={(e) => setNewForm({ ...newForm, rtpSupported: e.target.checked })}
-                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                      />
-                      <label htmlFor="rtpCheckbox" style={{ fontSize: 14, color: '#34495e', cursor: 'pointer' }}>
-                        My bank supports Real-Time Payments (RTP) or FedNow
-                      </label>
-                    </div>
-                  </>
-                )}
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-                  <button onClick={() => { setShowAddModal(false); setSelectedMethodId('method_rtp'); }} style={{ padding: '12px', flex: 1, borderRadius: '8px', border: '2px solid #e1e8ed', background: 'transparent', cursor: 'pointer', fontWeight: 'bold', color: '#7f8c8d' }}>Cancel</button>
-                  <button onClick={handleAddNewMethod} disabled={addingMethod} style={{ padding: '12px', flex: 1, background: '#1A73E8', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                    {addingMethod ? 'Saving...' : 'Save Method'}
-                  </button>
-                </div>
-              </div>
-            </div>}
           </div>
 
           {/* RIGHT: BREAKDOWN */}
           <div>
-            <div style={{ backgroundColor: '#fdfdfd', border: '1px solid #e1e8ed', borderRadius: '16px', padding: '24px' }}>
-              <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#2c3e50' }}>Transaction Breakdown</h3>
-
-              {/* NON-SACRED SWAP INTENT */}
-              <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '10px' }}>
-                <span>Swap Amount</span>
-                <span style={{ fontWeight: '600', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.principalSource)}</span>
-              </div>
-
-              {/* SACRED RECEIVE */}
-              <div style={{ ...rowStyle, fontSize: '16px', marginBottom: '20px', color: '#27ae60' }}>
-                <span style={{ fontWeight: '600', display: 'flex', alignItems: 'center' }}>
-                  Beneficiary Receives
-                  <span style={{ fontSize: '11px', color: '#27ae60', background: '#e8f8f5', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>SACRED</span>
-                </span>
-                <span style={{ fontWeight: '800' }}>{targetCurr} {currencyFmt(breakdown.grossReceive)}</span>
-              </div>
-
-              <div style={{ borderTop: '1px solid #eee', margin: '15px 0' }}></div>
-
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>+ Applicable Fees</h4>
-
-              {/* ADDITIVE FEES Breakdown - 5 Core Fees */}
-              {/* 1. Inbound (Percentage) */}
-              <div style={rowStyle}>
-                <span>Inbound Cost ({(breakdown as any).inboundFee > 0 ? 'Variable' : 'Free'}) <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.inboundFee)}</span> <Tooltip text="The cost your bank or local payment app charges to move your money into the system" /></span>
-                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.inboundFee)}</span>
-              </div>
-
-              {/* 2. Card Fixed - NEW */}
-              {(breakdown as any).cardFixedFee > 0 && (
-                <div style={rowStyle}>
-                  <span>Card Processing (Fixed) <Tooltip text="Network fixed fee" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt((breakdown as any).cardFixedFee)}</span>
-                </div>
-              )}
-
-              {/* 3. Premium / Liquidity */}
-              {breakdown.liquidityFee > 0 && <div style={rowStyle}>
-                <span>Instant Liquidity <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.liquidityFee)}</span> <Tooltip text="This covers the cost for the independent Gateway institution to advance money to your recipient immediately, even if your bank or card takes days to finish the transfer" /></span>
-                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.liquidityFee)}</span>
-              </div>}
-
-              {/* 4. Gateway */}
-              <div style={rowStyle}>
-                <span>Gateway Processing <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.gatewayFee)}</span> <Tooltip text="A small fee paid to an independent financial institution (the 'Gateway') that handles your money. This institution acts as a buffer to ensure your personal bank details are never shared directly with the recipient or their bank" /></span>
-                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.gatewayFee)}</span>
-              </div>
-
-              {/* 5. Service / Platform */}
-              <div style={rowStyle}>
-                <span>Platform Fee <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.platformFee)}</span> <Tooltip text="The cost for using the Symmetri app to find the best market rate and organize your swap from start to finish" /></span>
-                <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.platformFee)}</span>
-              </div>
-
-                <div style={rowStyle}>
-                  <span>Outbound Cost (Delivery) <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(breakdown.outboundFee)}</span> <Tooltip text="The cost your bank or local payment app charges to delivery the funds to the recipient" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(breakdown.outboundFee)}</span>
-                </div>
-
-              {/* DYNAMIC COMPLIANCE TAXES */}
-              {breakdown.appliedTaxes.map((tax, i) => (
-                <div key={i} style={rowStyle}>
-                  <span>{tax.label} <span style={{fontSize:'12px', color:'#95a5a6', marginLeft: '4px'}}>{pct(tax.amountSource)}</span> <Tooltip text="Mandatory taxes required by the government in the destination country. These are deducted by the local bank or delivery partner; Symmetri does not receive or handle these funds" /></span>
-                  <span style={{ color: '#2c3e50' }}>+ {fromCurr} {currencyFmt(tax.amountSource)}</span>
-                </div>
-              ))}
-
-              <div style={{ borderTop: '2px solid #e1e8ed', margin: '15px 0' }}></div>
-
-              {/* TOTAL COST */}
-              <div style={{ ...rowStyle, color: '#57606f', fontWeight: 'bold', fontSize: '16px' }}>
-                <span>Total Additional Cost (Friction)</span>
-                <span>+ {fromCurr} {currencyFmt(breakdown.totalFeesSource)}</span>
-              </div>
-
-              {/* FRICTION PERCENTAGE - NEW */}
-              <div style={{ ...rowStyle, color: '#57606f', fontWeight: 'bold', fontSize: '16px', marginTop: '-4px' }}>
-                <span>Total Additional Cost (%)</span>
-                <span>{(breakdown.principalSource > 0 ? (breakdown.totalFeesSource / breakdown.principalSource * 100).toFixed(2) : '0.00')}%</span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#2c3e50' }}>Total You Pay</span>
-                <span style={{ fontSize: '24px', fontWeight: '800', color: '#2c3e50' }}>{fromCurr} {currencyFmt(breakdown.totalToPaySource)}</span>
-              </div>
-
-              {/* EXCHANGE RATES */}
-              <div style={{ background: '#f1f5f9', padding: '16px', borderRadius: '12px', marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
-                    Agreed Exchange Rate 
-                    <Tooltip text="The base rate secured via P2P match before fees" />
-                  </span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '14px', fontWeight: '600', color: '#64748b' }}>
-                      {renderExchangeRate(agreedRate)}
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: '#475569' }}>
-                    Effective Exchange Rate 
-                    <Tooltip text="The true rate you are getting when all friction and fees are accounted for" />
-                  </span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#0f172a' }}>
-                      {renderExchangeRate(effectiveRate)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <TransactionSummary
+              title="Transaction Breakdown"
+              subtitle=""
+              hideHeader={true}
+              amount={currencyFmt(breakdown.principalSource)}
+              sourceCurrency={fromCurr}
+              amountReceived={currencyFmt(breakdown.grossReceive)}
+              targetCurrency={targetCurr}
+              beneficiaryName={effectiveBeneficiary?.first_name ? `${effectiveBeneficiary.first_name} ${effectiveBeneficiary.last_name || ''}` : (effectiveBeneficiary?.name || '-')}
+              fundingMethodName={useNewMethod ? (paymentData?.methodId === 'rtp' ? 'Bank (RTP)' : 'Card') : (paymentMethods.find(m => m.id === selectedMethodId)?.label || '-')}
+              symmetriFee={currencyFmt(breakdown.platformFee)}
+              inboundFee={currencyFmt((breakdown as any).inboundFee + ((breakdown as any).cardFixedFee || 0))}
+              outboundFee={currencyFmt(breakdown.outboundFee)}
+              additionalFees={[
+                ...(breakdown.gatewayFee > 0 ? [{ label: 'Gateway Processing', amount: currencyFmt(breakdown.gatewayFee) }] : []),
+                ...(breakdown.liquidityFee > 0 ? [{ label: 'Instant Liquidity', amount: currencyFmt(breakdown.liquidityFee) }] : []),
+                ...breakdown.appliedTaxes.map(tax => ({ label: tax.label, amount: currencyFmt(tax.amountSource) }))
+              ]}
+              totalFees={currencyFmt(breakdown.totalFeesSource)}
+              effectiveRate={effectiveRate.toFixed(4)}
+            />
 
             {/* FOOTER ACTIONS - EXACT HARMONY WITH BENEFICIARY.TSX */}
             <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>

@@ -165,7 +165,7 @@ class TransactionController:
             retailer_wholesale_margin=wholesale_margin,
             beneficiary_id=uuid.UUID(beneficiary_id) if beneficiary_id else None,
             vendor_id=retailer_id,
-            status="pending_fulfillment",
+            status="PENDING",
             type="VOUCHER_CREATION",
             description=f"Retail Voucher for {retailer_id} in {destination_market} from {origin_market}",
             idempotency_key=payment_success_token
@@ -185,9 +185,9 @@ class TransactionController:
                 transaction_id=str(new_tx.id)
             )
 
-            # Update the transaction status to fulfilled since we have the barcode
-            new_tx.status = "fulfilled"
-            db.commit()
+            # Status remains PENDING until settlement webhook clears it
+            # new_tx.status = "fulfilled"
+            # db.commit()
 
             if background_tasks:
                 background_tasks.add_task(check_low_inventory, retailer_id)
