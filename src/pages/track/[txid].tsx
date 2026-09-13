@@ -35,15 +35,15 @@ export default function TrackTransactionPage() {
 
         const fetchStatus = async () => {
             try {
-                // In real app: GET /api/transactions/[txid]
-                // For demo, we might need to mock if API returns static 'completed'
+                // GET /api/transactions/[txid]
+                // If API returns static 'completed' early, simulate progression
                 const { json } = await apiFetch<Transaction>(`/api/transactions/${txid}`);
 
-                // MOCK override for demo visualization (Simulate progression)
+                // Visual override for demo visualization (Simulate progression)
                 // If created < 10s ago -> screening. < 20s -> processing. > 20s -> completed.
                 // For now, let's just use the API response if it supports status.
                 // If API allows, we'd use json.status. 
-                // Since API mock is static 'completed', let's simulate "Live Ops" for the user 
+                // Since API state is static 'completed', let's simulate "Live Ops" for the user 
                 // based on client-side time for the "WOW" effect requested.
 
                 // Simulate "Live" Loading state

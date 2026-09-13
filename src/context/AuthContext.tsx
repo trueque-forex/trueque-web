@@ -57,6 +57,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (e) {
             console.error('Logout failed', e);
         }
+        
+        // Wipe all user-specific persistent state to prevent bleeding between accounts
+        try {
+            localStorage.removeItem('trueque_session');
+            localStorage.removeItem('symmetri_saved_payment');
+            localStorage.removeItem('trueque_swap_state_persistent');
+        } catch (e) { /* ignore */ }
+
         setUser(null);
         router.push('/');
     };

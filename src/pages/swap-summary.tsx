@@ -28,14 +28,16 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
     'MXN': { name: 'Mexico', rules: [{ label: 'SPEI Fee', rate: 0.00 }, { label: 'IVA', rate: 0.16 }] }
 };
 
-const GATEWAY_PROCESSING_COST = 2.50;
-const TRUEQUE_PLATFORM_FEE = 0.005;
-const RETAILER_VOUCHER_FEE = 2.00;
-const CARD_DEBIT_INBOUND_PCT = 0.015;
-const CARD_DEBIT_LIQUIDITY_PCT = 0.005;
-const CARD_CREDIT_INBOUND_PCT = 0.029;
-const CARD_CREDIT_LIQUIDITY_PCT = 0.015;
-const CARD_FIXED_FEE = 0.30;
+import {
+    GATEWAY_PROCESSING_COST,
+    SYMMETRI_PLATFORM_FEE,
+    RETAILER_VOUCHER_FEE,
+    CARD_DEBIT_INBOUND_PCT,
+    CARD_DEBIT_LIQUIDITY_PCT,
+    CARD_CREDIT_INBOUND_PCT,
+    CARD_CREDIT_LIQUIDITY_PCT,
+    CARD_FIXED_FEE
+} from '../config/pricing';
 
 const Tooltip = ({ text }: { text: string }) => (
     <span title={text} style={{ cursor: 'help', marginLeft: '6px', color: '#bdc3c7', fontSize: '14px' }}>ⓘ</span>
@@ -138,7 +140,7 @@ export default function SwapSummaryPage() {
         }
 
         const gatewayFee = GATEWAY_PROCESSING_COST;
-        const platformFee = principalSource * TRUEQUE_PLATFORM_FEE;
+        const platformFee = principalSource * SYMMETRI_PLATFORM_FEE;
         let outboundFee = 0;
         if (deliveryMethod === 'card_push') outboundFee = principalSource * 0.015;
         else if (deliveryMethod === 'wallet') outboundFee = 0.50;
@@ -257,7 +259,18 @@ export default function SwapSummaryPage() {
                 return;
             }
         }
-        setShowMFA(true);
+        // Check if MFA is disabled for test accounts
+        if (s.mfa_enabled === false) {
+            console.log('Skipping MFA (mfa_enabled is false in session)');
+            processSwap();
+        } else {
+            setShowMFA(true);
+            fetch('/api/auth/resend-mfa', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: s.email }),
+            }).catch(console.error);
+        }
     };
 
     const handleVerifyMFA = async () => {

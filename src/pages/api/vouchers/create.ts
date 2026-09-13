@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth } from '../../../lib/withAuth';
+import { transaction } from '../../../lib/db';
+import { MIN_ORDER_VALUE } from '../../../config/pricing';
 import { TruequeSession } from '../../../types/auth';
-
-const MIN_ORDER_VALUE = 20.00;
 
 /**
  * POST /api/vouchers/create

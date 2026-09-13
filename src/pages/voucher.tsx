@@ -9,9 +9,7 @@ import PaymentMethodForm, { PaymentData } from '../components/shared/PaymentMeth
 import TransactionSummary from '../components/shared/TransactionSummary';
 import InlineBeneficiaryForm from '../components/shared/InlineBeneficiaryForm';
 
-const MIN_ORDER_VALUE = 20.00;
-const MAX_PER_TX_USD  = 250.00;
-const MAX_MONTHLY_USD = 750.00;
+import { MIN_ORDER_VALUE, MAX_PER_TX_USD, MAX_MONTHLY_USD } from '../config/pricing';
 
 type Retailer = {
     id: string;

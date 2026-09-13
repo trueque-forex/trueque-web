@@ -72,17 +72,15 @@ const COMPLIANCE_REGISTRY: Record<string, CountryCompliance> = {
   }
 };
 
-// ----------------------
-// CONFIGURATION
-// ----------------------
-const GATEWAY_PROCESSING_COST = 2.50;
-
-// Card Specifics
-const CARD_DEBIT_INBOUND_PCT = 0.015;
-const CARD_DEBIT_LIQUIDITY_PCT = 0.005;
-const CARD_CREDIT_INBOUND_PCT = 0.029;
-const CARD_CREDIT_LIQUIDITY_PCT = 0.015;
-const CARD_FIXED_FEE = 0.30;
+import {
+  GATEWAY_PROCESSING_COST,
+  CARD_DEBIT_INBOUND_PCT,
+  CARD_DEBIT_LIQUIDITY_PCT,
+  CARD_CREDIT_INBOUND_PCT,
+  CARD_CREDIT_LIQUIDITY_PCT,
+  CARD_FIXED_FEE,
+  SYMMETRI_PLATFORM_FEE
+} from '../config/pricing';
 
 
 const Tooltip = ({ text }: { text: string }) => (
@@ -241,9 +239,18 @@ export default function ReviewPage() {
     }
 
     // 2. Identify Methods
-    const payMethod = paymentMethods.find(m => m.id === selectedMethodId);
-    const isCard = payMethod?.type === 'CARD';
-    const isCredit = isCard && payMethod?.cardType === 'credit';
+    let isCard = false;
+    let isCredit = false;
+
+    if (useNewMethod) {
+      isCard = paymentData?.methodId === 'debit' || paymentData?.methodId === 'credit';
+      isCredit = paymentData?.methodId === 'credit';
+    } else {
+      const payMethod = paymentMethods.find(m => m.id === selectedMethodId);
+      isCard = payMethod?.type === 'CARD';
+      isCredit = isCard && payMethod?.cardType === 'credit';
+    }
+
     const deliveryMethod = effectiveBeneficiary?.banking?.deliveryMethod || 'bank_rtp';
 
     // 3. Calculate ADDITIVE Fees (Fuel) -> All in EUR
@@ -268,8 +275,8 @@ export default function ReviewPage() {
 
     const gatewayFee = GATEWAY_PROCESSING_COST;
 
-    // 5. Symmetri Platform Fee (Flat: 1.5%)
-    const platformFeeRate = 0.015;
+    // 5. Symmetri Platform Fee
+    const platformFeeRate = SYMMETRI_PLATFORM_FEE;
     const platformFee = principalSource * platformFeeRate;
 
     let outboundFee = 0;
@@ -329,7 +336,7 @@ export default function ReviewPage() {
       cardFixedFee
     } as any);
 
-  }, [effectiveSwapIntent, router.query, selectedMethodId, effectiveBeneficiary, qTo, paymentMethods, holidayModeCountry]);
+  }, [effectiveSwapIntent, router.query, selectedMethodId, effectiveBeneficiary, qTo, paymentMethods, holidayModeCountry, useNewMethod, paymentData]);
 
 
   // Handlers
@@ -481,6 +488,11 @@ export default function ReviewPage() {
       processSwap();
     } else {
       setShowMFA(true);
+      fetch('/api/auth/resend-mfa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: s.email }),
+      }).catch(console.error);
     }
   };
 
@@ -558,7 +570,8 @@ export default function ReviewPage() {
             <PaymentMethodForm 
                gateways={[
                  { id: 'rtp', label: 'Instant Bank (RTP)', pct: 0, fixed: 0.50 },
-                 { id: 'card', label: 'Debit / Credit Card', pct: 0.029, fixed: 0.30 },
+                 { id: 'debit', label: 'Debit Card', pct: CARD_DEBIT_INBOUND_PCT, fixed: CARD_FIXED_FEE },
+                 { id: 'credit', label: 'Credit Card', pct: CARD_CREDIT_INBOUND_PCT, fixed: CARD_FIXED_FEE },
                  { id: 'zelle', label: 'Zelle', pct: 0, fixed: 0 }
                ]}
                selectedMethodId={useNewMethod ? (paymentData?.methodId || null) : null}
@@ -800,7 +813,15 @@ export default function ReviewPage() {
                   </div>
 
                   <div style={{ marginTop: '20px', fontSize: '12px', color: '#95a5a6' }}>
-                    Code sent. <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => alert('Code Resent!')}>Resend</span>
+                    Code sent. <span style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => {
+                      const s = JSON.parse(localStorage.getItem('trueque_session') || '{}');
+                      fetch('/api/auth/resend-mfa', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: s.email }),
+                      }).catch(console.error);
+                      alert('A new code has been generated in your terminal!');
+                    }}>Resend</span>
                   </div>
 
                 </div>

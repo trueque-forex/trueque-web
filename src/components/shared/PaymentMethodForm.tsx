@@ -94,10 +94,26 @@ export default function PaymentMethodForm({
             <div className="flex-1">
               <p className="text-sm font-semibold text-gray-900">{method.label}</p>
               {(method.pct > 0 || method.fixed > 0) && (
-                <p className="text-xs text-gray-500">
-                  Fee: {(method.pct * 100).toFixed(2)}%{' '}
-                  {method.fixed > 0 && `+ $${method.fixed.toFixed(2)}`}
-                </p>
+                <div className="text-xs text-gray-500 flex items-center space-x-1">
+                  <span>
+                    {(() => {
+                      if (method.id === 'debit_card') {
+                        return `Fee: ${((method.pct + 0.005) * 100).toFixed(2)}% + $${method.fixed.toFixed(2)} (Includes 0.50% Liquidity Cost)`;
+                      } else if (method.id === 'credit_card') {
+                        return `Fee: ${((method.pct + 0.015) * 100).toFixed(2)}% + $${method.fixed.toFixed(2)} (Includes 1.50% Liquidity Cost)`;
+                      }
+                      return `Fee: ${(method.pct * 100).toFixed(2)}% ${method.fixed > 0 ? `+ $${method.fixed.toFixed(2)}` : ''}`;
+                    })()}
+                  </span>
+                  {(method.id === 'debit_card' || method.id === 'credit_card') && (
+                    <span 
+                      className="inline-flex items-center justify-center w-3 h-3 rounded-full bg-gray-200 text-gray-600 text-[9px] font-bold cursor-help"
+                      title="Covers the cost of advancing funds instantly while the card network settles the transaction."
+                    >
+                      i
+                    </span>
+                  )}
+                </div>
               )}
             </div>
             <div

@@ -1,5 +1,6 @@
 // src/pages/api/orders/reservation.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { GATEWAY_PROCESSING_COST } from '../../../config/pricing';
 import { withAuth } from '../../../lib/withAuth';
 
 type Reservation = {
@@ -38,7 +39,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
   const expiresAt = new Date(ts + 5 * 60 * 1000).toISOString();
   const status: Reservation['status'] = Date.now() > ts + 5 * 60 * 1000 ? 'expired' : 'active';
 
-  const fees = 2.50; // Fixed mock fee
+  const fees = GATEWAY_PROCESSING_COST;
   const recipientAmount = (amount * rate) - fees; // Simplified logic
   const effectiveRate = recipientAmount / amount;
 

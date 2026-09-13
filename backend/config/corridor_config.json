@@ -150,8 +150,8 @@
                     "label": "FedNow / RTP"
                 },
                 "debit_card": {
-                    "pct": 0.021,
-                    "fixed": 0.25,
+                    "pct": 0.015,
+                    "fixed": 0.30,
                     "label": "Debit Card"
                 },
                 "credit_card": {

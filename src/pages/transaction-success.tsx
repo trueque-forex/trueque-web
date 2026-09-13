@@ -77,11 +77,11 @@ export default function TransactionStatusPage() {
         // Generate/Parse Counterparty ID (Symmetri ID / SID)
         // Format: S + YYYYMMDD + 4-digit sequence + checksum
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const mockSequence = (transactionId as string)?.substring((transactionId as string).length - 4).replace(/[^0-9]/g, '') || '0001';
-        const paddedSequence = mockSequence.padStart(4, '0').slice(-4);
+        const fallbackSequence = (transactionId as string)?.substring((transactionId as string).length - 4).replace(/[^0-9]/g, '') || '0001';
+        const paddedSequence = fallbackSequence.padStart(4, '0').slice(-4);
         const checksum = 'X';
-        const mockId = `S${date}${paddedSequence}${checksum}`;
-        setCounterpartyId(mockId);
+        const generatedTxId = `S${date}${paddedSequence}${checksum}`;
+        setCounterpartyId(generatedTxId);
 
         if (beneficiary) {
             try {

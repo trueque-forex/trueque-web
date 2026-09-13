@@ -10,6 +10,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Mock Generation
         const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Save to global state for local testing verification
+        (global as any).__DEV_MFA_CODE = newCode;
 
         // LOGGING (Critical for Dev)
         console.log('------------------------------------------------');
@@ -17,9 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.log(`📧 DESTINATION:       ${email || 'Unknown User'}`);
         console.log('------------------------------------------------');
 
-        // Note: For dev flow, we don't strictly update the token logic since '123456' is the universal key, 
-        // but this log proves the "Resend" action reached the backend.
-
+        // Note: For dev flow, we allow both '123456' and the globally generated code.
         return res.status(200).json({ ok: true, message: 'Code resent' });
     } catch (e) {
         console.error('Resend failed', e);

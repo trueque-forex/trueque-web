@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
+import { CARD_DEBIT_INBOUND_PCT, CARD_CREDIT_INBOUND_PCT, CARD_FIXED_FEE } from '../config/pricing';
 
 interface VoucherCheckoutProps {
   voucherAmount: number;
@@ -9,16 +10,14 @@ interface VoucherCheckoutProps {
 
 export default function VoucherCheckout({ voucherAmount, retailerName, onPurchase }: VoucherCheckoutProps) {
   const router = useRouter();
-  const [selectedMethod, setSelectedMethod] = useState<'ach' | 'card' | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<'ach' | 'debit' | 'credit' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Constants
-  const cardFeePct = 0.029;
-  const cardFixedFee = 0.30;
-  
   // Dynamic Math
-  const processorFee = selectedMethod === 'card' 
-    ? (voucherAmount * cardFeePct) + cardFixedFee 
+  const processorFee = selectedMethod === 'debit' 
+    ? (voucherAmount * CARD_DEBIT_INBOUND_PCT) + CARD_FIXED_FEE 
+    : selectedMethod === 'credit'
+    ? (voucherAmount * CARD_CREDIT_INBOUND_PCT) + CARD_FIXED_FEE
     : 0.00;
     
   const totalToPay = voucherAmount + processorFee;
@@ -80,28 +79,53 @@ export default function VoucherCheckout({ voucherAmount, retailerName, onPurchas
           </div>
         </button>
 
-        {/* Option 2: Card */}
+        {/* Option 2: Debit Card */}
         <button
-          onClick={() => setSelectedMethod('card')}
+          onClick={() => setSelectedMethod('debit')}
           className={`w-full flex justify-between items-center p-4 rounded-xl border-2 transition-all ${
-            selectedMethod === 'card' 
+            selectedMethod === 'debit' 
               ? 'border-indigo-600 bg-indigo-50/30' 
               : 'border-gray-200 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center gap-4">
-            <div className={`p-2 rounded-full ${selectedMethod === 'card' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
+            <div className={`p-2 rounded-full ${selectedMethod === 'debit' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
             </div>
             <div className="text-left">
-              <span className="block font-semibold text-gray-900">Debit/Credit Card</span>
-              <span className="block text-sm text-gray-500 font-medium">Processor fee applies (e.g., ${(voucherAmount * cardFeePct + cardFixedFee).toFixed(2)})</span>
+              <span className="block font-semibold text-gray-900">Debit Card</span>
+              <span className="block text-sm text-gray-500 font-medium">Processor fee applies (e.g., ${(voucherAmount * CARD_DEBIT_INBOUND_PCT + CARD_FIXED_FEE).toFixed(2)})</span>
             </div>
           </div>
-          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedMethod === 'card' ? 'border-indigo-600' : 'border-gray-300'}`}>
-            {selectedMethod === 'card' && <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />}
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedMethod === 'debit' ? 'border-indigo-600' : 'border-gray-300'}`}>
+            {selectedMethod === 'debit' && <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />}
+          </div>
+        </button>
+
+        {/* Option 3: Credit Card */}
+        <button
+          onClick={() => setSelectedMethod('credit')}
+          className={`w-full flex justify-between items-center p-4 rounded-xl border-2 transition-all ${
+            selectedMethod === 'credit' 
+              ? 'border-indigo-600 bg-indigo-50/30' 
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className={`p-2 rounded-full ${selectedMethod === 'credit' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-500'}`}>
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <span className="block font-semibold text-gray-900">Credit Card</span>
+              <span className="block text-sm text-gray-500 font-medium">Processor fee applies (e.g., ${(voucherAmount * CARD_CREDIT_INBOUND_PCT + CARD_FIXED_FEE).toFixed(2)})</span>
+            </div>
+          </div>
+          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selectedMethod === 'credit' ? 'border-indigo-600' : 'border-gray-300'}`}>
+            {selectedMethod === 'credit' && <div className="w-2.5 h-2.5 bg-indigo-600 rounded-full" />}
           </div>
         </button>
       </div>

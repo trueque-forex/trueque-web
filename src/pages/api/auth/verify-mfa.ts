@@ -18,12 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(400).json({ ok: false, error: 'invalid_code_format' });
         }
 
-        const appEnv = process.env.APP_ENV || process.env.NODE_ENV || 'development';
-        const isDevOrTest = appEnv === 'test' || appEnv === 'development';
+        const isDevOrTest = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
 
         // ── TEST BYPASS ──────────────────────────────────────────────────────
         // Only active when APP_ENV=test or development. Never reaches production.
-        if (isDevOrTest && code === '123456') {
+        if (isDevOrTest && (code === '123456' || code === (global as any).__DEV_MFA_CODE)) {
             console.log('[MFA] Test bypass used — APP_ENV=test');
             return res.status(200).json({ ok: true, verified: true });
         }

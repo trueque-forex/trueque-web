@@ -3,7 +3,7 @@ import { transaction } from '../../../lib/db';
 import { withAuth } from '../../../lib/withAuth';
 import { TruequeSession } from '../../../types/auth';
 
-const SYMMETRI_SWAP_FEE_PCT = 0.015; // 1.5% per side — GEMINI.md §3.2
+import { SYMMETRI_PLATFORM_FEE as SYMMETRI_SWAP_FEE_PCT } from '../../../config/pricing';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

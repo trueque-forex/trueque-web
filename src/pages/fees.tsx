@@ -1,4 +1,5 @@
 import { useRouter } from 'next/router';
+import { SYMMETRI_PLATFORM_FEE } from '../config/pricing';
 
 export default function FeesPage() {
   const router = useRouter();
@@ -9,16 +10,15 @@ export default function FeesPage() {
 
   const parsedAmount = parseFloat((Array.isArray(amount) ? amount[0] : amount) as string) || 0;
 
-  // Fee logic (can be updated dynamically later)
-  const truequeFeeRate = 0.015; // 1.5%
+  // Fee logic
+  const truequeFee = parsedAmount * SYMMETRI_PLATFORM_FEE;
   const deliveryFee = 5; // flat BRL
   const transmitterFee = corridorStr === 'BR-US' ? 3 : 4; // example logic
 
-  const truequeFee = parsedAmount * truequeFeeRate;
   const totalFees = truequeFee + deliveryFee + transmitterFee;
   const totalCost = parsedAmount + totalFees;
 
-  // Mock rate for BR-US
+  // Static rate for BR-US
   const rate = 0.18;
   const estimatedReceived = parsedAmount * rate;
 

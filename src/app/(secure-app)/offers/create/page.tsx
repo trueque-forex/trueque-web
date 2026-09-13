@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { SYMMETRI_PLATFORM_FEE } from '../../../../config/pricing';
 import { Contacts } from '@capacitor-community/contacts';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -53,8 +54,7 @@ export default function CreateOfferWizard() {
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [inboundGateways, setInboundGateways] = useState<any[]>([]);
   const [outboundRails, setOutboundRails] = useState<any[]>([]);
-  const feePct = 0.015;
-  const symmetriFee = (parseFloat(amount || '0') * feePct).toFixed(2);
+  const symmetriFee = (parseFloat(amount || '0') * SYMMETRI_PLATFORM_FEE).toFixed(2);
   const grossTotal = (parseFloat(amount || '0') + parseFloat(symmetriFee)).toFixed(2);
 
   // Fetch Beneficiaries & Config
