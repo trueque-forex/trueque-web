@@ -3,7 +3,7 @@ import { Page } from '@playwright/test';
 
 export async function loginUser(page: Page, email: string, password: string) {
     await page.goto('/signin');
-    await page.fill('input[id="identifier"]', email);
+    await page.fill('input[type="email"]', email);
     await page.fill('input[type="password"]', password);
     await page.click('button:has-text("Sign In")');
     await page.waitForURL(/\/swap|\/dashboard/, { timeout: 10000 });

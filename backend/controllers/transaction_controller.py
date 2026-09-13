@@ -31,6 +31,7 @@ def allocate_voucher_to_user(
     db: Session, 
     retailer_id: str, 
     value_amount: float, 
+    currency: str,
     owner_id: str, 
     transaction_id: str
 ) -> Dict[str, Any]:
@@ -42,13 +43,20 @@ def allocate_voucher_to_user(
         InventoryVoucher.is_allocated == False
     ).with_for_update(skip_locked=True).first()
 
-    # 2. Handle Empty Vault
+    # 2. Handle Empty Vault / Missing Exact Denomination
     if not available_voucher:
-        # In production, this should trigger an urgent internal alert
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Insufficient inventory for this retailer and amount."
+        # Synthetic Generation: We know liquidity was already secured via synthetic_liquidity check
+        import uuid
+        barcode = f"SYN-{retailer_id[:3].upper()}-{str(uuid.uuid4())[:8].upper()}"
+        available_voucher = InventoryVoucher(
+            retailer_id=retailer_id,
+            value_amount=value_amount,
+            currency=currency,
+            barcode_data=barcode,
+            is_allocated=False
         )
+        db.add(available_voucher)
+        db.flush() # Flush to get an ID before allocating
 
     # 3. Stamp the allocation
     available_voucher.is_allocated = True
@@ -181,6 +189,7 @@ class TransactionController:
                 db=db,
                 retailer_id=retailer_id,
                 value_amount=float(amount_origin),
+                currency=origin_currency,
                 owner_id=sender_id,
                 transaction_id=str(new_tx.id)
             )

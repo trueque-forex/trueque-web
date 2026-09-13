@@ -72,7 +72,15 @@ export default function VoucherPage() {
     useEffect(() => {
         try {
             const saved = localStorage.getItem('symmetri_saved_payment');
-            if (saved) setSavedPayment(JSON.parse(saved));
+            if (saved) {
+                let parsed = JSON.parse(saved);
+                if (parsed.type === 'card') {
+                    parsed.type = 'debit_card';
+                    parsed.label = parsed.label.replace('card ', 'debit_card ');
+                    localStorage.setItem('symmetri_saved_payment', JSON.stringify(parsed));
+                }
+                setSavedPayment(parsed);
+            }
         } catch { /* ignore */ }
     }, []);
 
@@ -385,6 +393,15 @@ export default function VoucherPage() {
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                         {usingSaved && <span style={{ fontSize: '13px', fontWeight: '700', color: '#1A73E8' }}>✓ Selected</span>}
+                                        {usingSaved && (
+                                            <button onClick={(e) => {
+                                                e.stopPropagation();
+                                                setUsingSaved(false);
+                                                setPaymentMethod('');
+                                            }} style={{ background: 'none', border: 'none', color: '#1A73E8', fontSize: '13px', cursor: 'pointer', textDecoration: 'underline' }}>
+                                                Change
+                                            </button>
+                                        )}
                                         <button onClick={(e) => {
                                             e.stopPropagation();
                                             setUsingSaved(false);
@@ -405,6 +422,7 @@ export default function VoucherPage() {
                                 <PaymentMethodForm
                                     gateways={inboundGateways}
                                     selectedMethodId={paymentMethod}
+                                    initialData={paymentData}
                                     onMethodSelect={setPaymentMethod}
                                     onDataChange={(isValid, data) => {
                                         setPaymentData(data);
@@ -414,10 +432,23 @@ export default function VoucherPage() {
                             </div>
                         )}
 
+                        {!paymentReady && (
+                            <p style={{ color: '#ef4444', fontSize: '13px', textAlign: 'center', marginBottom: '12px', fontWeight: '500' }}>
+                                Please fill out your payment details to continue.
+                            </p>
+                        )}
                         <button
                             disabled={!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || monthlyRemaining <= 0 || !paymentReady}
-                            onClick={() => setStep(3)}
-                            style={{ width: '100%', padding: '16px', background: '#1A73E8', color: 'white', fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', cursor: 'pointer', opacity: (!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || !paymentReady) ? 0.4 : 1 }}>
+                            onClick={() => {
+                                console.log("Button clicked!");
+                                setStep(3);
+                            }}
+                            style={{ 
+                                width: '100%', padding: '16px', background: '#1A73E8', color: 'white', 
+                                fontWeight: '700', fontSize: '16px', border: 'none', borderRadius: '12px', 
+                                cursor: 'pointer', 
+                                opacity: (!amountNum || amountNum < effectiveMin || exceedsPerTx || exceedsMonthly || monthlyRemaining <= 0 || !paymentReady) ? 0.4 : 1 
+                            }}>
                             Add Beneficiary →
                         </button>
                     </div>
@@ -439,6 +470,7 @@ export default function VoucherPage() {
                                     setIsAddingBeneficiary(false);
                                 }}
                                 onCancel={() => setIsAddingBeneficiary(false)}
+                                voucherOnly={true}
                             />
                         ) : (
                             <div className="space-y-4">
@@ -512,9 +544,33 @@ export default function VoucherPage() {
                         {error && <div style={{ padding: '12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#dc2626', marginBottom: '16px', fontSize: '14px' }}>{error}</div>}
 
                         <button onClick={handlePurchase} disabled={loading}
-                            style={{ width: '100%', padding: '18px', background: loading ? '#8AB4F8' : '#1A73E8', color: 'white', fontWeight: '800', fontSize: '17px', border: 'none', borderRadius: '14px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.4)' }}>
-                            {loading ? 'Generating Voucher...' : `Purchase Voucher — $${totalCharged.toFixed(2)}`}
+                            style={{ width: '100%', padding: '18px', background: loading ? '#8AB4F8' : '#1A73E8', color: 'white', fontWeight: '800', fontSize: '17px', border: 'none', borderRadius: '14px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: '0 4px 14px rgba(26,115,232,0.4)', marginBottom: '16px' }}>
+                            {loading ? 'Generating Voucher...' : `Confirm & Pay $${totalCharged.toFixed(2)}`}
                         </button>
+                        
+                        {/* Cancel Transaction Link */}
+                        <div style={{ textAlign: 'center' }}>
+                            <button
+                                onClick={() => {
+                                    if (confirm('Are you sure you want to cancel? Your progress will be lost.')) {
+                                        router.push('/dashboard');
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px',
+                                    background: 'transparent',
+                                    border: '2px solid #e1e8ed',
+                                    borderRadius: '10px',
+                                    color: '#7f8c8d',
+                                    fontSize: '16px',
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease'
+                                }}>
+                                Cancel Transaction
+                            </button>
+                        </div>
                     </div>
                 )}
             </main>

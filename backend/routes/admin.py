@@ -138,3 +138,45 @@ async def fund_liquidity(req: LiquidityFundRequest, db: Session = Depends(get_db
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+from ..models.transaction import Transaction
+from ..models.inventory_model import InventoryVoucher
+
+@router.post('/transactions/cancel-pending')
+async def cancel_pending_voucher_transactions(db: Session = Depends(get_db)):
+    """
+    Cancels all PENDING transactions strictly limited to VOUCHER_CREATION.
+    Refunds synthetic liquidity and unallocates vouchers.
+    """
+    try:
+        pending_txs = db.query(Transaction).filter(
+            Transaction.status.in_(['PENDING', 'PENDING_FULFILLMENT']),
+            Transaction.type == 'VOUCHER_CREATION'
+        ).all()
+        
+        count = 0
+        for tx in pending_txs:
+            # 1. Refund Synthetic Liquidity
+            if tx.vendor_id:
+                db.execute(
+                    text('UPDATE synthetic_liquidity SET available_balance = available_balance + :amt WHERE retailer_id = :r'),
+                    {'amt': float(tx.amount), 'r': tx.vendor_id}
+                )
+            
+            # 2. Unallocate Voucher
+            voucher = db.query(InventoryVoucher).filter(InventoryVoucher.transaction_id == tx.id).first()
+            if voucher:
+                voucher.is_allocated = False
+                voucher.allocated_to_owner_id = None
+                voucher.transaction_id = None
+                voucher.allocated_at = None
+            
+            # 3. Cancel Transaction
+            tx.status = 'CANCELLED'
+            count += 1
+            
+        db.commit()
+        return {'success': True, 'cancelled_count': count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+

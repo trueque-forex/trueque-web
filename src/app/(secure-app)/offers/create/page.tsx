@@ -211,7 +211,7 @@ export default function CreateOfferWizard() {
          setAmountReceived('');
          setIsLoading(false);
       } else {
-         router.push('/?success=offer_created');
+         router.push('/dashboard?success=offer_created');
       }
     } catch (err: any) {
       setErrorMsg(err.message);

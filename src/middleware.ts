@@ -60,6 +60,34 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // 2.5 INVESTOR ACCESS TOKEN URL
+  // Lock the entire site behind a secret URL.
+  if (!pathname.startsWith('/api/mobile/')) {
+    const searchParams = req.nextUrl.searchParams;
+    const accessCode = searchParams.get('access');
+    const hasCookie = req.cookies.has('symmetri_investor_access');
+
+    // If they have the correct secret link, set the cookie and redirect to clean URL
+    if (accessCode === 'Vamos2026') {
+      const url = req.nextUrl.clone();
+      url.searchParams.delete('access');
+      const response = NextResponse.redirect(url);
+      response.cookies.set('symmetri_investor_access', 'true', {
+        path: '/',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+      });
+      return response;
+    }
+
+    // If no cookie is present, show a completely blank 404
+    if (!hasCookie) {
+      return new NextResponse('Coming Soon', { status: 404 });
+    }
+  }
+
   // 3. MAIN ROUTE HANDLER
   async function routeHandler() {
     if (PUBLIC_FILE_PATHS.includes(pathname)) {

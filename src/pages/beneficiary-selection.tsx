@@ -61,9 +61,12 @@ export default function BeneficiarySelectionPage() {
         localStorage.setItem('selected_beneficiary', JSON.stringify(b));
 
         const rail = router.query.rail as string;
-        if (rail) {
-            // Return to review with the selected rail
-            router.push(`/review?rail=${rail}`);
+        if (rail || router.query.offerId || swapIntent?.provider) {
+            // Return to review with the selected rail and all query params preserved
+            router.push({
+                pathname: '/review',
+                query: { ...router.query }
+            });
         } else {
             // Navigate to Counterparty Selection
             router.push('/counterparty-offers');
@@ -73,7 +76,7 @@ export default function BeneficiarySelectionPage() {
     const handleNewRecipient = () => {
         // CLEAR any previous draft so we don't accidentally load Maria!
         localStorage.removeItem('selected_beneficiary');
-        router.push('/beneficiary');
+        router.push('/beneficiary?new=true');
     };
 
     return (

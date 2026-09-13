@@ -39,6 +39,7 @@ export default function Offers() {
   const [txCount, setTxCount] = useState(0);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [fetchError, setFetchError] = useState('');
+  const [fetchedMarketRate, setFetchedMarketRate] = useState<number>(marketRate);
 
   // ── Load offers from DB ────────────────────────────────────────────────────
 
@@ -47,14 +48,25 @@ export default function Offers() {
     setFetchError('');
     try {
       const params = new URLSearchParams();
-      // Invert the query: we want counterparty offers where they OFFER what we WANT (currencyTo),
-      // and they WANT what we OFFER (currencyFrom).
-      if (currencyTo)   params.set('currencyFrom', currencyTo);
-      if (currencyFrom) params.set('currencyTo',   currencyFrom);
-      const res = await fetch(`/api/offers?${params}`);
+      // API already maps currencyFrom to currency_wanted and currencyTo to currency_offered.
+      if (currencyFrom) params.set('currencyFrom', currencyFrom);
+      if (currencyTo)   params.set('currencyTo',   currencyTo);
+      
+      const [res, rateRes] = await Promise.all([
+        fetch(`/api/offers?${params}`),
+        fetch(`/api/rate?from=${currencyFrom}&to=${currencyTo}`)
+      ]);
+      
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data: DbOffer[] = await res.json();
       setOffers(data);
+
+      if (rateRes.ok) {
+        const rateData = await rateRes.json();
+        if (rateData.rate) {
+          setFetchedMarketRate(rateData.rate);
+        }
+      }
     } catch (err: any) {
       console.error('[Offers] Failed to fetch offers:', err);
       setFetchError('Could not load offers. Please refresh.');
@@ -125,7 +137,7 @@ export default function Offers() {
     });
 
     router.push({
-      pathname: '/review',
+      pathname: '/beneficiary-selection',
       query: {
         amountIntent: amountWanted,
         expectedReceive: amountOffered.toFixed(2),
@@ -222,13 +234,13 @@ export default function Offers() {
               </select>
             </div>
 
-            {marketRate > 0 && (
+            {fetchedMarketRate > 0 && (
                 <div style={{ marginLeft: 'auto', textAlign: 'right', paddingLeft: '20px' }}>
                     <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Market Rate</div>
                     <div style={{ fontSize: '14px', fontWeight: '600', color: '#0f172a' }}>
-                      {(currencyTo === 'USD' || currencyTo === 'EUR') 
-                        ? `1 ${currencyTo} = ${(1/marketRate).toFixed(4)} ${currencyFrom}`
-                        : `1 ${currencyFrom} = ${marketRate.toFixed(4)} ${currencyTo}`}
+                      {(currencyTo === 'USD' || currencyTo === 'EUR')
+                    ? `1 ${currencyTo} = ${(1/Number(fetchedMarketRate)).toFixed(4)} ${currencyFrom}`
+                    : `1 ${currencyFrom} = ${Number(fetchedMarketRate).toFixed(4)} ${currencyTo}`}
                     </div>
                 </div>
             )}

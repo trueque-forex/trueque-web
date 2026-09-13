@@ -5,12 +5,13 @@ export interface InlineBeneficiaryFormProps {
   targetCurrency: string;
   onSuccess: (savedBeneficiary: any) => void;
   onCancel: () => void;
+  voucherOnly?: boolean;
 }
 
-export default function InlineBeneficiaryForm({ targetCurrency, onSuccess, onCancel }: InlineBeneficiaryFormProps) {
+export default function InlineBeneficiaryForm({ targetCurrency, onSuccess, onCancel, voucherOnly }: InlineBeneficiaryFormProps) {
   const [newBenName, setNewBenName] = useState('');
   const [newBenPhone, setNewBenPhone] = useState('');
-  const [newBenMethod, setNewBenMethod] = useState('bank_rtp');
+  const [newBenMethod, setNewBenMethod] = useState(voucherOnly ? 'retail_voucher' : 'bank_rtp');
   const [newBenBank, setNewBenBank] = useState('');
   const [newBenAccount, setNewBenAccount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -93,14 +94,16 @@ export default function InlineBeneficiaryForm({ targetCurrency, onSuccess, onCan
           <label className="block text-xs font-medium text-gray-700 mb-1">Phone Number</label>
           <input type="text" value={newBenPhone} onChange={e => setNewBenPhone(e.target.value)} className="w-full text-sm rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500" placeholder="+52 123 456 7890" />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Method</label>
-          <select value={newBenMethod} onChange={e => setNewBenMethod(e.target.value)} className="w-full text-sm rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500">
-            <option value="bank_rtp">Bank Deposit</option>
-            <option value="visa_direct">Debit Card (Push)</option>
-            <option value="retail_voucher">Retail Voucher (Phone Only)</option>
-          </select>
-        </div>
+        {!voucherOnly && (
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Delivery Method</label>
+            <select value={newBenMethod} onChange={e => setNewBenMethod(e.target.value)} className="w-full text-sm rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500">
+              <option value="bank_rtp">Bank Deposit</option>
+              <option value="visa_direct">Debit Card (Push)</option>
+              <option value="retail_voucher">Retail Voucher (Phone Only)</option>
+            </select>
+          </div>
+        )}
         
         {newBenMethod === 'visa_direct' ? (
           <>

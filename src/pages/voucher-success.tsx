@@ -106,8 +106,8 @@ export default function VoucherSuccess() {
                 <div style={{ background: 'white', borderRadius: '16px', padding: '24px', marginBottom: '20px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
                     {[
                         ['You paid', `$${parseFloat(total || amountUsd || '0').toFixed(2)} USD`],
-                        ['Payment method', paymentMethod === 'ach' ? '🏦 Bank Transfer (ACH/RTP)' : paymentMethod === 'zelle' ? '💚 Zelle' : '💳 Card'],
-                        paymentMethod === 'card' ? ['Card issuer fee', `$${(parseFloat(total||'0') - parseFloat(amountUsd||'0')).toFixed(2)} — Visa/Mastercard/Amex (not Symmetri)`] : null,
+                        ['Payment method', paymentMethod === 'ach' || (typeof paymentMethod === 'string' && paymentMethod.includes('rtp')) ? '🏦 Bank Transfer (ACH/RTP)' : paymentMethod === 'zelle' ? '💚 Zelle' : '💳 Card'],
+                        (typeof paymentMethod === 'string' && paymentMethod.includes('card')) ? ['Card issuer fee', `$${(parseFloat(total as string || '0') - parseFloat(amountUsd as string || '0')).toFixed(2)} — Visa/Mastercard/Amex (not Symmetri)`] : null,
                         ['Symmetri fee', '✦ $0.00 — None'],
                         ['Valid until', expiryDate],
                     ].filter(Boolean).map(([label, value]) => (

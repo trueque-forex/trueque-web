@@ -37,6 +37,15 @@ export default function TransactionSummary({
   stepNumber,
   hideHeader = false,
 }: TransactionSummaryProps) {
+  const isFeeZero = (fee: string | undefined) => !fee || parseFloat(fee) === 0;
+
+  const showSymmetriFee = !isFeeZero(symmetriFee);
+  const showInboundFee = !isFeeZero(inboundFee);
+  const showOutboundFee = !isFeeZero(outboundFee);
+  const validAdditionalFees = additionalFees?.filter(f => !isFeeZero(f.amount)) || [];
+  
+  const showAnyFees = showSymmetriFee || showInboundFee || showOutboundFee || validAdditionalFees.length > 0;
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
       {!hideHeader && (
@@ -62,39 +71,55 @@ export default function TransactionSummary({
           <div><span className="text-gray-500">Funding Method</span><br /><strong className="text-gray-900">{fundingMethodName || '-'}</strong></div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
-          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Fee Breakdown</h4>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Symmetri Platform Fee (1.5%)</span>
-            <span className="font-medium text-gray-900">${symmetriFee}</span>
+        {showAnyFees && (
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Fee Breakdown</h4>
+            {showSymmetriFee && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Symmetri Platform Fee (1.5%)</span>
+                <span className="font-medium text-gray-900">${symmetriFee}</span>
+              </div>
+            )}
+            {showInboundFee && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Funding Method Fee</span>
+                <span className="font-medium text-gray-900">${inboundFee}</span>
+              </div>
+            )}
+            {showOutboundFee && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Outbound Delivery</span>
+                <span className="font-medium text-gray-900">${outboundFee}</span>
+              </div>
+            )}
+            {validAdditionalFees.map((fee, idx) => (
+              <div key={idx} className="flex justify-between text-sm">
+                <span className="text-gray-600">{fee.label}</span>
+                <span className="font-medium text-gray-900">${fee.amount}</span>
+              </div>
+            ))}
+            <div className="flex justify-between text-sm font-bold border-t pt-2 mt-2">
+              <span className="text-gray-900">Total Fees</span>
+              <span className="text-gray-900">${totalFees}</span>
+            </div>
           </div>
-          {inboundFee !== undefined && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Funding Method Fee</span>
-              <span className="font-medium text-gray-900">${inboundFee}</span>
+        )}
+
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex flex-col justify-center">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-bold text-blue-900">Effective Exchange Rate</span>
+            <span className="text-lg font-black text-blue-900">
+              1 {sourceCurrency} = {effectiveRate} {targetCurrency}
+            </span>
+          </div>
+          {parseFloat(amount) > 0 && parseFloat(totalFees) > 0 && (
+            <div className="flex justify-between items-center mt-1 text-xs text-blue-700/80">
+              <span>Total Cost Increase</span>
+              <span className="font-semibold text-blue-800 bg-blue-100/50 px-2 py-0.5 rounded">
+                + {((parseFloat(totalFees) / parseFloat(amount)) * 100).toFixed(2)}% from mid-market
+              </span>
             </div>
           )}
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Outbound Delivery</span>
-            <span className="font-medium text-gray-900">${outboundFee}</span>
-          </div>
-          {additionalFees && additionalFees.map((fee, idx) => (
-            <div key={idx} className="flex justify-between text-sm">
-              <span className="text-gray-600">{fee.label}</span>
-              <span className="font-medium text-gray-900">${fee.amount}</span>
-            </div>
-          ))}
-          <div className="flex justify-between text-sm font-bold border-t pt-2 mt-2">
-            <span className="text-gray-900">Total Fees</span>
-            <span className="text-gray-900">${totalFees}</span>
-          </div>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex justify-between items-center">
-          <span className="text-sm font-bold text-blue-900">Effective Exchange Rate</span>
-          <span className="text-lg font-black text-blue-900">
-            1 {sourceCurrency} = {effectiveRate} {targetCurrency}
-          </span>
         </div>
       </div>
     </div>

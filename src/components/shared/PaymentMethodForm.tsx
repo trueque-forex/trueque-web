@@ -21,6 +21,7 @@ export interface PaymentData {
 interface PaymentMethodFormProps {
   gateways: PaymentGateway[];
   selectedMethodId?: string | null;
+  initialData?: PaymentData | null;
   onMethodSelect: (methodId: string) => void;
   onDataChange: (isValid: boolean, data: PaymentData) => void;
 }
@@ -28,17 +29,18 @@ interface PaymentMethodFormProps {
 export default function PaymentMethodForm({
   gateways,
   selectedMethodId,
+  initialData,
   onMethodSelect,
   onDataChange,
 }: PaymentMethodFormProps) {
-  const [accountHolderName, setAccountHolderName] = useState('');
+  const [accountHolderName, setAccountHolderName] = useState(initialData?.accountHolderName || '');
   
   // Bank fields
-  const [routingNumber, setRoutingNumber] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
+  const [routingNumber, setRoutingNumber] = useState(initialData?.routingNumber || '');
+  const [accountNumber, setAccountNumber] = useState(initialData?.accountNumber || '');
   
   // Mock Adyen Card State
-  const [isCardVerified, setIsCardVerified] = useState(false);
+  const [isCardVerified, setIsCardVerified] = useState(!!initialData?.token);
   
   useEffect(() => {
     // Validate based on method type
@@ -51,6 +53,11 @@ export default function PaymentMethodForm({
       if (isValid) {
         data.token = "adyen_tok_" + Math.random().toString(36).substring(7);
         data.maskedNumber = "1234";
+      }
+    } else if (selectedMethodId === 'zelle') {
+      isValid = accountHolderName.length > 0 && routingNumber.length > 0;
+      if (isValid) {
+        data.routingNumber = routingNumber;
       }
     } else {
       // For banks, we need routing and account
@@ -156,6 +163,21 @@ export default function PaymentMethodForm({
                     <p className="text-xs text-blue-900 leading-relaxed">
                       <strong>Auth without Capture:</strong> Your card is securely verified and tokenized. You will <strong>not be charged</strong> until another user accepts your offer.
                     </p>
+                  </div>
+                </div>
+              ) : method.id === 'zelle' ? (
+                <div className="flex space-x-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Zelle Email or Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      value={routingNumber}
+                      onChange={(e) => setRoutingNumber(e.target.value)}
+                      className="w-full text-sm rounded-lg border-gray-300 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="user@example.com"
+                    />
                   </div>
                 </div>
               ) : (

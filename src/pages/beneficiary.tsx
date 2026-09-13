@@ -178,10 +178,10 @@ export default function BeneficiaryPage() {
 
     // Otherwise, if we have saved beneficiaries, prefer selection
     // Ignoring contextForm.personal.firstName allows us to show the list even if a draft exists
-    if (savedBeneficiaries.length > 0) {
+    if (savedBeneficiaries.length > 0 && !router.query.new) {
       setViewMode('selection');
     }
-  }, [savedBeneficiaries.length, router.query.beneficiaryId]); // Explicit dependencies
+  }, [savedBeneficiaries.length, router.query.beneficiaryId, router.query.new]); // Explicit dependencies
 
   // Handlers
   const handlePersonalChange = (field: keyof typeof contextForm.personal, value: string) => {

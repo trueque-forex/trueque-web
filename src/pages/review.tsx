@@ -561,7 +561,7 @@ export default function ReviewPage() {
                  { id: 'card', label: 'Debit / Credit Card', pct: 0.029, fixed: 0.30 },
                  { id: 'zelle', label: 'Zelle', pct: 0, fixed: 0 }
                ]}
-               selectedMethodId={useNewMethod ? (paymentData?.methodId || 'card') : null}
+               selectedMethodId={useNewMethod ? (paymentData?.methodId || null) : null}
                onMethodSelect={(id) => {
                  setUseNewMethod(true);
                  if (paymentData) {
@@ -629,11 +629,10 @@ export default function ReviewPage() {
             <div style={{ display: 'flex', gap: '15px', marginTop: '30px' }}>
               <button
                 onClick={() => {
-                  if (effectiveBeneficiary?.id) {
-                    router.push(`/beneficiary?beneficiaryId=${effectiveBeneficiary.id}`);
-                  } else {
-                    router.back();
-                  }
+                  router.push({
+                    pathname: '/beneficiary-selection',
+                    query: router.query
+                  });
                 }}
                 style={{
                   flex: 1, padding: '14px', borderRadius: '10px',
