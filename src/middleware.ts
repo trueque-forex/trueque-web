@@ -68,9 +68,12 @@ export async function middleware(req: NextRequest) {
     const hasCookie = req.cookies.has('symmetri_investor_access');
 
     // If they have the correct secret link, set the cookie and redirect to clean URL
-    if (accessCode === 'Vamos2026' || accessCode === 'Lattitude2026' || accessCode === 'Leap2026' || accessCode === 'Hustle2026') {
+    if (accessCode === 'Vamos2026' || accessCode === 'Lattitude2026' || accessCode === 'Leap2026' || accessCode === 'Hustle2026' || accessCode === 'Magma2026') {
       const url = req.nextUrl.clone();
       url.searchParams.delete('access');
+      if (url.pathname === '/') {
+        url.pathname = '/signin';
+      }
       const response = NextResponse.redirect(url);
       response.cookies.set('symmetri_investor_access', 'true', {
         path: '/',
@@ -82,8 +85,9 @@ export async function middleware(req: NextRequest) {
       return response;
     }
 
-    // If no cookie is present, show a completely blank 404
-    if (!hasCookie) {
+    // If no cookie is present, show a completely blank 404 (except for marketing pages)
+    const MARKETING_PATHS = ['/', '/about', '/partners', '/faq', '/legal/privacy', '/legal/terms', '/social-card'];
+    if (!hasCookie && !MARKETING_PATHS.includes(pathname)) {
       return new NextResponse('Coming Soon', { status: 404 });
     }
   }
