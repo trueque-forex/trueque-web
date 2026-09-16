@@ -4,7 +4,6 @@ import type { NextApiRequest, NextApiResponse } from 'next';
  * POST /api/auth/verify-mfa
  * Verifies a 6-digit MFA code submitted during a transaction.
  *
- * In APP_ENV=test: accepts '123456' as a universal bypass for automated testing.
  * In production: validates against the stored OTP (Twilio Verify or equivalent).
  *               Returns 501 if the SMS/OTP provider is not yet configured.
  */
@@ -19,14 +18,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const isDevOrTest = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
-
-        // ── TEST BYPASS ──────────────────────────────────────────────────────
-        // Temporarily allowed in production for testing until Twilio is connected
-        if (code === '123456' || code === (global as any).__DEV_MFA_CODE) {
-            console.log('[MFA] Test bypass used (Allowed globally for testing)');
-            return res.status(200).json({ ok: true, verified: true });
-        }
-        // ── END TEST BYPASS ──────────────────────────────────────────────────
 
         // ── PRODUCTION VERIFICATION ──────────────────────────────────────────
         // TODO: Integrate Twilio Verify or equivalent OTP provider here.
