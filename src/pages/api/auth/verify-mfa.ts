@@ -18,10 +18,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // ── STRICT DEMO BYPASS ────────────────────────────────────────────────
-        const DEMO_EMAIL = process.env.DEMO_USER_EMAIL || 'demo@symmetri.org';
+        const rawDemoEmails = process.env.DEMO_USER_EMAIL || 'demo@symmetri.org';
+        const demoEmails = rawDemoEmails.split(',').map(e => e.trim().toLowerCase());
         const isDemoMode = process.env.DEMO_MODE === 'true';
         
-        if (isDemoMode && email === DEMO_EMAIL && code === '123456') {
+        if (isDemoMode && email && demoEmails.includes(email.toLowerCase()) && code === '123456') {
             console.log(`[MFA] Secure Demo Bypass triggered for authorized demo account: ${email}`);
             return res.status(200).json({ ok: true, verified: true });
         }
