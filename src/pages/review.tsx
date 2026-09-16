@@ -499,10 +499,11 @@ export default function ReviewPage() {
   const handleVerifyMFA = async () => {
     const fullCode = mfaCode.join('');
     try {
+      const s = JSON.parse(localStorage.getItem('trueque_session') || '{}');
       const res = await fetch('/api/auth/verify-mfa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: fullCode }),
+        body: JSON.stringify({ code: fullCode, email: s.email }),
       });
       const data = await res.json();
       if (data.ok && data.verified) {

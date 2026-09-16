@@ -11,13 +11,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method !== 'POST') return res.status(405).end();
 
     try {
-        const { code, mfa_token } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+        const { code, mfa_token, email } = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
         if (!code || code.length !== 6) {
             return res.status(400).json({ ok: false, error: 'invalid_code_format' });
         }
 
-        const isDevOrTest = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
+        // ── STRICT DEMO BYPASS ────────────────────────────────────────────────
+        const DEMO_EMAIL = process.env.DEMO_USER_EMAIL || 'demo@symmetri.org';
+        const isDemoMode = process.env.DEMO_MODE === 'true';
+        
+        if (isDemoMode && email === DEMO_EMAIL && code === '123456') {
+            console.log(`[MFA] Secure Demo Bypass triggered for authorized demo account: ${email}`);
+            return res.status(200).json({ ok: true, verified: true });
+        }
+        // ── END STRICT DEMO BYPASS ────────────────────────────────────────────
 
         // ── PRODUCTION VERIFICATION ──────────────────────────────────────────
         // TODO: Integrate Twilio Verify or equivalent OTP provider here.
