@@ -34,7 +34,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         // 3. Call Python Backend
         let finalTxId = `TX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
         try {
-            const pythonRes = await fetch('http://127.0.0.1:8000/api/offers/create', {
+            const FASTAPI_BASE = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
+            const pythonRes = await fetch(`${FASTAPI_BASE}/api/offers/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(pythonPayload)

@@ -56,9 +56,10 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         beneficiary_id: null
     };
 
+    const FASTAPI_BASE = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
     // 3. Proxy to FastAPI
     try {
-        const fastApiRes = await fetch('http://127.0.0.1:8000/api/transactions/voucher', {
+        const fastApiRes = await fetch(`${FASTAPI_BASE}/api/transactions/voucher`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

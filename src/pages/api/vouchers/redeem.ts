@@ -32,7 +32,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
             merchant_id: session.user.id
         };
 
-        const fastApiRes = await fetch('http://127.0.0.1:8000/api/merchants/redeem', {
+        const FASTAPI_BASE = process.env.FASTAPI_URL || 'http://127.0.0.1:8000';
+        const fastApiRes = await fetch(`${FASTAPI_BASE}/api/merchants/redeem`, {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
