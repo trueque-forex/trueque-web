@@ -12,6 +12,7 @@ import logging
 import traceback
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # ── Routers with self-defined prefix (do NOT add prefix here) ─────────────────
@@ -56,6 +57,19 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+)
+
+# ── CORS Middleware ───────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://symmetri.org",
+        "https://www.symmetri.org"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # ── Request logging middleware ────────────────────────────────────────────────
