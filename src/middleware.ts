@@ -68,7 +68,7 @@ export async function middleware(req: NextRequest) {
     const hasCookie = req.cookies.has('symmetri_investor_access');
 
     // If they have the correct secret link, set the cookie and redirect to clean URL
-    if (accessCode === 'Kaszek2026' || accessCode === 'Vamos2026' || accessCode === 'Lattitude2026' || accessCode === 'Leap2026' || accessCode === 'Hustle2026' || accessCode === 'Magma2026') {
+    if (accessCode === 'Kapor2026' || accessCode === 'Kaszek2026' || accessCode === 'Vamos2026' || accessCode === 'Lattitude2026' || accessCode === 'Leap2026' || accessCode === 'Hustle2026' || accessCode === 'Magma2026') {
       const url = req.nextUrl.clone();
       url.searchParams.delete('access');
       if (url.pathname === '/') {
